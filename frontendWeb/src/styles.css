@@ -1,0 +1,79 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sora", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ge7-gold: #c9a227;
+  --color-ge7-gold-light: #f3d27a;
+  --color-ge7-gold-soft: #f8ecc7;
+  --color-ge7-bronze: #8a6a1c;
+  --color-ge7-purple: #6a3fd1;
+  --color-ge7-purple-light: #9b6dff;
+  --color-ge7-purple-soft: #ece4ff;
+  --color-ge7-black: #151515;
+  --color-ge7-charcoal: #1f1f22;
+  --color-ge7-graphite: #2b2b30;
+  --color-ge7-cream: #faf7f0;
+  --color-ge7-pearl: #f2eee4;
+
+  --shadow-soft: 0 10px 30px -12px rgb(21 21 21 / 0.18);
+  --shadow-gold: 0 10px 24px -10px rgb(201 162 39 / 0.55);
+  --shadow-purple: 0 10px 24px -10px rgb(106 63 209 / 0.5);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-ge7-cream text-ge7-black font-sans;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+  input, select, textarea {
+    @apply bg-white;
+  }
+  input:focus, select:focus, textarea:focus {
+    @apply outline-none ring-2 ring-ge7-gold/50 border-ge7-gold;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ge7-bronze/40;
+  }
+}
+
+@layer components {
+  .ge7-input {
+    @apply w-full rounded-xl border border-ge7-black/10 bg-white px-3.5 py-2.5 text-sm placeholder:text-ge7-black/40 transition;
+  }
+  .ge7-label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ge7-black/60;
+  }
+  .ge7-gold-text {
+    background: linear-gradient(120deg, #8a6a1c, #c9a227 50%, #f3d27a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+.leaflet-container {
+  @apply rounded-2xl;
+  font-family: inherit;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}
