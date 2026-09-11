@@ -1,4 +1,4 @@
-import { ShoppingCart, Package, Settings, Warehouse, type LucideIcon } from "lucide-react";
+import { ShoppingCart, Package, Settings, Warehouse, LayoutDashboard, type LucideIcon } from "lucide-react";
 import type { Role } from "@/types";
 
 export interface NavItem {
@@ -26,14 +26,14 @@ const ADMIN_DIR: Role[] = ["ADMIN", "DIRECTION"];
  * Les rôles CLIENT et CHAUFFEUR n'ont aucun accès Web (application mobile).
  */
 export const NAVIGATION: NavGroup[] = [
-  /*{
+  {
     title: "Pilotage",
     items: [
       { label: "Tableau de bord", to: "/dashboard", icon: LayoutDashboard, roles: ADMIN_DIR },
-      { label: "Rapports", to: "/rapports", icon: BarChart3, roles: ADMIN_DIR },
+      /*{ label: "Rapports", to: "/rapports", icon: BarChart3, roles: ADMIN_DIR },
       { label: "Notifications", to: "/notifications", icon: Bell, roles: ADMIN_DIR },
-    ],
-  },*/
+    */],
+  },
   {
     title: "Gestion",
     items: [

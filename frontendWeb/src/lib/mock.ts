@@ -88,7 +88,7 @@ const taxes: Tax[] = [
 
 const users: User[] = [
   { id: 1, name: "Super Admin G7", email: "superadmin@g7energy.com", code: "40000004", role: "SUPERADMIN", permissions: [], is_admin: true },
-  { id: 2, name: "Admin G7", email: "admin@g7energy.com", code: "10000001", role: "ADMIN", permissions: [], is_admin: true },
+  { id: 2, name: "ag_logistique", email: "ag_logistique@g7energy.com", code: "10000001", role: "ADMIN", permissions: [], is_admin: true },
   { id: 3, name: "Caissier G7", email: "caisse@g7energy.com", code: "20000002", role: "CAISSIER", permissions: [], is_admin: false },
   { id: 4, name: "Direction G7", email: "direction@g7energy.com", code: "30000003", role: "DIRECTION", permissions: [], is_admin: false },
 ];
