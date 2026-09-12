@@ -18,7 +18,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://admin-ge7g.com', 'http://admin-ge7g.com', 'http://localhost:5173', 'http://localhost:3000'],
+    'allowed_origins' => ['https://admin-ge7g.com', 'http://admin-ge7g.com', 'https://www.admin-ge7g.com', 'http://www.admin-ge7g.com', 'http://localhost:5173', 'http://localhost:3000'],
 
     'allowed_origins_patterns' => [],
 
