@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -14,13 +13,14 @@ import { Link } from "react-router-dom";
 import { getOne, toApiError } from "@/lib/api";
 import type { DashboardStats, SalesSeriesPoint } from "@/types";
 import { money, relative } from "@/lib/format";
-import { Card, CardHeader, ErrorState, KpiCard, Loading, PageHeader, Select } from "@/components/ui";
+import { Card, CardHeader, ErrorState, KpiCard, Loading, PageHeader } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["dashboard"],
@@ -28,12 +28,10 @@ export function DashboardPage() {
     refetchInterval: 120_000,
   });
 
-  const { data: salesSeries, isLoading: salesLoading } = useQuery({
+  const { data: salesSeries } = useQuery({
     queryKey: ["sales-series", year, month],
     queryFn: () => getOne<SalesSeriesPoint[]>(`/dashboard/sales-series?year=${year}&month=${month}`),
   });
-
-  const seriesData = salesSeries ?? data?.sales_series ?? [];
 
   if (isLoading) return <Loading />;
   if (error || !data) return <ErrorState message={toApiError(error).message} onRetry={() => void refetch()} />;
@@ -63,22 +61,9 @@ export function DashboardPage() {
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader title="Ventes caisse sur la période" subtitle="Chiffre d'affaires et volume des ventes en caisse" />
-          <div className="mb-4 flex flex-wrap items-end gap-3 px-6 pt-2">
-            <Select label="Année" value={year} onChange={(e) => setYear(Number(e.target.value))} className="w-28">
-              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </Select>
-            <Select label="Mois" value={month} onChange={(e) => setMonth(Number(e.target.value))} className="w-24">
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>{m.toString().padStart(2, "0")}</option>
-              ))}
-            </Select>
-            {salesLoading && <span className="text-xs text-ge7-black/50">Chargement…</span>}
-          </div>
           <div className="h-72">
             <ResponsiveContainer>
-              <AreaChart data={seriesData}>
+              <AreaChart data={salesSeries ?? data.sales_series}>
                 <defs>
                   <linearGradient id="gold" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stopColor="#c9a227" stopOpacity={0.5} />

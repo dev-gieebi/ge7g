@@ -6,6 +6,7 @@ use App\Models\Tax;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 
 class TaxController extends Controller
 {
@@ -28,6 +29,15 @@ class TaxController extends Controller
     {
         $this->authorizeUser($request, self::VIEW_ROLES);
 
+        if (! $request->hasAny(['search', 'sort', 'dir', 'per_page'])) {
+            return Cache::remember('taxes.index', 300, fn () => $this->buildIndex($request));
+        }
+
+        return $this->buildIndex($request);
+    }
+
+    private function buildIndex(Request $request): JsonResponse
+    {
         $query = Tax::query();
 
         if ($search = $request->input('search')) {
@@ -86,6 +96,8 @@ class TaxController extends Controller
             'is_default' => $isDefault,
         ]);
 
+        Cache::forget('taxes.index');
+
         return response()->json(['data' => $tax], 201);
     }
 
@@ -122,6 +134,8 @@ class TaxController extends Controller
             'is_default' => $isDefault,
         ]);
 
+        Cache::forget('taxes.index');
+
         return response()->json(['data' => $tax]);
     }
 
@@ -130,6 +144,8 @@ class TaxController extends Controller
         $this->authorizeUser($request);
 
         $tax->delete();
+
+        Cache::forget('taxes.index');
 
         return response()->noContent();
     }

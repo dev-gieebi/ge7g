@@ -83,7 +83,7 @@ class PosController extends Controller
     {
         $this->authorizeUser($request);
 
-        $query = PosSale::query()->with(['cashier', 'items.product']);
+        $query = PosSale::query()->with(['cashier', 'items.product.unit']);
 
         if ($request->has('payment_method') && $request->input('payment_method') !== '') {
             $query->where('payment_method', $request->input('payment_method'));
@@ -239,15 +239,11 @@ class PosController extends Controller
 
     private function g7gPrices(array|\Illuminate\Support\Collection $productIds): \Illuminate\Support\Collection
     {
-        $forPos = Price::whereIn('product_id', $productIds)->where('for_pos', true)->get()->keyBy('product_id');
-        $missing = collect($productIds)->diff($forPos->keys())->values();
-
-        if ($missing->isEmpty()) {
-            return $forPos;
-        }
-
-        $fallback = Price::whereIn('product_id', $missing)->whereNull('zone_id')->get()->keyBy('product_id');
-
-        return $forPos->merge($fallback);
+        return Price::whereIn('product_id', $productIds)
+            ->where(fn ($q) => $q->where('for_pos', true)->orWhereNull('zone_id'))
+            ->get()
+            ->sortByDesc(fn ($p) => (int) $p->for_pos)
+            ->unique('product_id')
+            ->keyBy('product_id');
     }
 }

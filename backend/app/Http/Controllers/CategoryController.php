@@ -6,6 +6,7 @@ use App\Models\Category;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -29,6 +30,15 @@ class CategoryController extends Controller
     {
         $this->authorizeUser($request);
 
+        if (! $request->hasAny(['search', 'with_trashed', 'sort', 'dir', 'per_page'])) {
+            return Cache::remember('categories.index', 300, fn () => $this->buildIndex($request));
+        }
+
+        return $this->buildIndex($request);
+    }
+
+    private function buildIndex(Request $request): JsonResponse
+    {
         $query = Category::query();
 
         if ($request->boolean('with_trashed')) {
@@ -82,6 +92,8 @@ class CategoryController extends Controller
             'parent_id' => $validated['parent_id'] ?? null,
         ]);
 
+        Cache::forget('categories.index');
+
         return response()->json(['data' => $category], 201);
     }
 
@@ -109,6 +121,8 @@ class CategoryController extends Controller
             'parent_id' => $validated['parent_id'] ?? $category->parent_id,
         ]);
 
+        Cache::forget('categories.index');
+
         return response()->json(['data' => $category]);
     }
 
@@ -117,6 +131,8 @@ class CategoryController extends Controller
         $this->authorizeUser($request);
 
         $category->delete();
+
+        Cache::forget('categories.index');
 
         return response()->noContent();
     }

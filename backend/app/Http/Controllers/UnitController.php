@@ -6,6 +6,7 @@ use App\Models\Unit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -29,6 +30,15 @@ class UnitController extends Controller
     {
         $this->authorizeUser($request);
 
+        if (! $request->hasAny(['search', 'with_trashed', 'sort', 'dir', 'per_page'])) {
+            return Cache::remember('units.index', 300, fn () => $this->buildIndex($request));
+        }
+
+        return $this->buildIndex($request);
+    }
+
+    private function buildIndex(Request $request): JsonResponse
+    {
         $query = Unit::query();
 
         if ($request->boolean('with_trashed')) {
@@ -76,6 +86,8 @@ class UnitController extends Controller
 
         $unit = Unit::create($validated);
 
+        Cache::forget('units.index');
+
         return response()->json(['data' => $unit], 201);
     }
 
@@ -97,6 +109,8 @@ class UnitController extends Controller
 
         $unit->update($validated);
 
+        Cache::forget('units.index');
+
         return response()->json(['data' => $unit]);
     }
 
@@ -105,6 +119,8 @@ class UnitController extends Controller
         $this->authorizeUser($request);
 
         $unit->delete();
+
+        Cache::forget('units.index');
 
         return response()->noContent();
     }

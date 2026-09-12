@@ -6,6 +6,7 @@ use App\Models\Zone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 
 class ZoneController extends Controller
@@ -28,6 +29,15 @@ class ZoneController extends Controller
     {
         $this->authorizeUser($request);
 
+        if (! $request->hasAny(['search', 'sort', 'dir', 'per_page'])) {
+            return Cache::remember('zones.index', 300, fn () => $this->buildIndex($request));
+        }
+
+        return $this->buildIndex($request);
+    }
+
+    private function buildIndex(Request $request): JsonResponse
+    {
         $query = Zone::query();
 
         if ($search = $request->input('search')) {
@@ -71,6 +81,8 @@ class ZoneController extends Controller
 
         $zone = Zone::create($validated);
 
+        Cache::forget('zones.index');
+
         return response()->json(['data' => $zone], 201);
     }
 
@@ -92,6 +104,8 @@ class ZoneController extends Controller
 
         $zone->update($validated);
 
+        Cache::forget('zones.index');
+
         return response()->json(['data' => $zone]);
     }
 
@@ -100,6 +114,8 @@ class ZoneController extends Controller
         $this->authorizeUser($request);
 
         $zone->delete();
+
+        Cache::forget('zones.index');
 
         return response()->noContent();
     }
