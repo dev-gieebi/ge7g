@@ -9,8 +9,8 @@ use Illuminate\Http\Response;
 
 class TaxController extends Controller
 {
-    private const MANAGE_ROLES = ['ADMIN', 'DIRECTION', 'SUPERADMIN'];
-    private const VIEW_ROLES = ['ADMIN', 'DIRECTION', 'SUPERADMIN', 'CAISSIER'];
+    private const MANAGE_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN'];
+    private const VIEW_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN', 'CAISSIER'];
 
     private function authorizeUser(Request $request, array $roles = self::MANAGE_ROLES): \App\Models\User
     {

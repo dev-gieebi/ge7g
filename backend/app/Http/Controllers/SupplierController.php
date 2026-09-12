@@ -9,7 +9,7 @@ use Illuminate\Http\Response;
 
 class SupplierController extends Controller
 {
-    private const MANAGE_ROLES = ['ADMIN', 'DIRECTION', 'SUPERADMIN'];
+    private const MANAGE_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN'];
 
     private function authorizeUser(Request $request): \App\Models\User
     {

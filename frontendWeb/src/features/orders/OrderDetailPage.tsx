@@ -14,7 +14,7 @@ const KEYS = ["order", "orders", "products", "dashboard", "logistics", "missions
 export function OrderDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
-  const isAdmin = hasRole(user, "ADMIN", "DIRECTION");
+  const isAdmin = hasRole(user, "AG_LOGISTIQUE", "DIRECTION");
   const order = useOne<Order>("order", id ? `/orders/${id}` : null);
   const { data: drivers } = useDriversRef();
   const { data: vehicles } = useVehiclesRef();

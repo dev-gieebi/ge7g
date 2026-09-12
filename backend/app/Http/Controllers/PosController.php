@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
 
 class PosController extends Controller
 {
-    private const POS_ROLES = ['ADMIN', 'DIRECTION', 'SUPERADMIN', 'CAISSIER'];
+    private const POS_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN', 'CAISSIER'];
 
     private function authorizeUser(Request $request): \App\Models\User
     {

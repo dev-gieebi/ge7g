@@ -11,7 +11,7 @@ use Illuminate\Validation\Rule;
 
 class CategoryController extends Controller
 {
-    private const MANAGE_ROLES = ['ADMIN', 'DIRECTION', 'SUPERADMIN'];
+    private const MANAGE_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN'];
 
     private function authorizeUser(Request $request): \App\Models\User
     {

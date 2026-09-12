@@ -16,14 +16,16 @@ const TABS: { key: Tab; label: string; icon: typeof Percent }[] = [
 ];
 
 export function SettingsPage() {
-  const [tab, setTab] = useState<Tab>("taxes");
   const { user } = useAuth();
+  const isSuperAdmin = user?.role === "SUPERADMIN";
+  const availableTabs = TABS.filter((t) => t.key !== "users" || isSuperAdmin);
+  const [tab, setTab] = useState<Tab>(availableTabs[0]?.key ?? "taxes");
   return (
     <>
       <ModuleTabs tabs={SYSTEME_TABS} />
       <PageHeader title="Paramètres" subtitle="Configuration fiscale, zones géographiques et comptes utilisateurs." breadcrumb="Système" />
       <div className="mb-6 flex flex-wrap gap-2">
-        {TABS.map((t) => (
+        {availableTabs.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${tab === t.key ? "bg-ge7-black text-ge7-gold-light" : "bg-white text-ge7-black/70 hover:bg-ge7-gold-soft/50"}`}><t.icon size={15} /> {t.label}</button>
         ))}
       </div>
@@ -69,7 +71,7 @@ export function SettingsPage() {
             { key: "code", header: "Code", render: (u) => <span className="font-mono text-xs font-semibold">{u.code}</span> },
             { key: "name", header: "Nom", render: (u) => <span className="font-semibold">{u.name}</span> },
             { key: "email", header: "Email", render: (u) => u.email },
-            { key: "role", header: "Rôle", render: (u) => <Badge tone={u.role === "SUPERADMIN" ? "dark" : u.role === "ADMIN" ? "dark" : u.role === "CAISSIER" ? "gold" : "purple"}>{ROLE_LABELS[u.role]}</Badge> },
+            { key: "role", header: "Rôle", render: (u) => <Badge tone={u.role === "SUPERADMIN" ? "dark" : u.role === "AG_LOGISTIQUE" ? "dark" : u.role === "CAISSIER" ? "gold" : "purple"}>{ROLE_LABELS[u.role]}</Badge> },
           ]}
           fields={[
             { name: "name", label: "Nom", required: true, span: 2 },

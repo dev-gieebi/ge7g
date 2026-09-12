@@ -13,7 +13,7 @@ const KEYS = ["mission", "missions", "orders", "order", "logistics", "dashboard"
 export function MissionDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
-  const canAct = hasRole(user, "ADMIN", "DIRECTION");
+  const canAct = hasRole(user, "AG_LOGISTIQUE", "DIRECTION");
   const mission = useOne<Mission>("mission", id ? `/missions/${id}` : null);
 
   const depart = useAction(() => `/missions/${id}/depart`, { keys: KEYS, success: "Départ enregistré" });

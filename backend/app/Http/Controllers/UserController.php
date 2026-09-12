@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    private const MANAGE_ROLES = ['ADMIN', 'DIRECTION', 'SUPERADMIN'];
+    private const MANAGE_ROLES = ['SUPERADMIN'];
 
     private function authorizeUser(Request $request): User
     {
@@ -68,7 +68,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email',
-            'role' => 'required|string|in:ADMIN,CAISSIER,DIRECTION,SUPERADMIN',
+            'role' => 'required|string|in:AG_LOGISTIQUE,CAISSIER,DIRECTION,SUPERADMIN',
         ]);
 
         $code = $this->generateUniqueCode();
@@ -80,7 +80,7 @@ class UserController extends Controller
             'role' => $validated['role'],
             'password' => 'Password123',
             'permissions' => [],
-            'is_admin' => in_array($validated['role'], ['ADMIN', 'SUPERADMIN'], true),
+            'is_admin' => in_array($validated['role'], ['AG_LOGISTIQUE', 'SUPERADMIN'], true),
         ]);
 
         return response()->json(['data' => $user], 201);
@@ -100,7 +100,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'role' => 'required|string|in:ADMIN,CAISSIER,DIRECTION,SUPERADMIN',
+            'role' => 'required|string|in:AG_LOGISTIQUE,CAISSIER,DIRECTION,SUPERADMIN',
             'permissions' => 'sometimes|array',
         ]);
 
@@ -109,7 +109,7 @@ class UserController extends Controller
             'email' => $validated['email'],
             'role' => $validated['role'],
             'permissions' => $validated['permissions'] ?? $user->permissions,
-            'is_admin' => in_array($validated['role'], ['ADMIN', 'SUPERADMIN'], true),
+            'is_admin' => in_array($validated['role'], ['AG_LOGISTIQUE', 'SUPERADMIN'], true),
         ]);
 
         return response()->json(['data' => $user]);

@@ -1,30 +1,39 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   Banknote,
-  Clock,
   CreditCard,
-  PackageCheck,
+  Package,
   PackageX,
   ShoppingCart,
-  Truck,
   Wallet,
 } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link } from "react-router-dom";
 import { getOne, toApiError } from "@/lib/api";
-import type { DashboardStats } from "@/types";
+import type { DashboardStats, SalesSeriesPoint } from "@/types";
 import { money, relative } from "@/lib/format";
-import { Card, CardHeader, ErrorState, KpiCard, Loading, PageHeader } from "@/components/ui";
+import { Card, CardHeader, ErrorState, KpiCard, Loading, PageHeader, Select } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => getOne<DashboardStats>("/dashboard"),
     refetchInterval: 120_000,
   });
+
+  const { data: salesSeries, isLoading: salesLoading } = useQuery({
+    queryKey: ["sales-series", year, month],
+    queryFn: () => getOne<SalesSeriesPoint[]>(`/dashboard/sales-series?year=${year}&month=${month}`),
+  });
+
+  const seriesData = salesSeries ?? data?.sales_series ?? [];
 
   if (isLoading) return <Loading />;
   if (error || !data) return <ErrorState message={toApiError(error).message} onRetry={() => void refetch()} />;
@@ -32,17 +41,20 @@ export function DashboardPage() {
   return (
     <>
       <PageHeader
-        title={`Bonjour, ${user?.name.split(" ")[0]}`}
+        title={`Bonjour, ${user?.name ?? ""}`}
         subtitle="Vue d'ensemble de l'activité G-ENERGY 7 GROUPE."
         breadcrumb="Pilotage"
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Chiffre d'affaires" value={money(data.revenue)} trend={data.revenue_trend} hint="vs période précédente" icon={Banknote} tone="gold" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {/*<KpiCard label="Chiffre d'affaires" value={money(data.revenue)} trend={data.revenue_trend} hint="vs période précédente" icon={Banknote} tone="gold" />
         <KpiCard label="Commandes" value={data.orders_count} icon={ShoppingCart} tone="purple" to="/commandes" />
+        <KpiCard label="Ventes en ligne" value={money(data.online_sales)} icon={Globe} tone="purple" to="/commandes" />
         <KpiCard label="En attente de validation" value={data.pending_orders} icon={Clock} tone="dark" to="/commandes?status=EN_ATTENTE" />
         <KpiCard label="Livraisons en cours" value={data.deliveries_in_progress} icon={Truck} tone="purple" to="/missions" />
-        <KpiCard label="Livraisons terminées" value={data.deliveries_completed} icon={PackageCheck} tone="green" to="/livraisons" />
+        <KpiCard label="Livraisons terminées" value={data.deliveries_completed} icon={PackageCheck} tone="green" to="/livraisons" />*/}
+        <KpiCard label="Produits" value={data.products_count} icon={Package} tone="dark" to="/produits" />
+        <KpiCard label="Produits vendus aujourd'hui" value={data.products_sold_today} icon={ShoppingCart} tone="purple" to="/caisse/ventes" />
         <KpiCard label="Stock faible" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock ? "red" : "green"} to="/stock?alert=low" />
         <KpiCard label="Ruptures" value={data.out_of_stock} icon={PackageX} tone={data.out_of_stock ? "red" : "green"} to="/stock?alert=out" />
         <KpiCard label="Ventes caisse" value={money(data.pos_sales)} icon={CreditCard} tone="gold" to="/caisse/ventes" />
@@ -50,10 +62,23 @@ export function DashboardPage() {
 
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader title="Ventes sur la période" subtitle="Chiffre d'affaires et volume de commandes" />
+          <CardHeader title="Ventes caisse sur la période" subtitle="Chiffre d'affaires et volume des ventes en caisse" />
+          <div className="mb-4 flex flex-wrap items-end gap-3 px-6 pt-2">
+            <Select label="Année" value={year} onChange={(e) => setYear(Number(e.target.value))} className="w-28">
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </Select>
+            <Select label="Mois" value={month} onChange={(e) => setMonth(Number(e.target.value))} className="w-24">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>{m.toString().padStart(2, "0")}</option>
+              ))}
+            </Select>
+            {salesLoading && <span className="text-xs text-ge7-black/50">Chargement…</span>}
+          </div>
           <div className="h-72">
             <ResponsiveContainer>
-              <AreaChart data={data.sales_series}>
+              <AreaChart data={seriesData}>
                 <defs>
                   <linearGradient id="gold" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stopColor="#c9a227" stopOpacity={0.5} />

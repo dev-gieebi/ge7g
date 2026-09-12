@@ -31,7 +31,7 @@ export function InvoiceDetailPage() {
   if (!invoice.data) return <ErrorState message="Facture introuvable" />;
   const inv = invoice.data;
   const remaining = inv.total - inv.paid_amount;
-  const canPay = hasRole(user, "ADMIN", "DIRECTION") && remaining > 0 && inv.status !== "ANNULEE";
+  const canPay = hasRole(user, "AG_LOGISTIQUE", "DIRECTION") && remaining > 0 && inv.status !== "ANNULEE";
 
   return (
     <>

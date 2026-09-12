@@ -63,7 +63,7 @@ export const router = createBrowserRouter([
           { path: "/", element: <HomeRedirect /> },
 
           {
-            element: <RequireRole roles={["ADMIN", "DIRECTION"]} />,
+            element: <RequireRole roles={["AG_LOGISTIQUE", "DIRECTION"]} />,
             children: [
               { path: "/dashboard", element: <DashboardPage /> },
               { path: "/rapports", element: <ReportsPage /> },
@@ -85,7 +85,7 @@ export const router = createBrowserRouter([
             ],
           },
           {
-            element: <RequireRole roles={["ADMIN", "DIRECTION"]} />,
+            element: <RequireRole roles={["AG_LOGISTIQUE", "DIRECTION"]} />,
             children: [
               { path: "/logistique", element: <LogisticsDashboardPage /> },
               { path: "/categories", element: <CategoriesPage /> },
@@ -98,11 +98,11 @@ export const router = createBrowserRouter([
             ],
           },
           {
-            element: <RequireRole roles={["ADMIN", "CAISSIER"]} />,
+            element: <RequireRole roles={["AG_LOGISTIQUE", "CAISSIER"]} />,
             children: [{ path: "/caisse", element: <PosPage /> }],
           },
           {
-            element: <RequireRole roles={["ADMIN", "DIRECTION"]} />,
+            element: <RequireRole roles={["AG_LOGISTIQUE", "DIRECTION"]} />,
             children: [
               { path: "/caisse/ventes", element: <PosSalesPage /> },
               { path: "/caisse/ventes/:id", element: <PosSaleDetailPage /> },

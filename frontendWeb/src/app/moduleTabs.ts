@@ -1,7 +1,7 @@
 import type { ModuleTab } from "@/components/ui";
 import type { Role } from "@/types";
 
-const ADMIN_DIR: Role[] = ["ADMIN", "DIRECTION"];
+const ADMIN_DIR: Role[] = ["AG_LOGISTIQUE", "DIRECTION"];
 const SUPERADMIN_ONLY: Role[] = ["SUPERADMIN"];
 
 /** Onglets des hubs — chaque entrée de sidebar ouvre une page à onglets. */
@@ -34,7 +34,7 @@ export const LOGISTIQUE_TABS: ModuleTab[] = [
 ];
 
 export const CAISSE_TABS: ModuleTab[] = [
-  { label: "Point de vente", to: "/caisse", roles: ["ADMIN", "CAISSIER"] },
+  { label: "Point de vente", to: "/caisse", roles: ["AG_LOGISTIQUE", "CAISSIER"] },
   { label: "Historique ventes", to: "/caisse/ventes", roles: ADMIN_DIR },
 ];
 

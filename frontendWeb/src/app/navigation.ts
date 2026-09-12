@@ -17,7 +17,7 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-const ADMIN_DIR: Role[] = ["ADMIN", "DIRECTION"];
+const ADMIN_DIR: Role[] = ["AG_LOGISTIQUE", "DIRECTION"];
 
 /**
  * Menu principal Web — plateforme interne G7 Energy.
@@ -57,7 +57,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     title: "Caisse",
     items: [
-      { label: "Caisse", to: "/caisse", icon: ShoppingCart, roles: ["ADMIN", "CAISSIER"], paths: ["/caisse", "/caisse/ventes"] },
+      { label: "Caisse", to: "/caisse", icon: ShoppingCart, roles: ["AG_LOGISTIQUE", "CAISSIER"], paths: ["/caisse", "/caisse/ventes"] },
     ],
   },
   {

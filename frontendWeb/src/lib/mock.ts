@@ -88,7 +88,7 @@ const taxes: Tax[] = [
 
 const users: User[] = [
   { id: 1, name: "Super Admin G7", email: "superadmin@g7energy.com", code: "40000004", role: "SUPERADMIN", permissions: [], is_admin: true },
-  { id: 2, name: "ag_logistique", email: "ag_logistique@g7energy.com", code: "10000001", role: "ADMIN", permissions: [], is_admin: true },
+  { id: 2, name: "Agent Logistique", email: "ag_logistique@g7energy.com", code: "10000001", role: "AG_LOGISTIQUE", permissions: [], is_admin: true },
   { id: 3, name: "Caissier G7", email: "caisse@g7energy.com", code: "20000002", role: "CAISSIER", permissions: [], is_admin: false },
   { id: 4, name: "Direction G7", email: "direction@g7energy.com", code: "30000003", role: "DIRECTION", permissions: [], is_admin: false },
 ];
@@ -250,8 +250,16 @@ const nextId = (rows: any[]) => rows.reduce((m, r) => Math.max(m, Number(r.id) |
 
 /* --------------------------- Statistiques ------------------------------- */
 
+function isToday(iso: string) {
+  return new Date(iso).toDateString() === new Date().toDateString();
+}
+
 function dashboard() {
-  const revenue = orders.reduce((s, o) => s + o.total, 0) + posSales.reduce((s, v) => s + v.total, 0);
+  const onlineSales = orders.reduce((s, o) => s + o.total, 0);
+  const posSalesTotal = posSales.reduce((s, v) => s + v.total, 0);
+  const revenue = onlineSales + posSalesTotal;
+  const todaySales = posSales.filter((s) => isToday(s.created_at));
+  const productsSoldToday = todaySales.reduce((sum, s) => sum + (s.items ?? []).reduce((i, it) => i + it.quantity, 0), 0);
   return {
     revenue,
     revenue_trend: 12.4,
@@ -261,7 +269,10 @@ function dashboard() {
     deliveries_completed: deliveries.length,
     low_stock: products.filter((p) => p.stock_quantity > 0 && p.stock_quantity < p.min_stock).length,
     out_of_stock: products.filter((p) => p.stock_quantity <= 0).length,
-    pos_sales: posSales.reduce((s, v) => s + v.total, 0),
+    products_count: products.length,
+    products_sold_today: productsSoldToday,
+    online_sales: onlineSales,
+    pos_sales: posSalesTotal,
     purchases: purchases.reduce((s, p) => s + p.total, 0),
     expenses: purchases.reduce((s, p) => s + p.total, 0),
     alerts: [
@@ -307,6 +318,24 @@ const report = (params: any) => ({
   ],
   deliveries: { completed: 1, partial: 1, on_time_rate: 92 },
 });
+
+function salesSeries(params: Record<string, any>) {
+  const today = new Date();
+  const year = Number(params?.year) || today.getFullYear();
+  const month = Number(params?.month) || today.getMonth() + 1;
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  return Array.from({ length: daysInMonth }, (_, i) => {
+    const day = i + 1;
+    const isoDate = new Date(year, month - 1, day).toISOString().slice(0, 10);
+    const daySales = posSales.filter((s) => s.created_at.slice(0, 10) === isoDate);
+    return {
+      label: `${day.toString().padStart(2, "0")}/${month.toString().padStart(2, "0")}`,
+      revenue: daySales.reduce((s, v) => s + v.total, 0),
+      orders: daySales.length,
+    };
+  });
+}
 
 /* ------------------------------ Actions --------------------------------- */
 
@@ -393,6 +422,7 @@ export async function mockAdapter(config: AxiosRequestConfig): Promise<AxiosResp
 
   // Endpoints spéciaux
   if (method === "get" && url === "dashboard") return ok(config, { data: dashboard() });
+  if (method === "get" && url === "dashboard/sales-series") return ok(config, { data: salesSeries(params) });
   if (method === "get" && url === "logistics/stats") return ok(config, { data: logisticsStats() });
   if (method === "get" && url === "reports/overview") return ok(config, { data: report(params) });
   if (method === "get" && url === "reports/export")

@@ -16,10 +16,10 @@ class UserSeeder extends Seeder
         $users = [
             [
                 'code' => '10000001',
-                'name' => 'ag_logistique',
+                'name' => 'Agent Logistique',
                 'email' => 'ag_logistique@g7energy.com',
                 'password' => 'aglogistique123',
-                'role' => 'ADMIN',
+                'role' => 'AG_LOGISTIQUE',
                 'is_admin' => true,
             ],
             [

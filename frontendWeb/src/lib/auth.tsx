@@ -32,7 +32,7 @@ export const MOCK_ACCOUNTS: MockAccount[] = [
   {
     code: "10000001",
     password: "aglogistique123",
-    user: { id: 1, name: "ag_logistique", email: "ag_logistique@g7energy.com", code: "10000001", role: "ADMIN", permissions: [], is_admin: true },
+    user: { id: 1, name: "Agent Logistique", email: "ag_logistique@g7energy.com", code: "10000001", role: "AG_LOGISTIQUE", permissions: [], is_admin: true },
   },
   {
     code: "20000002",

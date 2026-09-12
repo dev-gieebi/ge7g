@@ -18,7 +18,7 @@ export function DeliveryDetailPage() {
   if (delivery.isLoading) return <Loading />;
   if (!delivery.data) return <ErrorState message="Livraison introuvable" />;
   const d = delivery.data;
-  const canConfirm = d.status === "LIVREE" && hasRole(user, "ADMIN", "DIRECTION");
+  const canConfirm = d.status === "LIVREE" && hasRole(user, "AG_LOGISTIQUE", "DIRECTION");
 
   return (
     <>

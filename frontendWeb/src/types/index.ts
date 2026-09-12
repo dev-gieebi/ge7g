@@ -1,4 +1,4 @@
-export type Role = "ADMIN" | "CAISSIER" | "DIRECTION" | "SUPERADMIN";
+export type Role = "AG_LOGISTIQUE" | "CAISSIER" | "DIRECTION" | "SUPERADMIN";
 
 export interface User {
   id: number;
@@ -444,6 +444,12 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface SalesSeriesPoint {
+  label: string;
+  revenue: number;
+  orders: number;
+}
+
 export interface DashboardStats {
   revenue: number;
   revenue_trend: number;
@@ -453,12 +459,15 @@ export interface DashboardStats {
   deliveries_completed: number;
   low_stock: number;
   out_of_stock: number;
+  products_count: number;
+  products_sold_today: number;
+  online_sales: number;
   pos_sales: number;
   purchases: number;
   expenses: number;
   alerts: { level: "warning" | "danger" | "info"; message: string; link?: string }[];
   recent_activity: AuditLog[];
-  sales_series: { label: string; revenue: number; orders: number }[];
+  sales_series: SalesSeriesPoint[];
   top_products: { name: string; value: number }[];
 }
 
