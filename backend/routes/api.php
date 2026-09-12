@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PriceController;
 use App\Http\Controllers\ProductController;
@@ -42,6 +43,9 @@ Route::middleware('auth:api')->group(function () {
     Route::get('pos/sales', [PosController::class, 'index']);
     Route::post('pos/sales', [PosController::class, 'store']);
     Route::get('pos/sales/{sale}', [PosController::class, 'show']);
+
+    Route::get('dashboard', [DashboardController::class, 'index']);
+    Route::get('dashboard/sales-series', [DashboardController::class, 'salesSeries']);
 
     Route::patch('suppliers/{supplier}/toggle', [SupplierController::class, 'toggle']);
     Route::patch('suppliers/{id}/restore', [SupplierController::class, 'restore']);

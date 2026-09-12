@@ -13,7 +13,7 @@ export const tokenStore = {
 const selectiveAdapter: AxiosAdapter = (config) => {
   const path = (config.url || "").replace(/^\/+/, "");
   // Ces ressources sont branchées sur l'API Laravel.
-  if (path === "users" || path.startsWith("users/") || path === "zones" || path.startsWith("zones/") || path === "taxes" || path.startsWith("taxes/") || path === "suppliers" || path.startsWith("suppliers/") || path === "units" || path.startsWith("units/") || path === "categories" || path.startsWith("categories/") || path === "products" || path.startsWith("products/") || path === "prices" || path.startsWith("prices/") || path === "purchases" || path.startsWith("purchases/") || path === "stocks" || path.startsWith("stocks/") || path === "stock-movements" || path.startsWith("stock-movements/") || path === "pos" || path.startsWith("pos/")) {
+  if (path === "users" || path.startsWith("users/") || path === "zones" || path.startsWith("zones/") || path === "taxes" || path.startsWith("taxes/") || path === "suppliers" || path.startsWith("suppliers/") || path === "units" || path.startsWith("units/") || path === "categories" || path.startsWith("categories/") || path === "products" || path.startsWith("products/") || path === "prices" || path.startsWith("prices/") || path === "purchases" || path.startsWith("purchases/") || path === "stocks" || path.startsWith("stocks/") || path === "stock-movements" || path.startsWith("stock-movements/") || path === "pos" || path.startsWith("pos/") || path === "dashboard" || path.startsWith("dashboard/")) {
     const { adapter, ...rest } = config;
     return axios.request(rest as AxiosRequestConfig);
   }
@@ -23,7 +23,7 @@ const selectiveAdapter: AxiosAdapter = (config) => {
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? "/api",
   headers: { Accept: "application/json" },
-  // Les requêtes /users, /zones et /taxes passent au backend Laravel, le reste reste en mock.
+  // Les requêtes vers ces ressources passent au backend Laravel, le reste reste en mock.
   adapter: selectiveAdapter,
 });
 
