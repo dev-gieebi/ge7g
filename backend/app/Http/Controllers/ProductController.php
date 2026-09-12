@@ -67,7 +67,7 @@ class ProductController extends Controller
         $this->authorizeUser($request);
 
         $validated = $request->validate([
-            'reference' => 'required|string|max:100|unique:products,reference',
+            'reference' => 'nullable|string|max:100|unique:products,reference',
             'name' => 'required|string|max:255',
             'category_id' => 'required|integer|exists:categories,id',
             'unit_id' => 'required|integer|exists:units,id',
@@ -108,7 +108,7 @@ class ProductController extends Controller
         $this->authorizeUser($request);
 
         $validated = $request->validate([
-            'reference' => ['required', 'string', 'max:100', Rule::unique('products', 'reference')->ignore($product->id)],
+            'reference' => ['nullable', 'string', 'max:100', Rule::unique('products', 'reference')->ignore($product->id)],
             'name' => 'required|string|max:255',
             'category_id' => 'required|integer|exists:categories,id',
             'unit_id' => 'required|integer|exists:units,id',
@@ -146,8 +146,13 @@ class ProductController extends Controller
         $margin = $salePrice - $purchasePrice;
         $marginPercent = $purchasePrice > 0 ? ($margin / $purchasePrice) * 100 : 0;
 
+        $reference = $validated['reference'] ?? null;
+        if (empty($reference)) {
+            $reference = 'REF-' . now()->format('Ymd-His-u') . '-' . strtoupper(Str::random(4));
+        }
+
         return [
-            'reference' => $validated['reference'],
+            'reference' => $reference,
             'name' => $validated['name'],
             'category_id' => $validated['category_id'],
             'unit_id' => $validated['unit_id'],

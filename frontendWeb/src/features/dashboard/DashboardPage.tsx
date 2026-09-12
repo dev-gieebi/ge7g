@@ -1,12 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  Banknote,
   CreditCard,
   Package,
   PackageX,
   ShoppingCart,
-  Wallet,
 } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link } from "react-router-dom";
@@ -95,15 +93,7 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card>
-          <CardHeader title="Achats & dépenses" />
-          <div className="space-y-3">
-            <Row icon={Wallet} label="Achats fournisseurs" value={money(data.purchases)} />
-            <Row icon={Banknote} label="Dépenses" value={money(data.expenses)} />
-          </div>
-        </Card>
-
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader title="Alertes" />
           {data.alerts.length === 0 ? (
@@ -157,13 +147,4 @@ export function DashboardPage() {
   );
 }
 
-function Row({ icon: Icon, label, value }: { icon: typeof Wallet; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl bg-ge7-cream px-4 py-3">
-      <span className="flex items-center gap-2 text-sm text-ge7-black/70">
-        <Icon size={16} className="text-ge7-bronze" /> {label}
-      </span>
-      <span className="font-bold">{value}</span>
-    </div>
-  );
-}
+

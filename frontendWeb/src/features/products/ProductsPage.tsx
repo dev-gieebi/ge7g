@@ -158,7 +158,7 @@ export function ProductsPage() {
         >
           <form id="product-form" onSubmit={submit}>
             <FormGrid cols={3}>
-              <Input label="Référence" required value={editing.reference ?? ""} onChange={(e) => setEditing({ ...editing, reference: e.target.value })} error={errors.reference} />
+              <Input label="Référence" value={editing.reference ?? ""} onChange={(e) => setEditing({ ...editing, reference: e.target.value })} error={errors.reference} />
               <Input label="Désignation" required value={editing.name ?? ""} onChange={(e) => setEditing({ ...editing, name: e.target.value })} error={errors.name} className="sm:col-span-2" />
               <Select label="Catégorie" required value={String(editing.category_id ?? "")} onChange={(e) => setEditing({ ...editing, category_id: e.target.value ? Number(e.target.value) : undefined })} error={errors.category_id}>
                 <option value="">Choisir une catégorie</option>
