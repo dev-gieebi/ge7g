@@ -26,6 +26,16 @@ export function SettingsPage() {
 
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [password, setPassword] = useState("");
+  const generatePassword = (length = 16) => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*_+-";
+    const array = new Uint32Array(length);
+    window.crypto.getRandomValues(array);
+    let result = "";
+    for (let i = 0; i < length; i++) {
+      result += chars[array[i] % chars.length];
+    }
+    return result;
+  };
   const notify = useToast();
   const qc = useQueryClient();
   const passwordMutation = useMutation<void, unknown, { id: number; password: string }>({
@@ -99,7 +109,7 @@ export function SettingsPage() {
             empty={{ name: "", role: "CAISSIER" }}
             allowDelete={(u) => u.id !== user?.id}
             extraActions={(u) => (
-              <Button size="sm" variant="ghost" onClick={() => { setPasswordUser(u); setPassword(""); }}>
+              <Button size="sm" variant="ghost" onClick={() => { setPasswordUser(u); setPassword(generatePassword()); }}>
                 <Key size={14} />
               </Button>
             )}
@@ -116,7 +126,7 @@ export function SettingsPage() {
                 </>
               }
             >
-              <Input type="password" label="Nouveau mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input type="text" label="Mot de passe généré" value={password} readOnly />
             </Modal>
           )}
         </>
