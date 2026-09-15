@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
@@ -27,6 +28,7 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('users', UserController::class);
     Route::apiResource('zones', ZoneController::class);
     Route::apiResource('taxes', TaxController::class);
+    Route::get('audit-logs', [AuditLogController::class, 'index']);
 
     Route::apiResource('units', UnitController::class);
     Route::apiResource('categories', CategoryController::class);

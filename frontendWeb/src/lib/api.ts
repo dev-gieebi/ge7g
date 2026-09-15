@@ -4,16 +4,32 @@ import { mockAdapter } from "./mock";
 
 const TOKEN_KEY = "ge7.token";
 
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp("(^|; )" + name.replace(/[\[\]\\.*+?^$|{}()]/g, "\\$&") + "=([^;]*)"));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+function setTokenCookie(token: string): void {
+  const isHttps = window.location.protocol === "https:";
+  const secure = isHttps ? "Secure;" : "";
+  const sameSite = isHttps ? "SameSite=None;" : "SameSite=Lax;";
+  document.cookie = `${TOKEN_KEY}=${encodeURIComponent(token)}; Path=/; ${sameSite} ${secure} Max-Age=86400;`;
+}
+
+function clearTokenCookie(): void {
+  document.cookie = `${TOKEN_KEY}=; Path=/; Max-Age=0;`;
+}
+
 export const tokenStore = {
-  get: () => localStorage.getItem(TOKEN_KEY),
-  set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+  get: () => getCookie(TOKEN_KEY),
+  set: (t: string) => setTokenCookie(t),
+  clear: () => clearTokenCookie(),
 };
 
 const selectiveAdapter: AxiosAdapter = (config) => {
   const path = (config.url || "").replace(/^\/+/, "");
   // Ces ressources sont branchées sur l'API Laravel.
-  if (path === "users" || path.startsWith("users/") || path === "zones" || path.startsWith("zones/") || path === "taxes" || path.startsWith("taxes/") || path === "suppliers" || path.startsWith("suppliers/") || path === "units" || path.startsWith("units/") || path === "categories" || path.startsWith("categories/") || path === "products" || path.startsWith("products/") || path === "prices" || path.startsWith("prices/") || path === "purchases" || path.startsWith("purchases/") || path === "stocks" || path.startsWith("stocks/") || path === "stock-movements" || path.startsWith("stock-movements/") || path === "pos" || path.startsWith("pos/") || path === "dashboard" || path.startsWith("dashboard/")) {
+  if (path === "users" || path.startsWith("users/") || path === "zones" || path.startsWith("zones/") || path === "taxes" || path.startsWith("taxes/") || path === "suppliers" || path.startsWith("suppliers/") || path === "units" || path.startsWith("units/") || path === "categories" || path.startsWith("categories/") || path === "products" || path.startsWith("products/") || path === "prices" || path.startsWith("prices/") || path === "purchases" || path.startsWith("purchases/") || path === "stocks" || path.startsWith("stocks/") || path === "stock-movements" || path.startsWith("stock-movements/") || path === "pos" || path.startsWith("pos/") || path === "dashboard" || path.startsWith("dashboard/") || path === "audit-logs" || path.startsWith("audit-logs/")) {
     const { adapter, ...rest } = config;
     return axios.request(rest as AxiosRequestConfig);
   }

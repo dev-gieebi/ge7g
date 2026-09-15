@@ -34,15 +34,17 @@ class PosController extends Controller
     {
         $this->authorizeUser($request);
 
+        $priceQuery = Price::query()
+            ->select('product_id', DB::raw('MIN(amount) as pos_price'))
+            ->where('for_pos', true)
+            ->whereNull('deleted_at')
+            ->groupBy('product_id');
+
         $query = Product::query()
             ->with(['category', 'unit'])
-            ->join('prices', function ($join) {
-                $join->on('prices.product_id', '=', 'products.id')
-                    ->where('prices.for_pos', '=', true)
-                    ->whereNull('prices.deleted_at');
-            })
+            ->leftJoinSub($priceQuery, 'pos_prices', 'pos_prices.product_id', '=', 'products.id')
             ->select('products.*')
-            ->addSelect(DB::raw('prices.amount as pos_price'));
+            ->addSelect(DB::raw('pos_prices.pos_price'));
 
         if ($request->has('category_id') && $request->input('category_id') !== '') {
             $query->where('products.category_id', (int) $request->input('category_id'));
