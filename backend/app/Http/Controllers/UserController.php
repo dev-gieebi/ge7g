@@ -115,6 +115,20 @@ class UserController extends Controller
         return response()->json(['data' => $user]);
     }
 
+    public function updatePassword(Request $request, User $user): JsonResponse
+    {
+        $this->authorizeUser($request);
+
+        $validated = $request->validate([
+            'password' => 'required|string|min:6',
+        ]);
+
+        $user->password = $validated['password'];
+        $user->save();
+
+        return response()->json(['message' => 'Mot de passe mis à jour.']);
+    }
+
     public function destroy(Request $request, User $user): Response
     {
         $this->authorizeUser($request);

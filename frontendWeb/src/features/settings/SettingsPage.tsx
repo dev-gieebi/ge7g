@@ -1,11 +1,14 @@
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ModuleTabs } from "@/components/ui";
 import { SYSTEME_TABS } from "@/app/moduleTabs";
-import { MapPin, Percent, Users } from "lucide-react";
+import { Key, MapPin, Percent, Users } from "lucide-react";
 import type { Role, Tax, User, Zone } from "@/types";
 import { ROLE_LABELS } from "@/lib/rbac";
 import { useAuth } from "@/lib/auth";
-import { Badge, PageHeader } from "@/components/ui";
+import { useToast } from "@/lib/toast";
+import { api, toApiError } from "@/lib/api";
+import { Badge, Button, Input, Modal, PageHeader } from "@/components/ui";
 import { SimpleCrud } from "./SimpleCrud";
 
 type Tab = "taxes" | "zones" | "users";
@@ -20,6 +23,22 @@ export function SettingsPage() {
   const isSuperAdmin = user?.role === "SUPERADMIN";
   const availableTabs = TABS.filter((t) => t.key !== "users" || isSuperAdmin);
   const [tab, setTab] = useState<Tab>(availableTabs[0]?.key ?? "taxes");
+
+  const [passwordUser, setPasswordUser] = useState<User | null>(null);
+  const [password, setPassword] = useState("");
+  const notify = useToast();
+  const qc = useQueryClient();
+  const passwordMutation = useMutation<void, unknown, { id: number; password: string }>({
+    mutationFn: ({ id, password }) => api.put(`/users/${id}/password`, { password }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      notify("Mot de passe mis à jour");
+      setPasswordUser(null);
+      setPassword("");
+    },
+    onError: (e) => notify(toApiError(e).message, "error"),
+  });
+
   return (
     <>
       <ModuleTabs tabs={SYSTEME_TABS} />
@@ -65,22 +84,44 @@ export function SettingsPage() {
       )}
 
       {tab === "users" && (
-        <SimpleCrud<User & { status?: string }>
-          queryKey="users" url="/users" title="Utilisateurs"
-          columns={[
-            { key: "code", header: "Code", render: (u) => <span className="font-mono text-xs font-semibold">{u.code}</span> },
-            { key: "name", header: "Nom", render: (u) => <span className="font-semibold">{u.name}</span> },
-            { key: "email", header: "Email", render: (u) => u.email },
-            { key: "role", header: "Rôle", render: (u) => <Badge tone={u.role === "SUPERADMIN" ? "dark" : u.role === "AG_LOGISTIQUE" ? "dark" : u.role === "CAISSIER" ? "gold" : "purple"}>{ROLE_LABELS[u.role]}</Badge> },
-          ]}
-          fields={[
-            { name: "name", label: "Nom", required: true, span: 2 },
-            { name: "email", label: "Email", type: "email", required: true, span: 2 },
-            { name: "role", label: "Rôle", type: "select", required: true, span: 2, options: (Object.keys(ROLE_LABELS) as Role[]).map((r) => ({ value: r, label: ROLE_LABELS[r] })) },
-          ]}
-          empty={{ name: "", email: "", role: "CAISSIER" }}
-          allowDelete={(u) => u.id !== user?.id}
-        />
+        <>
+          <SimpleCrud<User & { status?: string }>
+            queryKey="users" url="/users" title="Utilisateurs"
+            columns={[
+              { key: "code", header: "Code", render: (u) => <span className="font-mono text-xs font-semibold">{u.code}</span> },
+              { key: "name", header: "Nom", render: (u) => <span className="font-semibold">{u.name}</span> },
+              { key: "email", header: "Email", render: (u) => u.email },
+              { key: "role", header: "Rôle", render: (u) => <Badge tone={u.role === "SUPERADMIN" ? "dark" : u.role === "AG_LOGISTIQUE" ? "dark" : u.role === "CAISSIER" ? "gold" : "purple"}>{ROLE_LABELS[u.role]}</Badge> },
+            ]}
+            fields={[
+              { name: "name", label: "Nom", required: true, span: 2 },
+              { name: "email", label: "Email", type: "email", required: true, span: 2 },
+              { name: "role", label: "Rôle", type: "select", required: true, span: 2, options: (Object.keys(ROLE_LABELS) as Role[]).map((r) => ({ value: r, label: ROLE_LABELS[r] })) },
+            ]}
+            empty={{ name: "", email: "", role: "CAISSIER" }}
+            allowDelete={(u) => u.id !== user?.id}
+            extraActions={(u) => (
+              <Button size="sm" variant="ghost" onClick={() => { setPasswordUser(u); setPassword(""); }}>
+                <Key size={14} />
+              </Button>
+            )}
+          />
+          {passwordUser && (
+            <Modal
+              title={`Modifier le mot de passe — ${passwordUser.name}`}
+              size="sm"
+              onClose={() => { setPasswordUser(null); setPassword(""); }}
+              footer={
+                <>
+                  <Button variant="secondary" onClick={() => setPasswordUser(null)}>Annuler</Button>
+                  <Button loading={passwordMutation.isPending} onClick={() => passwordMutation.mutate({ id: passwordUser.id, password })}>Enregistrer</Button>
+                </>
+              }
+            >
+              <Input type="password" label="Nouveau mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </Modal>
+          )}
+        </>
       )}
 
     </>

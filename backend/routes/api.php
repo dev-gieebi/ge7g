@@ -28,6 +28,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::post('refresh', [AuthController::class, 'refresh']);
 
+    Route::patch('users/{user}/password', [UserController::class, 'updatePassword']);
     Route::apiResource('users', UserController::class);
     Route::apiResource('zones', ZoneController::class);
     Route::apiResource('taxes', TaxController::class);
