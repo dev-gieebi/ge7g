@@ -21,6 +21,13 @@ class UserSeeder extends Seeder
                 'role' => 'SUPERADMIN',
                 'is_admin' => true,
             ],
+            [
+                'code' => '30000003',
+                'name' => 'Direction G7',
+                'password' => 'direction123',
+                'role' => 'DIRECTION',
+                'is_admin' => true,
+            ],
         ];
 
         foreach ($users as $user) {
