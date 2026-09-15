@@ -6,8 +6,6 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Validation\Rule;
-
 class UserController extends Controller
 {
     private const MANAGE_ROLES = ['SUPERADMIN'];
@@ -33,7 +31,6 @@ class UserController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%");
             });
         }
@@ -67,7 +64,6 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email',
             'role' => 'required|string|in:AG_LOGISTIQUE,CAISSIER,DIRECTION,SUPERADMIN',
         ]);
 
@@ -75,7 +71,6 @@ class UserController extends Controller
 
         $user = User::create([
             'name' => $validated['name'],
-            'email' => $validated['email'],
             'code' => $code,
             'role' => $validated['role'],
             'password' => 'Password123',
@@ -99,14 +94,12 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'role' => 'required|string|in:AG_LOGISTIQUE,CAISSIER,DIRECTION,SUPERADMIN',
             'permissions' => 'sometimes|array',
         ]);
 
         $user->update([
             'name' => $validated['name'],
-            'email' => $validated['email'],
             'role' => $validated['role'],
             'permissions' => $validated['permissions'] ?? $user->permissions,
             'is_admin' => in_array($validated['role'], ['AG_LOGISTIQUE', 'SUPERADMIN'], true),

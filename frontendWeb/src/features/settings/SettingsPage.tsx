@@ -90,15 +90,13 @@ export function SettingsPage() {
             columns={[
               { key: "code", header: "Code", render: (u) => <span className="font-mono text-xs font-semibold">{u.code}</span> },
               { key: "name", header: "Nom", render: (u) => <span className="font-semibold">{u.name}</span> },
-              { key: "email", header: "Email", render: (u) => u.email },
               { key: "role", header: "Rôle", render: (u) => <Badge tone={u.role === "SUPERADMIN" ? "dark" : u.role === "AG_LOGISTIQUE" ? "dark" : u.role === "CAISSIER" ? "gold" : "purple"}>{ROLE_LABELS[u.role]}</Badge> },
             ]}
             fields={[
               { name: "name", label: "Nom", required: true, span: 2 },
-              { name: "email", label: "Email", type: "email", required: true, span: 2 },
               { name: "role", label: "Rôle", type: "select", required: true, span: 2, options: (Object.keys(ROLE_LABELS) as Role[]).map((r) => ({ value: r, label: ROLE_LABELS[r] })) },
             ]}
-            empty={{ name: "", email: "", role: "CAISSIER" }}
+            empty={{ name: "", role: "CAISSIER" }}
             allowDelete={(u) => u.id !== user?.id}
             extraActions={(u) => (
               <Button size="sm" variant="ghost" onClick={() => { setPasswordUser(u); setPassword(""); }}>

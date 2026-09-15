@@ -17,7 +17,6 @@ class UserSeeder extends Seeder
             [
                 'code' => '41234567',
                 'name' => 'Super Admin G7',
-                'email' => 'super-admin@g7energy.com',
                 'password' => 'password123',
                 'role' => 'SUPERADMIN',
                 'is_admin' => true,
@@ -26,7 +25,7 @@ class UserSeeder extends Seeder
 
         foreach ($users as $user) {
             User::updateOrCreate(
-                ['email' => $user['email']],
+                ['code' => $user['code']],
                 array_merge($user, ['permissions' => []])
             );
         }
