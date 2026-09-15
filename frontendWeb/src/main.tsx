@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/lib/auth";
 import { ToastProvider } from "@/lib/toast";
 import { router } from "@/app/router";
+import { PusherListener } from "@/components/PusherListener";
 import "./styles.css";
 
 const queryClient = new QueryClient({
@@ -18,6 +19,7 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthProvider>
+          <PusherListener />
           <RouterProvider router={router} />
         </AuthProvider>
       </ToastProvider>

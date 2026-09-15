@@ -14,8 +14,11 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\PusherTestController;
 use App\Http\Controllers\ZoneController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('pusher/trigger', [PusherTestController::class, 'trigger']);
 
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
