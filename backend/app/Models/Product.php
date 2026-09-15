@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['reference', 'name', 'category_id', 'type', 'unit_id', 'sale_price', 'purchase_price', 'margin', 'margin_percent', 'stock_quantity', 'reserved_quantity', 'min_stock', 'image_url'])]
+#[Fillable(['reference', 'name', 'category_id', 'unit_id', 'sale_price', 'purchase_price', 'margin', 'margin_percent', 'stock_quantity', 'reserved_quantity', 'min_stock', 'image_url'])]
 class Product extends Model
 {
     /** @use HasFactory<\Database\Factories\ProductFactory> */

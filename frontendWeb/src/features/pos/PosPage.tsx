@@ -51,6 +51,9 @@ export function PosPage() {
   }, [taxes]);
 
   const selectedTaxes = useMemo(() => taxes?.filter((t) => taxIds.includes(t.id)) ?? [], [taxes, taxIds]);
+  const vatCssIds = useMemo(() => taxes?.filter((t) => t.type === "TVA" || t.type === "CSS").map((t) => t.id) ?? [], [taxes]);
+  const tpsIds = useMemo(() => taxes?.filter((t) => t.type === "TPS").map((t) => t.id) ?? [], [taxes]);
+  const otherTaxes = useMemo(() => taxes?.filter((t) => !["TVA", "CSS", "TPS"].includes(t.type)) ?? [], [taxes]);
 
   const groups = useMemo(() => {
     const items = products.data?.data ?? [];
@@ -63,7 +66,7 @@ export function PosPage() {
   }, [products.data]);
 
   const subtotal = cart.reduce((s, l) => s + l.product.sale_price * l.quantity, 0);
-  const rate = selectedTaxes.reduce((s, t) => s + (t.type === "AUCUNE" ? 0 : Number(t.rate)), 0) / 100;
+  const rate = selectedTaxes.reduce((s, t) => s + (t.type === "AUCUNE" ? 0 : (t.type === "TPS" ? -Number(t.rate) : Number(t.rate))), 0) / 100;
   const taxAmount = Math.round(subtotal * rate);
   const total = subtotal + taxAmount;
   const change = received !== "" && method === "ESPECES" ? Number(received) - total : null;
@@ -156,15 +159,35 @@ export function PosPage() {
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-ge7-black/70">Taxes</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {taxes?.map((t) => (
+                  {vatCssIds.length > 0 && (
+                    <label className="flex items-center gap-2 rounded-lg border border-ge7-black/10 px-2 py-1.5 text-sm">
+                      <input
+                        type="checkbox"
+                        className="size-4 rounded border-ge7-black/20 text-ge7-bronze focus:ring-ge7-bronze"
+                        checked={vatCssIds.every((id) => taxIds.includes(id))}
+                        onChange={(e) => setTaxIds(e.target.checked ? vatCssIds : [])}
+                      />
+                      TVA
+                    </label>
+                  )}
+                  {tpsIds.length > 0 && (
+                    <label className="flex items-center gap-2 rounded-lg border border-ge7-black/10 px-2 py-1.5 text-sm">
+                      <input
+                        type="checkbox"
+                        className="size-4 rounded border-ge7-black/20 text-ge7-bronze focus:ring-ge7-bronze"
+                        checked={tpsIds.every((id) => taxIds.includes(id))}
+                        onChange={(e) => setTaxIds(e.target.checked ? tpsIds : [])}
+                      />
+                      TPS
+                    </label>
+                  )}
+                  {otherTaxes.map((t) => (
                     <label key={t.id} className="flex items-center gap-2 rounded-lg border border-ge7-black/10 px-2 py-1.5 text-sm">
                       <input
                         type="checkbox"
                         className="size-4 rounded border-ge7-black/20 text-ge7-bronze focus:ring-ge7-bronze"
                         checked={taxIds.includes(t.id)}
-                        onChange={(e) =>
-                          setTaxIds((prev) => (e.target.checked ? [...prev, t.id] : prev.filter((id) => id !== t.id)))
-                        }
+                        onChange={(e) => setTaxIds((prev) => (e.target.checked ? [...prev.filter((id) => !tpsIds.includes(id)), t.id] : prev.filter((id) => id !== t.id)))}
                       />
                       {t.name}
                     </label>
@@ -175,7 +198,7 @@ export function PosPage() {
                 {METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </Select>
             </div>
-            {method === "ESPECES" && <Input label="Montant reçu" type="number" min={0} value={received} onChange={(e) => setReceived(e.target.value === "" ? "" : Number(e.target.value))} />}
+            {method === "ESPECES" && <Input label="Montant reçu *" type="number" min={0} required value={received} onChange={(e) => setReceived(e.target.value === "" ? "" : Number(e.target.value))} />}
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-ge7-black/60"><span>Sous-total HT</span><span>{money(subtotal)}</span></div>
               <div className="flex justify-between text-ge7-black/60"><span>{selectedTaxes.length === 0 ? "Taxe" : `${selectedTaxes.map((t) => t.name).join(" + ")} ${(rate * 100).toFixed(2).replace(/\.?0+$/, "")} %`}</span><span>{money(taxAmount)}</span></div>
@@ -183,7 +206,7 @@ export function PosPage() {
               {change !== null && <div className={`flex justify-between font-semibold ${change < 0 ? "text-rose-600" : "text-emerald-700"}`}><span>Monnaie à rendre</span><span>{money(Math.max(0, change))}</span></div>}
             </div>
             <p className="text-[11px] text-ge7-black/40">Montants indicatifs — le calcul définitif est effectué par le serveur.</p>
-            <Button size="lg" className="w-full" disabled={!cart.length || (method === "ESPECES" && change !== null && change < 0)} loading={pay.isPending} onClick={checkout}>Encaisser {money(total)}</Button>
+            <Button size="lg" className="w-full" disabled={!cart.length || (method === "ESPECES" && (received === "" || (change !== null && change < 0)))} loading={pay.isPending} onClick={checkout}>Encaisser {money(total)}</Button>
           </div>
         </Card>
       </div>

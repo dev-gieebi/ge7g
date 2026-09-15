@@ -166,7 +166,6 @@ export function ProductsPage() {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </Select>
-              <Input label="Type / variante" placeholder="ex. 50 KVA, A0-6" value={editing.type ?? ""} onChange={(e) => setEditing({ ...editing, type: e.target.value })} error={errors.type} />
               <Select label="Unité" required value={String(editing.unit_id ?? "")} onChange={(e) => setEditing({ ...editing, unit_id: e.target.value ? Number(e.target.value) : undefined })} error={errors.unit_id}>
                 <option value="">Choisir une unité</option>
                 {units?.map((u: Unit) => (

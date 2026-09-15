@@ -150,8 +150,8 @@ class PosController extends Controller
             $taxes = collect([new Tax(['type' => 'AUCUNE', 'rate' => 0])]);
         }
 
-        $taxRate = (float) $taxes->sum('rate');
-        $taxType = $taxRate > 0 ? $taxes->pluck('type')->implode(' + ') : 'AUCUNE';
+        $taxRate = (float) $taxes->sum(fn ($t) => $t->type === 'TPS' ? -$t->rate : $t->rate);
+        $taxType = $taxes->pluck('type')->implode(' + ');
 
         $productIds = array_column($validated['items'], 'product_id');
         $prices = $this->g7gPrices($productIds);
@@ -213,7 +213,7 @@ class PosController extends Controller
                 $subtotal += $lineTotal;
             }
 
-            $taxAmount = $taxRate > 0 ? round($subtotal * ($taxRate / 100)) : 0;
+            $taxAmount = round($subtotal * ($taxRate / 100));
             $total = $subtotal + $taxAmount;
 
             $sale->subtotal = $subtotal;

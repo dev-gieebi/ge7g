@@ -35,7 +35,7 @@ export function AppShell() {
     <div className="flex min-h-screen">
       <Sidebar open={open} onClose={() => setOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header onMenu={() => setOpen(true)} />
+        {/*<Header onMenu={() => setOpen(true)} />*/}
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <Outlet />
         </main>

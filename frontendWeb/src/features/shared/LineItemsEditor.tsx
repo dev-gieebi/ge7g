@@ -57,7 +57,7 @@ export function LineItemsEditor({
               ))}
             </Select>
             <Input type="number" min={0} step="any" value={it.quantity} onChange={(e) => update(i, { quantity: Number(e.target.value) })} placeholder="Qté" />
-            <Input type="number" min={0} value={it.unit_price} onChange={(e) => update(i, { unit_price: Number(e.target.value) })} />
+            <Input type="number" min={0} step="any" value={it.unit_price} onChange={(e) => update(i, { unit_price: Number(e.target.value) })} />
             <span className="text-right text-sm font-bold">{money(it.quantity * it.unit_price)}{p?.unit ? <span className="block text-[10px] font-normal text-ge7-black/50">/ {p.unit.symbol}</span> : null}</span>
             <button type="button" onClick={() => remove(i)} className="justify-self-end rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={15} /></button>
           </div>
