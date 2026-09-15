@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { Sidebar } from "./Sidebar";
-import { Header } from "./Header";
+//import { Header } from "./Header";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "@/components/ui";
 
