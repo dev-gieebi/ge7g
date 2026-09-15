@@ -19,16 +19,37 @@ export function PricesPage() {
   const { data: products } = useProductsRef();
   const { data: zones } = useZones();
   const [editing, setEditing] = useState<Form | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-  const open = () =>
-    setEditing({ product_id: products?.[0]?.id, zone_id: null, competitor_price: 0, amount: 0, factory_price: 0 });
-  const close = () => setEditing(null);
+  const openNew = () => {
+    setEditingId(null);
+    setEditing({ product_id: products?.[0]?.id, zone_id: null, competitor_price: 0, amount: 0, factory_price: 0, for_pos: false });
+  };
+  const openEdit = (price: Price) => {
+    setEditingId(price.id);
+    setEditing({
+      product_id: price.product_id,
+      zone_id: price.zone_id,
+      competitor_price: price.competitor_price,
+      amount: price.amount,
+      factory_price: price.factory_price,
+      for_pos: price.for_pos ?? false,
+    });
+  };
+  const close = () => {
+    setEditing(null);
+    setEditingId(null);
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!editing) return;
-    crud.create.mutateAsync(editing).then(close).catch(() => {});
+    if (editingId) {
+      crud.update.mutateAsync({ id: editingId, body: editing }).then(close).catch(() => {});
+    } else {
+      crud.create.mutateAsync(editing).then(close).catch(() => {});
+    }
   };
-  const errors = fieldErrors(crud.create.error);
+  const errors = fieldErrors(editingId ? crud.update.error : crud.create.error);
   const [isExporting, setIsExporting] = useState(false);
 
   const exportToExcel = async () => {
@@ -136,7 +157,7 @@ export function PricesPage() {
             <Button variant="secondary" onClick={exportToExcel} loading={isExporting}>
               <Download size={16} /> Exporter
             </Button>
-            <Button onClick={open}>
+            <Button onClick={openNew}>
               <Plus size={16} /> Nouveau prix
             </Button>
           </div>
@@ -157,17 +178,19 @@ export function PricesPage() {
           <option value="0">Barème</option>
         </Select>
       </div>
-      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(p) => p.id} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucun prix défini" emptyHint="Le prix de vente par défaut du produit s'applique." />
+      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(p) => p.id} onRowClick={openEdit} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucun prix défini" emptyHint="Le prix de vente par défaut du produit s'applique." />
 
       {editing && (
         <Modal
-          title="Nouveau prix"
+          title={editingId ? "Modifier le prix" : "Nouveau prix"}
           subtitle="Prix concurrent, prix de vente G-E7G et prix usine HT pour la zone choisie."
           onClose={close}
           footer={
             <>
               <Button variant="secondary" onClick={close}>Annuler</Button>
-              <Button type="submit" form="price-form" loading={crud.create.isPending}>Créer</Button>
+              <Button type="submit" form="price-form" loading={editingId ? crud.update.isPending : crud.create.isPending}>
+                {editingId ? "Enregistrer" : "Créer"}
+              </Button>
             </>
           }
         >
