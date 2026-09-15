@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, KeyRound, Lock } from "lucide-react";
-import { MOCK_ACCOUNTS, useAuth } from "@/lib/auth";
-import { ROLE_LABELS, homeFor } from "@/lib/rbac";
+import { useAuth } from "@/lib/auth";
+import { homeFor } from "@/lib/rbac";
 import { toApiError } from "@/lib/api";
 import { Button, Logo } from "@/components/ui";
 
@@ -118,24 +118,7 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-8 rounded-2xl border border-ge7-gold/30 bg-ge7-gold-soft/40 p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-ge7-bronze">Comptes de démonstration</p>
-            <ul className="mt-2 space-y-1.5 text-xs">
-              {MOCK_ACCOUNTS.map((a) => (
-                <li key={a.code} className="flex items-center justify-between gap-2">
-                  <span className="font-semibold">{ROLE_LABELS[a.user.role]}</span>
-                  <button
-                    type="button"
-                    onClick={() => { setCode(a.code); setPassword(a.password); }}
-                    className="rounded-lg bg-white px-2 py-1 font-mono text-ge7-purple shadow-sm hover:bg-ge7-purple-soft"
-                    title="Remplir automatiquement"
-                  >
-                    {a.code} / {a.password}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+
         </div>
       </section>
     </div>
