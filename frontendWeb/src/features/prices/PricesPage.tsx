@@ -199,7 +199,7 @@ export function PricesPage() {
               <Select label="Produit" required value={String(editing.product_id ?? "")} onChange={(e) => setEditing({ ...editing, product_id: e.target.value ? Number(e.target.value) : undefined })} error={errors.product_id} className="sm:col-span-2">
                 {products?.map((p: Product) => <option key={p.id} value={p.id}>{p.name} ({p.reference})</option>)}
               </Select>
-              <Select label="Zone" value={String(editing.zone_id ?? "")} onChange={(e) => setEditing({ ...editing, zone_id: e.target.value ? Number(e.target.value) : null })}>
+              <Select label="Zone" hint="Avec une ville, le prix s'applique au point de vente de cette ville." value={String(editing.zone_id ?? "")} onChange={(e) => setEditing({ ...editing, zone_id: e.target.value ? Number(e.target.value) : null })}>
                 <option value="">Toutes</option>
                 {zones?.map((z: Zone) => <option key={z.id} value={z.id}>{z.name}</option>)}
               </Select>
@@ -208,7 +208,7 @@ export function PricesPage() {
               <Input label="PU Usine HT (FCFA)" type="number" min={0} required value={editing.factory_price ?? 0} onChange={(e) => setEditing({ ...editing, factory_price: Number(e.target.value) })} error={errors.factory_price} />
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={!!editing.for_pos} onChange={(e) => setEditing({ ...editing, for_pos: e.target.checked })} className="size-4 rounded border-ge7-black/20 text-ge7-bronze focus:ring-ge7-bronze" />
-                Prix destiné à la caisse
+                Prix destiné à la caisse (comptoir uniquement)
               </label>
             </FormGrid>
           </form>
