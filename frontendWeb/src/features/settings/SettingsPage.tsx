@@ -39,7 +39,7 @@ export function SettingsPage() {
   const notify = useToast();
   const qc = useQueryClient();
   const passwordMutation = useMutation<void, unknown, { id: number; password: string }>({
-    mutationFn: ({ id, password }) => api.put(`/users/${id}/password`, { password }),
+    mutationFn: ({ id, password }) => api.patch(`/users/${id}/password`, { password }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["users"] });
       notify("Mot de passe mis à jour");
