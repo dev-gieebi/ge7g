@@ -81,7 +81,6 @@ export function ProductsPage() {
       render: (p) => <span className="font-semibold">{p.name}</span>,
     },
     { key: "category", header: "Catégorie", render: (p) => p.category?.name ?? "—" },
-    { key: "type", header: "Type", render: (p) => p.type || "—" },
     { key: "stock", header: "Stock dispo", align: "right", render: (p) => qty(p.available_quantity, p.unit?.symbol) },
     { key: "min_stock", header: "Stock minimum", align: "right", render: (p) => qty(p.min_stock, p.unit?.symbol) },
     {
