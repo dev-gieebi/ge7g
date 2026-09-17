@@ -3,7 +3,7 @@ import { ArrowLeft, FileText, Printer, Receipt } from "lucide-react";
 import { useState } from "react";
 import type { PosSale } from "@/types";
 import { useOne } from "@/lib/hooks";
-import { Button, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/ui";
+import { Badge, Button, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/ui";
 import { PrintableDocument } from "@/features/invoices/PrintableDocument";
 
 export function PosSaleDetailPage() {
@@ -21,7 +21,7 @@ export function PosSaleDetailPage() {
         <PageHeader
           breadcrumb={<Link to="/caisse/ventes" className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Ventes</Link>}
           title={s.number}
-          subtitle={<StatusBadge status={s.status} />}
+          subtitle={<span className="inline-flex items-center gap-2"><StatusBadge status={s.status} />{s.zone ? <Badge tone="purple">{s.zone.name}</Badge> : null}</span>}
           action={
             <>
               <Button variant={mode === "ticket" ? "dark" : "secondary"} onClick={() => setMode("ticket")}><Receipt size={15} /> Ticket</Button>

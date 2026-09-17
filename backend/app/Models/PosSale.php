@@ -2,16 +2,17 @@
 
 namespace App\Models;
 
+use Database\Factories\PosSaleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['number', 'user_id', 'customer_name', 'subtotal', 'tax_type', 'tax_rate', 'tax_amount', 'total', 'payment_method', 'amount_received', 'status'])]
+#[Fillable(['number', 'user_id', 'zone_id', 'customer_name', 'subtotal', 'tax_type', 'tax_rate', 'tax_amount', 'total', 'payment_method', 'amount_received', 'status'])]
 class PosSale extends Model
 {
-    /** @use HasFactory<\Database\Factories\PosSaleFactory> */
+    /** @use HasFactory<PosSaleFactory> */
     use HasFactory;
 
     protected function casts(): array
@@ -28,6 +29,11 @@ class PosSale extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function zone(): BelongsTo
+    {
+        return $this->belongsTo(Zone::class);
     }
 
     public function items(): HasMany

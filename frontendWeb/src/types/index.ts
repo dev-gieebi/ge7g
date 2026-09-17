@@ -408,6 +408,8 @@ export interface PosSale {
   id: number;
   number: string;
   cashier?: Pick<User, "id" | "name">;
+  zone_id?: number | null;
+  zone?: Pick<Zone, "id" | "name"> | null;
   customer_name: string | null;
   subtotal: number;
   tax_type: TaxType;

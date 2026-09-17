@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\Zone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,12 +14,14 @@ class ZoneController extends Controller
 {
     private const MANAGE_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN'];
 
-    private function authorizeUser(Request $request): \App\Models\User
+    private const VIEW_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN', 'CAISSIER'];
+
+    private function authorizeUser(Request $request, array $roles = self::MANAGE_ROLES): User
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
-        if (! in_array($user->role, self::MANAGE_ROLES, true)) {
+        if (! in_array($user->role, $roles, true)) {
             abort(403, 'Accès réservé.');
         }
 
@@ -27,7 +30,7 @@ class ZoneController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $this->authorizeUser($request);
+        $this->authorizeUser($request, self::VIEW_ROLES);
 
         if (! $request->hasAny(['search', 'sort', 'dir', 'per_page'])) {
             return Cache::remember('zones.index', 300, fn () => $this->buildIndex($request));
@@ -88,7 +91,7 @@ class ZoneController extends Controller
 
     public function show(Request $request, Zone $zone): JsonResponse
     {
-        $this->authorizeUser($request);
+        $this->authorizeUser($request, self::VIEW_ROLES);
 
         return response()->json(['data' => $zone]);
     }

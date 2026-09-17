@@ -34,7 +34,8 @@ export const LOGISTIQUE_TABS: ModuleTab[] = [
 ];
 
 export const CAISSE_TABS: ModuleTab[] = [
-  { label: "Point de vente", to: "/caisse", roles: ["AG_LOGISTIQUE", "CAISSIER"] },
+  { label: "Comptoir", to: "/caisse", roles: ["AG_LOGISTIQUE", "CAISSIER"] },
+  { label: "Point de vente", to: "/caisse/point-de-vente", roles: ["AG_LOGISTIQUE", "CAISSIER"] },
   { label: "Historique ventes", to: "/caisse/ventes", roles: ADMIN_DIR },
 ];
 
