@@ -38,12 +38,16 @@ class PosController extends Controller
         $zoneId = $request->filled('zone_id') ? (int) $request->input('zone_id') : null;
 
         if ($zoneId) {
-            // Point de vente par ville : seuls les produits ayant un barème
-            // pour la zone choisie sont proposés, au prix du barème.
+            // Point de vente par ville : produits ayant un barème pour la zone
+            // choisie, ou un prix « Toutes les villes » (zone_id null) en repli.
             $priceQuery = Price::query()
-                ->select('product_id', 'amount as pos_price')
-                ->where('zone_id', $zoneId)
-                ->whereNull('deleted_at');
+                ->select('product_id')
+                ->selectRaw(
+                    'COALESCE(MAX(CASE WHEN zone_id = ? THEN amount END), MAX(CASE WHEN zone_id IS NULL THEN amount END)) as pos_price',
+                    [$zoneId]
+                )
+                ->where(fn ($q) => $q->where('zone_id', $zoneId)->orWhereNull('zone_id'))
+                ->groupBy('product_id');
 
             $query = Product::query()
                 ->with(['category', 'unit'])
@@ -267,9 +271,12 @@ class PosController extends Controller
     private function g7gPrices(array|Collection $productIds, ?int $zoneId = null): Collection
     {
         if ($zoneId) {
+            // Prix de la ville en priorité, sinon prix « Toutes les villes ».
             return Price::whereIn('product_id', $productIds)
-                ->where('zone_id', $zoneId)
+                ->where(fn ($q) => $q->where('zone_id', $zoneId)->orWhereNull('zone_id'))
                 ->get()
+                ->sortByDesc(fn ($p) => (int) $p->zone_id === $zoneId ? 1 : 0)
+                ->unique('product_id')
                 ->keyBy('product_id');
         }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Price;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -12,9 +13,9 @@ class PriceController extends Controller
 {
     private const MANAGE_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN'];
 
-    private function authorizeUser(Request $request): \App\Models\User
+    private function authorizeUser(Request $request): User
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         if (! in_array($user->role, self::MANAGE_ROLES, true)) {
@@ -89,8 +90,8 @@ class PriceController extends Controller
             'for_pos' => 'sometimes|boolean',
         ]);
 
-        if ($this->duplicateForZoneExists((int) $validated['product_id'], $validated['zone_id'] ?? null)) {
-            throw ValidationException::withMessages(['zone_id' => 'Un barème existe déjà pour ce produit et cette ville. Modifiez-le au lieu d\'en créer un nouveau.']);
+        if ($message = $this->conflictingPriceExists((int) $validated['product_id'], $validated['zone_id'] ?? null)) {
+            throw ValidationException::withMessages(['zone_id' => $message]);
         }
 
         $forPos = (bool) ($validated['for_pos'] ?? false);
@@ -139,8 +140,8 @@ class PriceController extends Controller
         $newForPos = array_key_exists('for_pos', $validated) ? (bool) $validated['for_pos'] : $price->for_pos;
 
         if ($newProductId != $price->product_id || $newZoneId !== $price->zone_id) {
-            if ($this->duplicateForZoneExists((int) $newProductId, $newZoneId, $price->id)) {
-                throw ValidationException::withMessages(['zone_id' => 'Un barème existe déjà pour ce produit et cette ville. Modifiez-le au lieu d\'en créer un nouveau.']);
+            if ($message = $this->conflictingPriceExists((int) $newProductId, $newZoneId === null ? null : (int) $newZoneId, $price->id)) {
+                throw ValidationException::withMessages(['zone_id' => $message]);
             }
         }
 
@@ -173,16 +174,32 @@ class PriceController extends Controller
         return response()->noContent();
     }
 
-    private function duplicateForZoneExists(int $productId, ?int $zoneId, ?int $exclude = null): bool
+    /**
+     * Un prix « Toutes les villes » (zone_id null) est exclusif : il fixe le
+     * prix du produit partout et interdit les barèmes par ville, et inversement.
+     */
+    private function conflictingPriceExists(int $productId, ?int $zoneId, ?int $exclude = null): ?string
     {
-        $query = Price::where('product_id', $productId)
-            ->when($zoneId, fn ($q) => $q->where('zone_id', $zoneId), fn ($q) => $q->whereNull('zone_id'));
-
+        $query = Price::where('product_id', $productId);
         if ($exclude) {
             $query->where('id', '!=', $exclude);
         }
 
-        return $query->exists();
+        if ($zoneId === null) {
+            return $query->exists()
+                ? 'Des prix par ville existent déjà pour ce produit. Supprimez-les pour définir un prix unique toutes villes.'
+                : null;
+        }
+
+        if ((clone $query)->whereNull('zone_id')->exists()) {
+            return 'Un prix « Toutes les villes » existe déjà pour ce produit. Modifiez-le pour définir des prix par ville.';
+        }
+
+        if ((clone $query)->where('zone_id', $zoneId)->exists()) {
+            return 'Un barème existe déjà pour ce produit et cette ville. Modifiez-le au lieu d\'en créer un nouveau.';
+        }
+
+        return null;
     }
 
     private function duplicateForPosExists(int $productId, ?int $exclude = null): bool

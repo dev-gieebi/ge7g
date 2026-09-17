@@ -23,7 +23,7 @@ export function PricesPage() {
 
   const openNew = () => {
     setEditingId(null);
-    setEditing({ product_id: products?.[0]?.id, zone_id: null, competitor_price: 0, amount: 0, factory_price: 0, for_pos: false });
+    setEditing({ product_id: products?.[0]?.id, zone_id: null, competitor_price: 0, amount: 0, factory_price: 0 });
   };
   const openEdit = (price: Price) => {
     setEditingId(price.id);
@@ -33,7 +33,6 @@ export function PricesPage() {
       competitor_price: price.competitor_price,
       amount: price.amount,
       factory_price: price.factory_price,
-      for_pos: price.for_pos ?? false,
     });
   };
   const close = () => {
@@ -142,7 +141,6 @@ export function PricesPage() {
     { key: "competitor_price", header: "Prix concurrent", align: "right", render: (p) => money(p.competitor_price) },
     { key: "amount", header: "Prix vente G-E7G", align: "right", sortable: true, render: (p) => <span className="font-bold text-ge7-purple">{money(p.amount)}</span> },
     { key: "factory_price", header: "PU Usine HT", align: "right", render: (p) => money(p.factory_price) },
-    { key: "for_pos", header: "Caisse", align: "center", render: (p) => p.for_pos ? <Badge tone="green">Oui</Badge> : <span className="text-ge7-black/30">—</span> },
   ];
 
   return (
@@ -163,7 +161,7 @@ export function PricesPage() {
           </div>
         }
       />
-      <div className="mb-4 grid gap-3 sm:grid-cols-4">
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <Select value={String(list.filters.product_id ?? "")} onChange={(e) => list.setFilter("product_id", e.target.value)} className="sm:col-span-2">
           <option value="">Tous les produits</option>
           {products?.map((p: Product) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -171,11 +169,6 @@ export function PricesPage() {
         <Select value={String(list.filters.zone_id ?? "")} onChange={(e) => list.setFilter("zone_id", e.target.value)}>
           <option value="">Toutes les zones</option>
           {zones?.map((z: Zone) => <option key={z.id} value={z.id}>{z.name}</option>)}
-        </Select>
-        <Select value={String(list.filters.for_pos ?? "")} onChange={(e) => list.setFilter("for_pos", e.target.value)}>
-          <option value="">Tous les prix</option>
-          <option value="1">Caisse</option>
-          <option value="0">Barème</option>
         </Select>
       </div>
       <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(p) => p.id} onRowClick={openEdit} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucun prix défini" emptyHint="Le prix de vente par défaut du produit s'applique." />
@@ -199,17 +192,13 @@ export function PricesPage() {
               <Select label="Produit" required value={String(editing.product_id ?? "")} onChange={(e) => setEditing({ ...editing, product_id: e.target.value ? Number(e.target.value) : undefined })} error={errors.product_id} className="sm:col-span-2">
                 {products?.map((p: Product) => <option key={p.id} value={p.id}>{p.name} ({p.reference})</option>)}
               </Select>
-              <Select label="Zone" hint="Avec une ville, le prix s'applique au point de vente de cette ville." value={String(editing.zone_id ?? "")} onChange={(e) => setEditing({ ...editing, zone_id: e.target.value ? Number(e.target.value) : null })}>
+              <Select label="Zone" hint="« Toutes » fixe un prix unique pour toutes les villes. Une ville précise permet un prix différent par ville." value={String(editing.zone_id ?? "")} onChange={(e) => setEditing({ ...editing, zone_id: e.target.value ? Number(e.target.value) : null })} error={errors.zone_id}>
                 <option value="">Toutes</option>
                 {zones?.map((z: Zone) => <option key={z.id} value={z.id}>{z.name}</option>)}
               </Select>
               <Input label="Prix concurrent (FCFA)" type="number" min={0} required value={editing.competitor_price ?? 0} onChange={(e) => setEditing({ ...editing, competitor_price: Number(e.target.value) })} error={errors.competitor_price} />
               <Input label="Prix vente G-E7G (FCFA)" type="number" min={0} required value={editing.amount ?? 0} onChange={(e) => setEditing({ ...editing, amount: Number(e.target.value) })} error={errors.amount} />
               <Input label="PU Usine HT (FCFA)" type="number" min={0} required value={editing.factory_price ?? 0} onChange={(e) => setEditing({ ...editing, factory_price: Number(e.target.value) })} error={errors.factory_price} />
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={!!editing.for_pos} onChange={(e) => setEditing({ ...editing, for_pos: e.target.checked })} className="size-4 rounded border-ge7-black/20 text-ge7-bronze focus:ring-ge7-bronze" />
-                Prix destiné à la caisse (comptoir uniquement)
-              </label>
             </FormGrid>
           </form>
         </Modal>
