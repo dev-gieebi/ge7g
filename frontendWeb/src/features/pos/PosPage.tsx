@@ -115,7 +115,7 @@ export function PosPage() {
               <option value="">Choisir la ville…</option>
               {zones?.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
             </Select>
-            <SearchInput value={search} onChange={setSearch} placeholder="Produit, référence, code-barres…" className="min-w-[260px] flex-1" autoFocus />
+            <SearchInput value={search} onChange={setSearch} placeholder="Nom du produit…" className="min-w-[260px] flex-1" autoFocus />
           </div>
 
           {zoneId === "" ? (
@@ -142,7 +142,7 @@ export function PosPage() {
                       {p.image_url ? <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" /> : <span className="font-display text-3xl font-extrabold text-ge7-bronze/60">{p.name.slice(0, 2).toUpperCase()}</span>}
                     </div>
                     <p className="font-bold leading-tight">{p.name}</p>
-                    <p className="text-xs text-ge7-black/50">{single ? `${p.reference}${p.type ? ` · ${p.type}` : ""}` : `${list.length} types disponibles`}</p>
+                    <p className="text-xs text-ge7-black/50">{single ? (p.type ?? "") : `${list.length} types disponibles`}</p>
                     <div className="mt-2 flex items-end justify-between">
                       <span className="font-extrabold text-ge7-bronze">{single ? money(p.sale_price) : `dès ${money(minPrice)}`}</span>
                       <Badge tone={avail <= 0 ? "red" : "green"}>{qty(avail, p.unit?.symbol)}</Badge>
@@ -250,7 +250,7 @@ export function PosPage() {
             <div className="mt-4 grid gap-2">
               {family.map((p) => (
                 <button key={p.id} disabled={p.available_quantity <= 0} onClick={() => add(p)} className="flex items-center justify-between rounded-2xl border border-ge7-black/10 p-4 text-left transition hover:border-ge7-gold hover:bg-ge7-gold-soft/40 disabled:opacity-50">
-                  <div><p className="font-bold">{p.type}</p><p className="text-xs text-ge7-black/50">{p.reference} · dispo {qty(p.available_quantity, p.unit?.symbol)}</p></div>
+                  <div><p className="font-bold">{p.type}</p><p className="text-xs text-ge7-black/50">dispo {qty(p.available_quantity, p.unit?.symbol)}</p></div>
                   <span className="font-extrabold text-ge7-bronze">{money(p.sale_price)}</span>
                 </button>
               ))}
