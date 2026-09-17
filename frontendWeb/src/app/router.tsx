@@ -25,7 +25,6 @@ import { DeliveriesPage } from "@/features/deliveries/DeliveriesPage";
 import { DeliveryDetailPage } from "@/features/deliveries/DeliveryDetailPage";
 import { NewDeliveryPage } from "@/features/deliveries/NewDeliveryPage";
 import { PosPage } from "@/features/pos/PosPage";
-import { PosZonePage } from "@/features/pos/PosZonePage";
 import { PosSalesPage } from "@/features/pos/PosSalesPage";
 import { PosSaleDetailPage } from "@/features/pos/PosSaleDetailPage";
 import { InvoicesPage } from "@/features/invoices/InvoicesPage";
@@ -100,10 +99,7 @@ export const router = createBrowserRouter([
           },
           {
             element: <RequireRole roles={["AG_LOGISTIQUE", "CAISSIER"]} />,
-            children: [
-              { path: "/caisse", element: <PosPage /> },
-              { path: "/caisse/point-de-vente", element: <PosZonePage /> },
-            ],
+            children: [{ path: "/caisse", element: <PosPage /> }],
           },
           {
             element: <RequireRole roles={["AG_LOGISTIQUE", "DIRECTION"]} />,

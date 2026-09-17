@@ -159,7 +159,7 @@ class PosController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
-            'zone_id' => 'nullable|integer|exists:zones,id',
+            'zone_id' => 'required|integer|exists:zones,id',
             'tax_ids' => 'nullable|array',
             'tax_ids.*' => 'integer|exists:taxes,id',
             'payment_method' => 'required|in:ESPECES,CARTE,VIREMENT,MOBILE_MONEY,AUTRE',
