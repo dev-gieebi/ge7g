@@ -15,10 +15,17 @@ class UserSeeder extends Seeder
     {
         $users = [
             [
-                'code' => '41234567',
+                'code' => '73456812',
                 'name' => 'Super Admin G7',
                 'password' => 'password123',
                 'role' => 'SUPERADMIN',
+                'is_admin' => true,
+            ],
+            [
+                'code' => '41234567',
+                'name' => 'Agent Logistique',
+                'password' => 'password123',
+                'role' => 'AG_LOGISTIQUE',
                 'is_admin' => true,
             ],
             [
