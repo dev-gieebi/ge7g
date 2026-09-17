@@ -190,9 +190,9 @@ export function PricesPage() {
           <form id="price-form" onSubmit={submit}>
             <FormGrid>
               <Select label="Produit" required value={String(editing.product_id ?? "")} onChange={(e) => setEditing({ ...editing, product_id: e.target.value ? Number(e.target.value) : undefined })} error={errors.product_id} className="sm:col-span-2">
-                {products?.map((p: Product) => <option key={p.id} value={p.id}>{p.name} ({p.reference})</option>)}
+                {products?.map((p: Product) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
-              <Select label="Zone" hint="« Toutes » fixe un prix unique pour toutes les villes. Une ville précise permet un prix différent par ville." value={String(editing.zone_id ?? "")} onChange={(e) => setEditing({ ...editing, zone_id: e.target.value ? Number(e.target.value) : null })} error={errors.zone_id}>
+              <Select label="Zone"  value={String(editing.zone_id ?? "")} onChange={(e) => setEditing({ ...editing, zone_id: e.target.value ? Number(e.target.value) : null })} error={errors.zone_id}>
                 <option value="">Toutes</option>
                 {zones?.map((z: Zone) => <option key={z.id} value={z.id}>{z.name}</option>)}
               </Select>

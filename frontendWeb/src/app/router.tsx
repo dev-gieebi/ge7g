@@ -105,9 +105,13 @@ export const router = createBrowserRouter([
             element: <RequireRole roles={["AG_LOGISTIQUE", "DIRECTION"]} />,
             children: [
               { path: "/caisse/ventes", element: <PosSalesPage /> },
-              { path: "/caisse/ventes/:id", element: <PosSaleDetailPage /> },
               { path: "/notifications", element: <NotificationsPage /> },
             ],
+          },
+          {
+            // Le ticket de caisse est visible par le caissier après encaissement.
+            element: <RequireRole roles={["AG_LOGISTIQUE", "DIRECTION", "CAISSIER"]} />,
+            children: [{ path: "/caisse/ventes/:id", element: <PosSaleDetailPage /> }],
           },
           {
             element: <RequireRole roles={["SUPERADMIN"]} />,

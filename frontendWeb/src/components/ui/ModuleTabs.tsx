@@ -16,7 +16,7 @@ export function ModuleTabs({ tabs }: { tabs: ModuleTab[] }) {
   const visible = tabs.filter((t) => !t.roles || (user && hasRole(user, ...t.roles)));
   if (visible.length < 2) return null;
   return (
-    <div className="mb-5 flex flex-wrap gap-1 border-b border-ge7-black/10">
+    <div className="sticky top-0 z-10 mb-5 flex flex-wrap gap-1 border-b border-ge7-black/10 bg-ge7-cream/95 pt-2 backdrop-blur">
       {visible.map((t) => (
         <NavLink
           key={t.to}

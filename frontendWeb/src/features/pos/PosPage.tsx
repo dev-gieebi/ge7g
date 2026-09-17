@@ -100,7 +100,7 @@ export function PosPage() {
     if (zoneId === "") return;
     pay
       .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity })), tax_ids: taxIds, payment_method: method, customer_name: customer || null, amount_received: received === "" ? null : Number(received), zone_id: zoneId })
-      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setTaxIds([]); navigate(`/caisse/ventes/${s.id}`); })
+      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setTaxIds([]); navigate(`/caisse/ventes/${s.id}?print=1`); })
       .catch(() => {});
   };
 
@@ -131,7 +131,7 @@ export function PosPage() {
           ) : products.error ? (
             <ErrorState message={toApiError(products.error).message} onRetry={() => void products.refetch()} />
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3">
               {groups.map(({ key, list, single }) => {
                 const p = list[0];
                 const avail = list.reduce((s, x) => s + x.available_quantity, 0);
@@ -236,7 +236,6 @@ export function PosPage() {
               <div className="flex justify-between text-xl font-extrabold"><span>TOTAL</span><span className="text-ge7-bronze">{money(total)}</span></div>
               {change !== null && <div className={`flex justify-between font-semibold ${change < 0 ? "text-rose-600" : "text-emerald-700"}`}><span>Monnaie à rendre</span><span>{money(Math.max(0, change))}</span></div>}
             </div>
-            <p className="text-[11px] text-ge7-black/40">Montants indicatifs — le calcul définitif est effectué par le serveur.</p>
             <Button size="lg" className="w-full" disabled={!cart.length || zoneId === "" || (method === "ESPECES" && (received === "" || (change !== null && change < 0)))} loading={pay.isPending} onClick={checkout}>Encaisser {money(total)}</Button>
           </div>
         </Card>
