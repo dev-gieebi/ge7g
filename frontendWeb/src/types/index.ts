@@ -348,7 +348,7 @@ export interface Tax {
   status?: Status;
 }
 
-export type PaymentMethod = "ESPECES" | "CARTE" | "VIREMENT" | "MOBILE_MONEY" | "AUTRE";
+export type PaymentMethod = "ESPECES" | "CARTE" | "CHEQUE" | "VIREMENT" | "MOBILE_MONEY" | "AUTRE";
 
 export interface Payment {
   id: number;
@@ -418,8 +418,9 @@ export interface PosSale {
   total: number;
   payment_method: PaymentMethod;
   status: "PAYEE" | "ANNULEE";
+  delivery_status?: "LIVREE" | "PARTIELLEMENT_LIVREE" | "A_LIVRER";
   invoice?: Invoice | null;
-  items?: { product?: PosProduct; quantity: number; unit_price: number; total: number }[];
+  items?: { id: number; product?: PosProduct; quantity: number; delivered_quantity: number; remaining_quantity: number; unit_price: number; total: number }[];
   created_at: string;
 }
 

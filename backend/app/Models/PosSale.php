@@ -15,6 +15,9 @@ class PosSale extends Model
     /** @use HasFactory<PosSaleFactory> */
     use HasFactory;
 
+    /** @var list<string> */
+    protected $appends = ['delivery_status'];
+
     protected function casts(): array
     {
         return [
@@ -24,6 +27,22 @@ class PosSale extends Model
             'total' => 'decimal:4',
             'amount_received' => 'decimal:4',
         ];
+    }
+
+    /**
+     * LIVREE / PARTIELLEMENT_LIVREE / A_LIVRER selon les quantités livrées.
+     * Nécessite la relation `items` (chargée en eager loading par le contrôleur).
+     */
+    public function getDeliveryStatusAttribute(): string
+    {
+        $ordered = (float) $this->items->sum('quantity');
+        $delivered = (float) $this->items->sum('delivered_quantity');
+
+        if ($ordered <= 0 || $delivered >= $ordered) {
+            return 'LIVREE';
+        }
+
+        return $delivered > 0 ? 'PARTIELLEMENT_LIVREE' : 'A_LIVRER';
     }
 
     public function cashier(): BelongsTo

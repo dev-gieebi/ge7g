@@ -163,10 +163,11 @@ class PosController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.delivered_quantity' => 'nullable|numeric|min:0',
             'zone_id' => 'required|integer|exists:zones,id',
             'tax_ids' => 'nullable|array',
             'tax_ids.*' => 'integer|exists:taxes,id',
-            'payment_method' => 'required|in:ESPECES,CARTE,VIREMENT,MOBILE_MONEY,AUTRE',
+            'payment_method' => 'required|in:ESPECES,CARTE,CHEQUE,VIREMENT,MOBILE_MONEY,AUTRE',
             'customer_name' => 'nullable|string|max:120',
             'amount_received' => 'nullable|numeric|min:0',
         ]);
@@ -205,9 +206,13 @@ class PosController extends Controller
             foreach ($validated['items'] as $input) {
                 $product = Product::lockForUpdate()->findOrFail($input['product_id']);
                 $qty = (float) $input['quantity'];
+                // Quantité livrée immédiatement : bornée entre 0 et la quantité commandée.
+                $delivered = isset($input['delivered_quantity'])
+                    ? min(max((float) $input['delivered_quantity'], 0.0), $qty)
+                    : $qty;
                 $available = (float) $product->stock_quantity - (float) $product->reserved_quantity;
 
-                if ($qty > $available) {
+                if ($delivered > $available) {
                     throw new \InvalidArgumentException('Stock insuffisant pour '.$product->name.'.');
                 }
 
@@ -219,25 +224,28 @@ class PosController extends Controller
                     'pos_sale_id' => $sale->id,
                     'product_id' => $product->id,
                     'quantity' => $qty,
+                    'delivered_quantity' => $delivered,
                     'unit_price' => $unitPrice,
                     'total' => $lineTotal,
                 ]);
 
-                $newStock = (float) $product->stock_quantity - $qty;
-                $product->stock_quantity = $newStock;
-                $product->save();
+                if ($delivered > 0) {
+                    $newStock = (float) $product->stock_quantity - $delivered;
+                    $product->stock_quantity = $newStock;
+                    $product->save();
 
-                StockMovement::create([
-                    'product_id' => $product->id,
-                    'type' => 'VENTE',
-                    'quantity' => -$qty,
-                    'balance_after' => $newStock,
-                    'reference_type' => 'PosSale',
-                    'reference_id' => $sale->id,
-                    'reference_number' => $sale->number,
-                    'note' => $zoneId ? 'Vente point de vente' : 'Vente comptoir',
-                    'user_id' => $user->id,
-                ]);
+                    StockMovement::create([
+                        'product_id' => $product->id,
+                        'type' => 'VENTE',
+                        'quantity' => -$delivered,
+                        'balance_after' => $newStock,
+                        'reference_type' => 'PosSale',
+                        'reference_id' => $sale->id,
+                        'reference_number' => $sale->number,
+                        'note' => $delivered < $qty ? 'Vente point de vente (livraison partielle)' : 'Vente point de vente',
+                        'user_id' => $user->id,
+                    ]);
+                }
 
                 $subtotal += $lineTotal;
             }
@@ -262,6 +270,70 @@ class PosController extends Controller
     public function show(Request $request, PosSale $sale): JsonResponse
     {
         $this->authorizeUser($request);
+
+        $sale->load(['cashier', 'zone', 'items.product.unit']);
+
+        return response()->json(['data' => $sale]);
+    }
+
+    /**
+     * Livre tout ou partie du reste d'une vente : déduit le stock au fur
+     * et à mesure et met à jour delivered_quantity sur chaque ligne.
+     */
+    public function deliver(Request $request, PosSale $sale): JsonResponse
+    {
+        $user = $this->authorizeUser($request);
+
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.id' => 'required|integer',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+        ]);
+
+        $sale->load('items');
+
+        DB::transaction(function () use ($validated, $sale, $user) {
+            foreach ($validated['items'] as $input) {
+                $item = $sale->items->firstWhere('id', (int) $input['id']);
+
+                if (! $item) {
+                    throw new \InvalidArgumentException('Ligne de vente inconnue.');
+                }
+
+                $qty = (float) $input['quantity'];
+                $remaining = (float) $item->quantity - (float) $item->delivered_quantity;
+
+                if ($qty > $remaining) {
+                    throw new \InvalidArgumentException('Quantité à livrer supérieure au reste pour '.($item->product->name ?? 'le produit').'.');
+                }
+
+                $product = Product::lockForUpdate()->findOrFail($item->product_id);
+                $available = (float) $product->stock_quantity - (float) $product->reserved_quantity;
+
+                if ($qty > $available) {
+                    throw new \InvalidArgumentException('Stock insuffisant pour '.$product->name.'.');
+                }
+
+                $newStock = (float) $product->stock_quantity - $qty;
+                $product->stock_quantity = $newStock;
+                $product->save();
+
+                $item->delivered_quantity = (float) $item->delivered_quantity + $qty;
+                $item->save();
+
+                StockMovement::create([
+                    'product_id' => $product->id,
+                    'type' => 'VENTE',
+                    'quantity' => -$qty,
+                    'balance_after' => $newStock,
+                    'reference_type' => 'PosSale',
+                    'reference_id' => $sale->id,
+                    'reference_number' => $sale->number,
+                    'note' => 'Livraison reliquat vente '.$sale->number,
+                    'user_id' => $user->id,
+                ]);
+            }
+        });
 
         $sale->load(['cashier', 'zone', 'items.product.unit']);
 

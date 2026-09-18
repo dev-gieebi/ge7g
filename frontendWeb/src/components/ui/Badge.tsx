@@ -47,6 +47,7 @@ const STATUS_TONES: Record<string, Tone> = {
   EN_MISSION: "blue",
   LIVREE: "green",
   PARTIELLEMENT_LIVREE: "amber",
+  A_LIVRER: "amber",
   RECEPTION_CONFIRMEE: "green",
   CLOTUREE: "dark",
   REFUSEE: "red",

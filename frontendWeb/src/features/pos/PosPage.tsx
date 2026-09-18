@@ -11,9 +11,9 @@ import { useAction } from "@/lib/hooks";
 import { money, qty } from "@/lib/format";
 import { Badge, Button, Card, ErrorState, Input, Loading, PageHeader, SearchInput, Select } from "@/components/ui";
 
-interface Line { product: PosProduct; quantity: number }
+interface Line { product: PosProduct; quantity: number; delivered: number }
 interface Payload {
-  items: { product_id: number; quantity: number }[];
+  items: { product_id: number; quantity: number; delivered_quantity: number }[];
   tax_ids: number[];
   payment_method: PaymentMethod;
   customer_name: string | null;
@@ -24,6 +24,7 @@ interface Payload {
 const METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "ESPECES", label: "Espèces" },
   { value: "CARTE", label: "Carte" },
+  { value: "CHEQUE", label: "Chèque" },
   { value: "VIREMENT", label: "Virement" },
   { value: "MOBILE_MONEY", label: "Mobile Money" },
   { value: "AUTRE", label: "Autre" },
@@ -39,6 +40,7 @@ export function PosPage() {
   const [customer, setCustomer] = useState("");
   const [received, setReceived] = useState<number | "">("");
   const [zoneId, setZoneId] = useState<number | "">("");
+  const [partial, setPartial] = useState(false);
 
   const { data: taxes } = useTaxes();
   const { data: zones } = useZones();
@@ -87,20 +89,22 @@ export function PosPage() {
     if (p.available_quantity <= 0) return;
     setCart((c) => {
       const ex = c.find((l) => l.product.id === p.id);
-      if (ex) return c.map((l) => (l.product.id === p.id ? { ...l, quantity: Math.min(l.quantity + 1, p.available_quantity) } : l));
-      return [...c, { product: p, quantity: 1 }];
+      // La quantité commandée peut dépasser le stock : le reste sera livré plus tard.
+      if (ex) return c.map((l) => (l.product.id === p.id ? { ...l, quantity: l.quantity + 1, delivered: Math.min(l.quantity + 1, p.available_quantity) } : l));
+      return [...c, { product: p, quantity: 1, delivered: Math.min(1, p.available_quantity) }];
     });
     setFamily(null);
   };
-  const setQty = (id: number, q: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, quantity: Math.max(0, Math.min(q, l.product.available_quantity)) } : l)).filter((l) => l.quantity > 0));
+  const setQty = (id: number, q: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, quantity: Math.max(0, q), delivered: Math.min(Math.max(0, q), l.product.available_quantity) } : l)).filter((l) => l.quantity > 0));
+  const setDelivered = (id: number, d: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, delivered: Math.max(0, Math.min(d, l.quantity, l.product.available_quantity)) } : l)));
 
   const pay = useAction<Payload, PosSale>(() => "/pos/sales", { keys: ["pos-products", "pos-sales", "products", "stock-movements", "dashboard"], success: "Vente enregistrée", body: (v) => v });
 
   const checkout = () => {
     if (zoneId === "") return;
     pay
-      .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity })), tax_ids: taxIds, payment_method: method, customer_name: customer || null, amount_received: received === "" ? null : Number(received), zone_id: zoneId })
-      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setTaxIds([]); navigate(`/caisse/ventes/${s.id}?print=1`); })
+      .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity, delivered_quantity: partial ? Math.min(l.delivered, l.quantity, l.product.available_quantity) : l.quantity })), tax_ids: taxIds, payment_method: method, customer_name: customer || null, amount_received: received === "" ? null : Number(received), zone_id: zoneId })
+      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setTaxIds([]); setPartial(false); navigate(`/caisse/ventes/${s.id}?print=1`); })
       .catch(() => {});
   };
 
@@ -179,6 +183,15 @@ export function PosPage() {
                     </div>
                     <span className="font-bold">{money(l.product.sale_price * l.quantity)}</span>
                   </div>
+                  {partial && (
+                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-ge7-black/5 pt-2 text-xs">
+                      <span className="text-ge7-black/60">Livrée maintenant</span>
+                      <span className="flex items-center gap-1.5">
+                        <input type="number" min={0} step="any" value={l.delivered} onChange={(e) => setDelivered(l.product.id, Number(e.target.value))} className="w-16 rounded-lg border border-ge7-black/10 px-2 py-1 text-center text-sm" />
+                        <span className="text-ge7-black/50">reste {qty(l.quantity - l.delivered, l.product.unit?.symbol)}</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -229,6 +242,10 @@ export function PosPage() {
                 {METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </Select>
             </div>
+            <label className="flex items-center gap-2 rounded-lg border border-ge7-black/10 px-3 py-2 text-sm" title="Seule la quantité livrée est déduite du stock ; le reste sera livré plus tard.">
+              <input type="checkbox" className="size-4 rounded border-ge7-black/20 text-ge7-bronze focus:ring-ge7-bronze" checked={partial} onChange={(e) => setPartial(e.target.checked)} />
+              Livraison partielle <span className="text-xs text-ge7-black/50"></span>
+            </label>
             {method === "ESPECES" && <Input label="Montant reçu *" type="number" min={0} required value={received} onChange={(e) => setReceived(e.target.value === "" ? "" : Number(e.target.value))} />}
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-ge7-black/60"><span>Sous-total HT</span><span>{money(subtotal)}</span></div>

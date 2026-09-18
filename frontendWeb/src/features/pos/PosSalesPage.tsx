@@ -23,6 +23,7 @@ export function PosSalesPage() {
     { key: "tax", header: "Taxe", render: (s) => (s.tax_type === "AUCUNE" ? "—" : `${s.tax_type} ${(Number(s.tax_rate) * 100).toFixed(0)} %`) },
     { key: "total", header: "Total", align: "right", sortable: true, render: (s) => <span className="font-bold">{money(s.total)}</span> },
     { key: "status", header: "Statut", render: (s) => <StatusBadge status={s.status} /> },
+    { key: "delivery", header: "Livraison", render: (s) => <StatusBadge status={s.delivery_status} /> },
   ];
 
   return (
@@ -33,7 +34,7 @@ export function PosSalesPage() {
         <SearchInput value={list.search} onChange={list.setSearch} placeholder="N° ticket, client…" />
         <Select value={String(list.filters.payment_method ?? "")} onChange={(e) => list.setFilter("payment_method", e.target.value)}>
           <option value="">Tous paiements</option>
-          {["ESPECES", "CARTE", "VIREMENT", "MOBILE_MONEY", "AUTRE"].map((m) => <option key={m} value={m}>{m.replace("_", " ")}</option>)}
+          {["ESPECES", "CARTE", "CHEQUE", "VIREMENT", "MOBILE_MONEY", "AUTRE"].map((m) => <option key={m} value={m}>{m.replace("_", " ")}</option>)}
         </Select>
         <Select value={String(list.filters.zone_id ?? "")} onChange={(e) => list.setFilter("zone_id", e.target.value)}>
           <option value="">Toutes villes</option>

@@ -8,13 +8,13 @@ use App\Http\Controllers\PosController;
 use App\Http\Controllers\PriceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\PusherTestController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\PusherTestController;
 use App\Http\Controllers\ZoneController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +49,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('pos/sales', [PosController::class, 'index']);
     Route::post('pos/sales', [PosController::class, 'store']);
     Route::get('pos/sales/{sale}', [PosController::class, 'show']);
+    Route::post('pos/sales/{sale}/deliver', [PosController::class, 'deliver']);
 
     Route::get('dashboard', [DashboardController::class, 'index']);
     Route::get('dashboard/sales-series', [DashboardController::class, 'salesSeries']);

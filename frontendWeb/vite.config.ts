@@ -12,8 +12,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: "https://api-ge7g.com",
-        //target: "http://127.0.0.1:8000",
+        //target: "https://api-ge7g.com",
+        target: "http://127.0.0.1:8000",
         changeOrigin: true,
       },
     },

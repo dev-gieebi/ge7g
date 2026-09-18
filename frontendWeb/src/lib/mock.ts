@@ -183,8 +183,8 @@ const invoices: Invoice[] = [
 ];
 
 const posSales: PosSale[] = [
-  { id: 1, number: "VNT-2026-0001", cashier: { id: 2, name: "Caissier G7" }, customer_name: "Client comptoir", subtotal: 106800, tax_type: "TVA", tax_rate: 0.18, tax_amount: 19224, total: 126024, payment_method: "ESPECES", status: "PAYEE", invoice: invoices[2], items: [{ product: products[8], quantity: 120, unit_price: 890, total: 106800 }], created_at: daysAgo(1) },
-  { id: 2, number: "VNT-2026-0002", cashier: { id: 2, name: "Caissier G7" }, customer_name: null, subtotal: 9000, tax_type: "TVA", tax_rate: 0.18, tax_amount: 1620, total: 10620, payment_method: "MOBILE_MONEY", status: "PAYEE", items: [{ product: products[0], quantity: 2, unit_price: 4500, total: 9000 }], created_at: now() },
+  { id: 1, number: "VNT-2026-0001", cashier: { id: 2, name: "Caissier G7" }, customer_name: "Client comptoir", subtotal: 106800, tax_type: "TVA", tax_rate: 0.18, tax_amount: 19224, total: 126024, payment_method: "ESPECES", status: "PAYEE", delivery_status: "LIVREE", invoice: invoices[2], items: [{ id: 1, product: products[8], quantity: 120, delivered_quantity: 120, remaining_quantity: 0, unit_price: 890, total: 106800 }], created_at: daysAgo(1) },
+  { id: 2, number: "VNT-2026-0002", cashier: { id: 2, name: "Caissier G7" }, customer_name: null, subtotal: 9000, tax_type: "TVA", tax_rate: 0.18, tax_amount: 1620, total: 10620, payment_method: "MOBILE_MONEY", status: "PAYEE", delivery_status: "LIVREE", items: [{ id: 2, product: products[0], quantity: 2, delivered_quantity: 2, remaining_quantity: 0, unit_price: 4500, total: 9000 }], created_at: now() },
 ];
 
 const notifications: Notification[] = [
