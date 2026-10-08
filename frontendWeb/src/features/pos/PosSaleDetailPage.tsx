@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCallback, useState } from "react";
-import { ArrowLeft, FileText, Printer, Receipt, Truck } from "lucide-react";
+import { ArrowLeft, Printer, Receipt, Truck } from "lucide-react";
 import type { PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
