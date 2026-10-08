@@ -46,7 +46,7 @@ export function LoginPage() {
           </h1>
           <p className="mt-5 text-white/70">
             Commandes, préparation, logistique, livraisons signées, caisse et facturation,
-            une seule plateforme pour G7 Energy.
+            une seule plateforme pour G-ENERGIE 7 GROUPE.
           </p>
           <div className="mt-8 grid grid-cols-3 gap-3 text-sm">
             {["Traçabilité totale", "Suivi de stock", "Caisse"].map((t) => (
@@ -56,7 +56,7 @@ export function LoginPage() {
             ))}
           </div>
         </div>
-        <p className="relative text-xs text-white/40">© {new Date().getFullYear()} G-Energy 7 Group. Tous droits réservés.</p>
+        <p className="relative text-xs text-white/40">© {new Date().getFullYear()} G-ENERGIE 7 GROUPE. Tous droits réservés.</p>
       </section>
 
       <section className="flex items-center justify-center bg-ge7-cream px-6 py-12">

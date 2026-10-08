@@ -18,7 +18,7 @@ export function Logo({
             G<span className="text-ge7-gold">-</span>E<span className="text-ge7-purple-light">7</span>G
           </p>
           <p className={`mt-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] ${light ? "text-ge7-gold-light/80" : "text-ge7-bronze"}`}>
-            G-ENERGY 7 GROUPE
+            G-ENERGIE 7 GROUPE
           </p>
         </div>
       )}

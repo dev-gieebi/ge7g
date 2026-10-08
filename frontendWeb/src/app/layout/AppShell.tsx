@@ -14,7 +14,7 @@ export function AppShell() {
   if (user?.role === "CAISSIER") {
     return (
       <div className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-ge7-black/5 bg-ge7-cream/85 px-4 py-2.5 backdrop-blur sm:px-6">
+        <header className="no-print sticky top-0 z-20 flex items-center justify-between border-b border-ge7-black/5 bg-ge7-cream/85 px-4 py-2.5 backdrop-blur sm:px-6">
           <Logo size={30} />
           <button
             onClick={() => void logout()}

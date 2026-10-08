@@ -411,10 +411,14 @@ export interface PosSale {
   zone_id?: number | null;
   zone?: Pick<Zone, "id" | "name"> | null;
   customer_name: string | null;
+  customer_phone: string | null;
+  customer_address: string | null;
   subtotal: number;
+  discount_rate: number;
   tax_type: TaxType;
   tax_rate: number;
   tax_amount: number;
+  tax_details?: { type: string; name: string; rate: number; amount: number }[] | null;
   total: number;
   payment_method: PaymentMethod;
   status: "PAYEE" | "ANNULEE";

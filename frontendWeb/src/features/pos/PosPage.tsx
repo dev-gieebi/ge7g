@@ -8,6 +8,7 @@ import { getList, toApiError } from "@/lib/api";
 import type { PaymentMethod, PosProduct, PosSale } from "@/types";
 import { useTaxes, useZones } from "@/features/shared/refData";
 import { useAction } from "@/lib/hooks";
+import { useAuth } from "@/lib/auth";
 import { money, qty } from "@/lib/format";
 import { Badge, Button, Card, ErrorState, Input, Loading, PageHeader, SearchInput, Select } from "@/components/ui";
 
@@ -17,6 +18,9 @@ interface Payload {
   tax_ids: number[];
   payment_method: PaymentMethod;
   customer_name: string | null;
+  customer_phone: string | null;
+  customer_address: string | null;
+  discount_rate: number | null;
   amount_received: number | null;
   zone_id: number;
 }
@@ -32,12 +36,18 @@ const METHODS: { value: PaymentMethod; label: string }[] = [
 
 export function PosPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // La caissière vend au comptoir sans fiche client ; les autres rôles doivent la renseigner.
+  const isCashier = user?.role === "CAISSIER";
   const [search, setSearch] = useState("");
   const [family, setFamily] = useState<PosProduct[] | null>(null);
   const [cart, setCart] = useState<Line[]>([]);
   const [taxIds, setTaxIds] = useState<number[]>([]);
   const [method, setMethod] = useState<PaymentMethod>("ESPECES");
   const [customer, setCustomer] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+  const [remise, setRemise] = useState<number | "">("");
   const [received, setReceived] = useState<number | "">("");
   const [zoneId, setZoneId] = useState<number | "">("");
   const [partial, setPartial] = useState(false);
@@ -80,9 +90,11 @@ export function PosPage() {
   }, [products.data]);
 
   const subtotal = cart.reduce((s, l) => s + l.product.sale_price * l.quantity, 0);
+  const discount = remise === "" ? 0 : Math.round(subtotal * Number(remise) / 100);
+  const netSubtotal = subtotal - discount;
   const rate = selectedTaxes.reduce((s, t) => s + (t.type === "AUCUNE" ? 0 : (t.type === "TPS" ? -Number(t.rate) : Number(t.rate))), 0) / 100;
-  const taxAmount = Math.round(subtotal * rate);
-  const total = subtotal + taxAmount;
+  const taxAmount = Math.round(netSubtotal * rate);
+  const total = netSubtotal + taxAmount;
   const change = received !== "" && method === "ESPECES" ? Number(received) - total : null;
 
   const add = (p: PosProduct) => {
@@ -103,8 +115,8 @@ export function PosPage() {
   const checkout = () => {
     if (zoneId === "") return;
     pay
-      .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity, delivered_quantity: partial ? Math.min(l.delivered, l.quantity, l.product.available_quantity) : l.quantity })), tax_ids: taxIds, payment_method: method, customer_name: customer || null, amount_received: received === "" ? null : Number(received), zone_id: zoneId })
-      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setTaxIds([]); setPartial(false); navigate(`/caisse/ventes/${s.id}?print=1`); })
+      .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity, delivered_quantity: partial ? Math.min(l.delivered, l.quantity, l.product.available_quantity) : l.quantity })), tax_ids: taxIds, payment_method: method, customer_name: customer || null, customer_phone: customerPhone || null, customer_address: customerAddress || null, discount_rate: remise === "" ? null : Number(remise), amount_received: received === "" ? null : Number(received), zone_id: zoneId })
+      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setCustomerPhone(""); setCustomerAddress(""); setRemise(""); setTaxIds([]); setPartial(false); navigate(`/caisse/ventes/${s.id}`); })
       .catch(() => {});
   };
 
@@ -198,7 +210,14 @@ export function PosPage() {
           </div>
 
           <div className="mt-4 space-y-3 border-t border-ge7-black/5 pt-4">
-            <Input placeholder="Nom client (optionnel)" value={customer} onChange={(e) => setCustomer(e.target.value)} />
+            {!isCashier && (
+              <>
+                <Input placeholder="Nom du client *" required value={customer} onChange={(e) => setCustomer(e.target.value)} />
+                <Input placeholder="Téléphone du client *" required value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                <Input placeholder="Adresse du client *" required value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
+                <Input placeholder="Remise % (optionnel)" type="number" min={0} max={100} step="any" value={remise} onChange={(e) => setRemise(e.target.value === "" ? "" : Number(e.target.value))} />
+              </>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-ge7-black/70">Taxes</label>
@@ -248,12 +267,18 @@ export function PosPage() {
             </label>
             {method === "ESPECES" && <Input label="Montant reçu *" type="number" min={0} required value={received} onChange={(e) => setReceived(e.target.value === "" ? "" : Number(e.target.value))} />}
             <div className="space-y-1 text-sm">
-              <div className="flex justify-between text-ge7-black/60"><span>Sous-total HT</span><span>{money(subtotal)}</span></div>
+              <div className="flex justify-between text-ge7-black/60"><span>Total HT</span><span>{money(subtotal)}</span></div>
+              {discount > 0 && (
+                <>
+                  <div className="flex justify-between text-ge7-black/60"><span>Remise {remise} %</span><span>-{money(discount)}</span></div>
+                  <div className="flex justify-between text-ge7-black/60"><span>Total HT net</span><span>{money(netSubtotal)}</span></div>
+                </>
+              )}
               <div className="flex justify-between text-ge7-black/60"><span>{selectedTaxes.length === 0 ? "Taxe" : `${selectedTaxes.map((t) => t.name).join(" + ")} ${(rate * 100).toFixed(2).replace(/\.?0+$/, "")} %`}</span><span>{money(taxAmount)}</span></div>
               <div className="flex justify-between text-xl font-extrabold"><span>TOTAL</span><span className="text-ge7-bronze">{money(total)}</span></div>
               {change !== null && <div className={`flex justify-between font-semibold ${change < 0 ? "text-rose-600" : "text-emerald-700"}`}><span>Monnaie à rendre</span><span>{money(Math.max(0, change))}</span></div>}
             </div>
-            <Button size="lg" className="w-full" disabled={!cart.length || zoneId === "" || (method === "ESPECES" && (received === "" || (change !== null && change < 0)))} loading={pay.isPending} onClick={checkout}>Encaisser {money(total)}</Button>
+            <Button size="lg" className="w-full" disabled={!cart.length || zoneId === "" || (!isCashier && (!customer.trim() || !customerPhone.trim() || !customerAddress.trim())) || (method === "ESPECES" && (received === "" || (change !== null && change < 0)))} loading={pay.isPending} onClick={checkout}>Encaisser {money(total)}</Button>
           </div>
         </Card>
       </div>

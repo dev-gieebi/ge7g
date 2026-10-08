@@ -34,8 +34,8 @@ export function PrintableDocument({ doc, compact, dense }: { doc: DocData; compa
   const container = compact
     ? "max-w-sm rounded-3xl p-6 font-mono text-sm"
     : dense
-      ? "max-w-xl rounded-2xl p-4 text-[11px]"
-      : "max-w-3xl rounded-3xl p-8 sm:p-10";
+      ? "font-times max-w-xl rounded-2xl p-4 text-[11px]"
+      : "font-times max-w-3xl rounded-3xl p-8 sm:p-10";
   return (
     <div className={`mx-auto bg-white text-ge7-black ${container} shadow-soft print:max-w-none print:shadow-none`}>
       <div className={`flex ${compact ? "flex-col items-center text-center" : "items-start justify-between"} ${dense ? "gap-2" : "gap-4"}`}>
@@ -100,7 +100,7 @@ export function PrintableDocument({ doc, compact, dense }: { doc: DocData; compa
       </div>
 
       <p className={`${dense ? "mt-3 text-[10px]" : "mt-6 text-xs"} text-center text-ge7-black/50 ${compact ? "" : `border-t border-ge7-black/5 ${dense ? "pt-2" : "pt-4"}`}`}>
-        Merci de votre confiance · G-Energy 7 Group{doc.status ? ` · ${doc.status}` : ""}
+        Merci de votre confiance · G-Energie 7 Groupe{doc.status ? ` · ${doc.status}` : ""}
       </p>
     </div>
   );

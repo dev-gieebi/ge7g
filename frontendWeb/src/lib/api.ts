@@ -1,6 +1,5 @@
-import axios, { AxiosError, type AxiosAdapter, type AxiosRequestConfig } from "axios";
+import axios, { AxiosError } from "axios";
 import type { Paginated, ListParams } from "@/types";
-import { mockAdapter } from "./mock";
 
 const TOKEN_KEY = "ge7.token";
 
@@ -26,21 +25,9 @@ export const tokenStore = {
   clear: () => clearTokenCookie(),
 };
 
-const selectiveAdapter: AxiosAdapter = (config) => {
-  const path = (config.url || "").replace(/^\/+/, "");
-  // Ces ressources sont branchées sur l'API Laravel.
-  if (path === "users" || path.startsWith("users/") || path === "zones" || path.startsWith("zones/") || path === "taxes" || path.startsWith("taxes/") || path === "suppliers" || path.startsWith("suppliers/") || path === "units" || path.startsWith("units/") || path === "categories" || path.startsWith("categories/") || path === "products" || path.startsWith("products/") || path === "prices" || path.startsWith("prices/") || path === "purchases" || path.startsWith("purchases/") || path === "stocks" || path.startsWith("stocks/") || path === "stock-movements" || path.startsWith("stock-movements/") || path === "pos" || path.startsWith("pos/") || path === "dashboard" || path.startsWith("dashboard/") || path === "audit-logs" || path.startsWith("audit-logs/")) {
-    const { adapter, ...rest } = config;
-    return axios.request(rest as AxiosRequestConfig);
-  }
-  return mockAdapter(config);
-};
-
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? "/api",
   headers: { Accept: "application/json" },
-  // Les requêtes vers ces ressources passent au backend Laravel, le reste reste en mock.
-  adapter: selectiveAdapter,
 });
 
 api.interceptors.request.use((config) => {

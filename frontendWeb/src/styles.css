@@ -50,6 +50,9 @@
 }
 
 @layer components {
+  .font-times {
+    font-family: "Times New Roman", Times, serif;
+  }
   .ge7-input {
     @apply w-full rounded-xl border border-ge7-black/10 bg-white px-3.5 py-2.5 text-sm placeholder:text-ge7-black/40 transition;
   }
@@ -70,10 +73,18 @@
 }
 
 @media print {
+  /* Zones réservées à l'en-tête (haut) et au pied de page (bas) figés,
+     répétés sur chaque page. Pas de marge latérale. */
+  @page {
+    margin: 36mm 0 22mm;
+  }
   .no-print {
     display: none !important;
   }
   body {
     background: white;
+  }
+  main {
+    padding: 0 !important;
   }
 }

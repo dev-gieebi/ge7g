@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ModuleTabs } from "@/components/ui";
 import { APPRO_TABS } from "@/app/moduleTabs";
-import { PackageCheck, Plus } from "lucide-react";
+import { ArrowLeft, PackageCheck, Plus, Printer } from "lucide-react";
 import type { Purchase, PurchaseItem } from "@/types";
 import { fieldErrors, useAction, useCrud, useListState, useOne, usePaginated } from "@/lib/hooks";
 import { useProductsRef, useSuppliersRef } from "@/features/shared/refData";
@@ -9,6 +9,7 @@ import { LineItemsEditor, type LineItem } from "@/features/shared/LineItemsEdito
 import { date, money, qty } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { Button, DataTable, FormGrid, Input, Modal, PageHeader, SearchInput, Select, StatusBadge, type Column } from "@/components/ui";
+import { BonDeCommande } from "./BonDeCommande";
 
 interface PurchaseForm {
   supplier_id?: number;
@@ -27,7 +28,14 @@ export function PurchasesPage() {
   const [receiveId, setReceiveId] = useState<number | null>(null);
   const detail = useOne<Purchase>("purchase", receiveId ? `/purchases/${receiveId}` : null);
   const [received, setReceived] = useState<Record<number, number>>({});
+  const [printDoc, setPrintDoc] = useState<Purchase | null>(null);
   const notify = useToast();
+
+  useEffect(() => {
+    if (!printDoc) return;
+    const t = window.setTimeout(() => window.print(), 400);
+    return () => window.clearTimeout(t);
+  }, [printDoc]);
 
   const receive = useAction<{ id: number; items: { item_id: number; quantity: number }[] }>((v) => `/purchases/${v.id}/receive`, {
     keys: ["purchases", "purchase", "products", "stock-movements", "dashboard"],
@@ -46,7 +54,7 @@ export function PurchasesPage() {
       notify("Veuillez sélectionner un produit et une quantité valide pour chaque ligne", "error");
       return;
     }
-    crud.create.mutateAsync(form).then(() => setForm(null)).catch(() => {});
+    crud.create.mutateAsync(form).then((created) => { setForm(null); setPrintDoc(created); }).catch(() => {});
   };
   const errors = fieldErrors(crud.create.error);
 
@@ -72,12 +80,30 @@ export function PurchasesPage() {
       key: "actions",
       header: "",
       align: "right",
-      render: (p) =>
-        p.status === "COMMANDE" || p.status === "RECU_PARTIEL" ? (
-          <Button size="sm" variant="purple" onClick={() => openReceive(p)}><PackageCheck size={14} /> Réceptionner</Button>
-        ) : null,
+      render: (p) => (
+        <div className="flex justify-end gap-2">
+          {p.status !== "RECU" && (
+            <Button size="sm" variant="secondary" onClick={() => setPrintDoc(p)}><Printer size={14} /> Imprimer</Button>
+          )}
+          {p.status === "COMMANDE" || p.status === "RECU_PARTIEL" ? (
+            <Button size="sm" variant="purple" onClick={() => openReceive(p)}><PackageCheck size={14} /> Réceptionner</Button>
+          ) : null}
+        </div>
+      ),
     },
   ];
+
+  if (printDoc) {
+    return (
+      <>
+        <div className="no-print mb-6 flex items-center justify-between">
+          <Button variant="secondary" onClick={() => setPrintDoc(null)}><ArrowLeft size={16} /> Retour aux achats</Button>
+          <Button onClick={() => window.print()}><Printer size={16} /> Imprimer</Button>
+        </div>
+        <BonDeCommande purchase={printDoc} />
+      </>
+    );
+  }
 
   return (
     <>
