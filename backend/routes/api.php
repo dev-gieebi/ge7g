@@ -49,6 +49,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('pos/sales', [PosController::class, 'index']);
     Route::post('pos/sales', [PosController::class, 'store']);
     Route::get('pos/sales/{sale}', [PosController::class, 'show']);
+    Route::post('pos/sales/{sale}/discount', [PosController::class, 'applyDiscount']);
     Route::post('pos/sales/{sale}/deliver', [PosController::class, 'deliver']);
 
     Route::get('dashboard', [DashboardController::class, 'index']);

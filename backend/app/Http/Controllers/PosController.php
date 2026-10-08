@@ -168,7 +168,11 @@ class PosController extends Controller
             'tax_ids' => 'nullable|array',
             'tax_ids.*' => 'integer|exists:taxes,id',
             'payment_method' => 'required|in:ESPECES,CARTE,CHEQUE,VIREMENT,MOBILE_MONEY,AUTRE',
-            'customer_name' => 'nullable|string|max:120',
+            // Le caissier vend au comptoir sans fiche client ; les autres rôles doivent renseigner le client.
+            'customer_name' => $user->role === 'CAISSIER' ? 'nullable|string|max:120' : 'required|string|max:120',
+            'customer_phone' => $user->role === 'CAISSIER' ? 'nullable|string|max:40' : 'required|string|max:40',
+            'customer_address' => $user->role === 'CAISSIER' ? 'nullable|string|max:255' : 'required|string|max:255',
+            'discount_rate' => 'nullable|numeric|min:0|max:100',
             'amount_received' => 'nullable|numeric|min:0',
         ]);
 
@@ -185,12 +189,15 @@ class PosController extends Controller
         $zoneId = isset($validated['zone_id']) ? (int) $validated['zone_id'] : null;
         $prices = $this->g7gPrices($productIds, $zoneId);
 
-        $sale = DB::transaction(function () use ($validated, $user, $taxRate, $taxType, $prices, $zoneId) {
+        $sale = DB::transaction(function () use ($validated, $user, $taxRate, $taxType, $taxes, $prices, $zoneId) {
             $sale = PosSale::create([
                 'number' => (string) Str::uuid(),
                 'user_id' => $user->id,
                 'zone_id' => $zoneId,
                 'customer_name' => $validated['customer_name'] ?? null,
+                'customer_phone' => $validated['customer_phone'] ?? null,
+                'customer_address' => $validated['customer_address'] ?? null,
+                'discount_rate' => (float) ($validated['discount_rate'] ?? 0),
                 'subtotal' => 0,
                 'tax_type' => $taxType,
                 'tax_rate' => $taxRate / 100,
@@ -250,12 +257,23 @@ class PosController extends Controller
                 $subtotal += $lineTotal;
             }
 
-            $taxAmount = round($subtotal * ($taxRate / 100));
-            $total = $subtotal + $taxAmount;
+            // Remise éventuelle : les taxes s'appliquent sur le HT net (après remise).
+            $discountAmount = round($subtotal * (float) $sale->discount_rate / 100);
+            $netSubtotal = $subtotal - $discountAmount;
+
+            $taxDetails = [];
+            $taxAmount = 0;
+            foreach ($taxes as $tax) {
+                $signedRate = $tax->type === 'TPS' ? -(float) $tax->rate : (float) $tax->rate;
+                $amount = (int) round($netSubtotal * $signedRate / 100);
+                $taxAmount += $amount;
+                $taxDetails[] = ['type' => $tax->type, 'name' => $tax->name, 'rate' => (float) $tax->rate, 'amount' => $amount];
+            }
 
             $sale->subtotal = $subtotal;
             $sale->tax_amount = $taxAmount;
-            $sale->total = $total;
+            $sale->tax_details = $taxDetails;
+            $sale->total = $netSubtotal + $taxAmount;
             $sale->number = 'VNT-'.now()->format('Y').'-'.str_pad((string) $sale->id, 5, '0', STR_PAD_LEFT);
             $sale->save();
 
@@ -265,6 +283,43 @@ class PosController extends Controller
         $sale->load(['cashier', 'zone', 'items.product.unit']);
 
         return response()->json(['data' => $sale], 201);
+    }
+
+    public function applyDiscount(Request $request, PosSale $sale): JsonResponse
+    {
+        $this->authorizeUser($request);
+
+        $validated = $request->validate([
+            'discount_rate' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $subtotal = (float) $sale->subtotal;
+        $discountAmount = round($subtotal * (float) $validated['discount_rate'] / 100);
+        $netSubtotal = $subtotal - $discountAmount;
+
+        // Recalcule chaque taxe sur le HT net à partir des taux figés dans tax_details.
+        if (is_array($sale->tax_details) && count($sale->tax_details) > 0) {
+            $taxAmount = 0;
+            $sale->tax_details = array_map(function (array $t) use ($netSubtotal, &$taxAmount) {
+                $signed = $t['type'] === 'TPS' ? -(float) $t['rate'] : (float) $t['rate'];
+                $t['amount'] = (int) round($netSubtotal * $signed / 100);
+                $taxAmount += $t['amount'];
+
+                return $t;
+            }, $sale->tax_details);
+        } else {
+            // Ventes antérieures sans détail : on applique le taux global historique.
+            $taxAmount = (int) round($netSubtotal * (float) $sale->tax_rate);
+        }
+
+        $sale->discount_rate = (float) $validated['discount_rate'];
+        $sale->tax_amount = $taxAmount;
+        $sale->total = $netSubtotal + $taxAmount;
+        $sale->save();
+
+        $sale->load(['cashier', 'zone', 'items.product.unit']);
+
+        return response()->json(['data' => $sale]);
     }
 
     public function show(Request $request, PosSale $sale): JsonResponse

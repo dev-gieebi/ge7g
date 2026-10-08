@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['number', 'user_id', 'zone_id', 'customer_name', 'subtotal', 'tax_type', 'tax_rate', 'tax_amount', 'total', 'payment_method', 'amount_received', 'status'])]
+#[Fillable(['number', 'user_id', 'zone_id', 'customer_name', 'customer_phone', 'customer_address', 'subtotal', 'discount_rate', 'tax_type', 'tax_rate', 'tax_amount', 'tax_details', 'total', 'payment_method', 'amount_received', 'status'])]
 class PosSale extends Model
 {
     /** @use HasFactory<PosSaleFactory> */
@@ -22,8 +22,10 @@ class PosSale extends Model
     {
         return [
             'subtotal' => 'decimal:4',
+            'discount_rate' => 'decimal:4',
             'tax_rate' => 'decimal:4',
             'tax_amount' => 'decimal:4',
+            'tax_details' => 'array',
             'total' => 'decimal:4',
             'amount_received' => 'decimal:4',
         ];
