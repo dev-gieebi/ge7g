@@ -27,6 +27,9 @@ import { NewDeliveryPage } from "@/features/deliveries/NewDeliveryPage";
 import { PosPage } from "@/features/pos/PosPage";
 import { PosSalesPage } from "@/features/pos/PosSalesPage";
 import { PosSaleDetailPage } from "@/features/pos/PosSaleDetailPage";
+import { QuotesPage } from "@/features/quotes/QuotesPage";
+import { QuoteNewPage } from "@/features/quotes/QuoteNewPage";
+import { QuoteDetailPage } from "@/features/quotes/QuoteDetailPage";
 import { InvoicesPage } from "@/features/invoices/InvoicesPage";
 import { InvoiceDetailPage } from "@/features/invoices/InvoiceDetailPage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
@@ -63,10 +66,9 @@ export const router = createBrowserRouter([
           { path: "/", element: <HomeRedirect /> },
 
           {
-            element: <RequireRole roles={["AG_LOGISTIQUE", "DIRECTION"]} />,
+            element: <RequireRole roles={["LG_ADMIN", "DG_ADMIN", "CDG_ADMIN"]} />,
             children: [
               { path: "/dashboard", element: <DashboardPage /> },
-              { path: "/rapports", element: <ReportsPage /> },
               { path: "/clients", element: <ClientsPage /> },
               { path: "/clients/:id", element: <ClientDetailPage /> },
               { path: "/commandes", element: <OrdersPage /> },
@@ -85,7 +87,7 @@ export const router = createBrowserRouter([
             ],
           },
           {
-            element: <RequireRole roles={["AG_LOGISTIQUE", "DIRECTION"]} />,
+            element: <RequireRole roles={["LG_ADMIN", "DG_ADMIN", "CDG_ADMIN"]} />,
             children: [
               { path: "/logistique", element: <LogisticsDashboardPage /> },
               { path: "/categories", element: <CategoriesPage /> },
@@ -94,15 +96,35 @@ export const router = createBrowserRouter([
               { path: "/preparation", element: <PreparationPage /> },
               { path: "/chauffeurs", element: <DriversPage /> },
               { path: "/vehicules", element: <VehiclesPage /> },
+            ],
+          },
+          {
+            // Paramètres système : Super administrateur uniquement.
+            element: <RequireRole roles={["SUPERADMIN"]} />,
+            children: [
               { path: "/parametres", element: <SettingsPage /> },
             ],
           },
           {
-            element: <RequireRole roles={["AG_LOGISTIQUE", "CAISSIER"]} />,
+            // Circuit facturation : devis et suivi des ventes.
+            element: <RequireRole roles={["LG_ADMIN", "DG_ADMIN", "CDG_ADMIN"]} />,
+            children: [
+              { path: "/devis", element: <QuotesPage /> },
+              { path: "/devis/nouveau", element: <QuoteNewPage /> },
+              { path: "/devis/:id", element: <QuoteDetailPage /> },
+            ],
+          },
+          {
+            // Rapports de suivi : Direction + CDG_ADMIN (LG_ADMIN n'y a pas accès).
+            element: <RequireRole roles={["DG_ADMIN", "CDG_ADMIN"]} />,
+            children: [{ path: "/rapports", element: <ReportsPage /> }],
+          },
+          {
+            element: <RequireRole roles={["LG_ADMIN", "CAISSIER"]} />,
             children: [{ path: "/caisse", element: <PosPage /> }],
           },
           {
-            element: <RequireRole roles={["AG_LOGISTIQUE", "DIRECTION"]} />,
+            element: <RequireRole roles={["LG_ADMIN", "DG_ADMIN", "CDG_ADMIN", "CAISSIER"]} />,
             children: [
               { path: "/caisse/ventes", element: <PosSalesPage /> },
               { path: "/notifications", element: <NotificationsPage /> },
@@ -110,7 +132,7 @@ export const router = createBrowserRouter([
           },
           {
             // Le ticket de caisse est visible par le caissier après encaissement.
-            element: <RequireRole roles={["AG_LOGISTIQUE", "DIRECTION", "CAISSIER"]} />,
+            element: <RequireRole roles={["LG_ADMIN", "DG_ADMIN", "CAISSIER", "CDG_ADMIN"]} />,
             children: [{ path: "/caisse/ventes/:id", element: <PosSaleDetailPage /> }],
           },
           {

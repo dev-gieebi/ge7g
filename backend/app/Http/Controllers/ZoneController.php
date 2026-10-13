@@ -12,9 +12,9 @@ use Illuminate\Validation\Rule;
 
 class ZoneController extends Controller
 {
-    private const MANAGE_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN'];
+    private const MANAGE_ROLES = ['SUPERADMIN'];
 
-    private const VIEW_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN', 'CAISSIER'];
+    private const VIEW_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'];
 
     private function authorizeUser(Request $request, array $roles = self::MANAGE_ROLES): User
     {

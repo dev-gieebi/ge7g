@@ -14,17 +14,17 @@ const KEYS = ["order", "orders", "products", "dashboard", "logistics", "missions
 export function OrderDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
-  const isAdmin = hasRole(user, "AG_LOGISTIQUE", "DIRECTION");
+  const isAdmin = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
   const order = useOne<Order>("order", id ? `/orders/${id}` : null);
   const { data: drivers } = useDriversRef();
   const { data: vehicles } = useVehiclesRef();
   const [refuse, setRefuse] = useState<string | null>(null);
   const [assign, setAssign] = useState<{ driver_id?: number; vehicle_id?: number; scheduled_at: string } | null>(null);
 
-  const validate = useAction(() => `/orders/${id}/validate`, { keys: KEYS, success: "Commande validée — stock réservé" });
+  const validate = useAction(() => `/orders/${id}/validate`, { keys: KEYS, success: "Commande validée  stock réservé" });
   const doRefuse = useAction<{ reason: string }>(() => `/orders/${id}/refuse`, { keys: KEYS, success: "Commande refusée", body: (v) => v });
   const prepare = useAction(() => `/orders/${id}/prepare`, { keys: KEYS, success: "Commande envoyée en préparation" });
-  const doAssign = useAction<NonNullable<typeof assign>>(() => `/orders/${id}/assign-driver`, { keys: KEYS, success: "Chauffeur affecté — mission créée", body: (v) => v });
+  const doAssign = useAction<NonNullable<typeof assign>>(() => `/orders/${id}/assign-driver`, { keys: KEYS, success: "Chauffeur affecté  mission créée", body: (v) => v });
 
   if (order.isLoading) return <Loading />;
   if (!order.data) return <ErrorState message="Commande introuvable" />;
@@ -84,7 +84,7 @@ export function OrderDetailPage() {
                       <td className="px-5 py-3 text-right">{qty(it.delivered_quantity)}</td>
                       <td className="px-5 py-3 text-right">{money(it.unit_price)}</td>
                       <td className="px-5 py-3 text-right font-semibold">{money(it.total)}</td>
-                      <td className={`px-5 py-3 text-right ${short ? "font-bold text-rose-600" : "text-ge7-black/60"}`}>{it.product ? qty(it.product.available_quantity) : "—"}</td>
+                      <td className={`px-5 py-3 text-right ${short ? "font-bold text-rose-600" : "text-ge7-black/60"}`}>{it.product ? qty(it.product.available_quantity) : ""}</td>
                     </tr>
                   );
                 })}
@@ -114,7 +114,7 @@ export function OrderDetailPage() {
               <div className="space-y-2 text-sm">
                 <Link to={`/missions/${o.mission.id}`} className="font-bold text-ge7-purple hover:underline">{o.mission.number}</Link>
                 <p>Chauffeur : <span className="font-semibold">{o.mission.driver?.name}</span></p>
-                <p>Véhicule : {o.mission.vehicle?.plate ?? "—"}</p>
+                <p>Véhicule : {o.mission.vehicle?.plate ?? ""}</p>
                 <p>Prévu : {datetime(o.mission.scheduled_at)}</p>
                 <StatusBadge status={o.mission.status} />
               </div>
@@ -151,11 +151,11 @@ export function OrderDetailPage() {
         <Modal title="Affecter un chauffeur" subtitle="Crée une mission de livraison pour cette commande." size="sm" onClose={() => setAssign(null)} footer={<><Button variant="secondary" onClick={() => setAssign(null)}>Annuler</Button><Button variant="purple" loading={doAssign.isPending} onClick={() => doAssign.mutateAsync(assign).then(() => setAssign(null)).catch(() => {})}>Créer la mission</Button></>}>
           <FormGrid cols={1}>
             <Select label="Chauffeur" required value={String(assign.driver_id ?? "")} onChange={(e) => setAssign({ ...assign, driver_id: Number(e.target.value) })}>
-              <option value="">—</option>
+              <option value=""></option>
               {drivers?.map((d) => <option key={d.id} value={d.id} disabled={d.status !== "DISPONIBLE"}>{d.name} · {d.status}</option>)}
             </Select>
             <Select label="Véhicule" value={String(assign.vehicle_id ?? "")} onChange={(e) => setAssign({ ...assign, vehicle_id: e.target.value ? Number(e.target.value) : undefined })}>
-              <option value="">—</option>
+              <option value=""></option>
               {vehicles?.map((v) => <option key={v.id} value={v.id} disabled={v.status !== "DISPONIBLE"}>{v.plate} · {v.model}</option>)}
             </Select>
             <Input label="Départ prévu" type="datetime-local" value={assign.scheduled_at} onChange={(e) => setAssign({ ...assign, scheduled_at: e.target.value })} />

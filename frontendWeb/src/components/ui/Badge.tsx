@@ -41,6 +41,8 @@ const STATUS_TONES: Record<string, Tone> = {
   BROUILLON: "gray",
   EN_ATTENTE: "amber",
   VALIDEE: "blue",
+  VALIDE: "green",
+  ENVOYE: "blue",
   EN_PREPARATION: "purple",
   PRETE: "gold",
   EN_LIVRAISON: "blue",

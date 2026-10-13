@@ -14,17 +14,28 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class PosController extends Controller
 {
-    private const POS_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN', 'CAISSIER'];
+    /** Établissement des factures : caissier, agent logistique et direction. */
+    private const SALE_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER'];
 
-    private function authorizeUser(Request $request): User
+    /** Consultation : circuit commercial (CDG_ADMIN consulte les ventes). */
+    private const VIEW_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'];
+
+    /** Catalogue + barème ville : caisse et création de devis (CDG_ADMIN inclus). */
+    private const PRODUCT_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'];
+
+    /** Saisie des livraisons : rôles opérationnels + CDG_ADMIN. */
+    private const DELIVER_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CDG_ADMIN'];
+
+    private function authorizeUser(Request $request, array $roles = self::SALE_ROLES): User
     {
         /** @var User $user */
         $user = $request->user();
 
-        if (! in_array($user->role, self::POS_ROLES, true)) {
+        if (! in_array($user->role, $roles, true)) {
             abort(403, 'Accès réservé.');
         }
 
@@ -33,7 +44,7 @@ class PosController extends Controller
 
     public function products(Request $request): JsonResponse
     {
-        $this->authorizeUser($request);
+        $this->authorizeUser($request, self::PRODUCT_ROLES);
 
         $zoneId = $request->filled('zone_id') ? (int) $request->input('zone_id') : null;
 
@@ -105,7 +116,7 @@ class PosController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $this->authorizeUser($request);
+        $this->authorizeUser($request, self::VIEW_ROLES);
 
         $query = PosSale::query()->with(['cashier', 'zone', 'items.product.unit']);
 
@@ -164,6 +175,7 @@ class PosController extends Controller
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.delivered_quantity' => 'nullable|numeric|min:0',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
             'zone_id' => 'required|integer|exists:zones,id',
             'tax_ids' => 'nullable|array',
             'tax_ids.*' => 'integer|exists:taxes,id',
@@ -224,7 +236,17 @@ class PosController extends Controller
                 }
 
                 $g7gPrice = $prices->get($product->id);
-                $unitPrice = $g7gPrice && (float) $g7gPrice->amount > 0 ? (float) $g7gPrice->amount : (float) $product->sale_price;
+                // Prix plancher : barème de la ville (ou prix produit en repli). Le prix
+                // peut être majoré mais jamais inférieur au seuil de la ville.
+                $floor = $g7gPrice && (float) $g7gPrice->amount > 0 ? (float) $g7gPrice->amount : (float) $product->sale_price;
+                $unitPrice = isset($input['unit_price']) ? (float) $input['unit_price'] : $floor;
+
+                if ($unitPrice < $floor - 0.0001) {
+                    throw ValidationException::withMessages([
+                        'items' => 'Le prix de « '.$product->name.' » ne peut pas être inférieur au barème de la ville ('.number_format($floor, 0, ',', ' ').' FCFA).',
+                    ]);
+                }
+
                 $lineTotal = round($qty * $unitPrice, 4);
 
                 PosSaleItem::create([
@@ -324,7 +346,7 @@ class PosController extends Controller
 
     public function show(Request $request, PosSale $sale): JsonResponse
     {
-        $this->authorizeUser($request);
+        $this->authorizeUser($request, self::VIEW_ROLES);
 
         $sale->load(['cashier', 'zone', 'items.product.unit']);
 
@@ -337,7 +359,7 @@ class PosController extends Controller
      */
     public function deliver(Request $request, PosSale $sale): JsonResponse
     {
-        $user = $this->authorizeUser($request);
+        $user = $this->authorizeUser($request, self::DELIVER_ROLES);
 
         $validated = $request->validate([
             'items' => 'required|array|min:1',

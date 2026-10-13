@@ -1,4 +1,4 @@
-export type Role = "AG_LOGISTIQUE" | "CAISSIER" | "DIRECTION" | "SUPERADMIN";
+export type Role = "LG_ADMIN" | "CAISSIER" | "DG_ADMIN" | "SUPERADMIN" | "CDG_ADMIN";
 
 export interface User {
   id: number;
@@ -19,6 +19,11 @@ export interface Paginated<T> {
     total: number;
     from: number | null;
     to: number | null;
+    /** Totaux de la période filtrée (mouvements de stock). */
+    totals?: {
+      entries: { quantity: number; amount: number };
+      exits: { quantity: number; amount: number };
+    };
   };
 }
 
@@ -185,6 +190,19 @@ export interface StockMovement {
   reference_number: string | null;
   note: string | null;
   user?: Pick<User, "id" | "name">;
+  /** Fournisseur (achat) ou client (vente) du document d'origine. */
+  party_name?: string | null;
+  unit_price?: number | null;
+  amount?: number | null;
+  /** N° de facture pour les sorties liées à une vente. */
+  invoice_number?: string | null;
+  /** N° de BL : bon de commande pour les entrées, vente pour les livraisons. */
+  bl_number?: string | null;
+  /** Totaux du mois du mouvement pour ce produit (colonnes Entrées/Sorties Mois). */
+  month_entries_quantity?: number;
+  month_entries_amount?: number;
+  month_exits_quantity?: number;
+  month_exits_amount?: number;
   created_at: string;
 }
 
@@ -426,6 +444,64 @@ export interface PosSale {
   invoice?: Invoice | null;
   items?: { id: number; product?: PosProduct; quantity: number; delivered_quantity: number; remaining_quantity: number; unit_price: number; total: number }[];
   created_at: string;
+}
+
+export type QuoteStatus = "BROUILLON" | "ENVOYE" | "VALIDE" | "ANNULE";
+
+export interface QuoteItem {
+  id: number;
+  product?: PosProduct;
+  quantity: number;
+  unit_price: number;
+  total: number;
+}
+
+export interface Quote {
+  id: number;
+  number: string;
+  creator?: Pick<User, "id" | "name">;
+  zone_id?: number | null;
+  zone?: Pick<Zone, "id" | "name"> | null;
+  customer_name: string;
+  customer_phone: string | null;
+  customer_address: string | null;
+  subtotal: number;
+  discount_rate: number;
+  tax_type: string;
+  tax_rate: number;
+  tax_amount: number;
+  tax_details?: { type: string; name: string; rate: number; amount: number }[] | null;
+  total: number;
+  status: QuoteStatus;
+  valid_until: string | null;
+  notes: string | null;
+  items?: QuoteItem[];
+  created_at: string;
+}
+
+export interface SalesReport {
+  from: string | null;
+  to: string | null;
+  sales_count: number;
+  total: number;
+  subtotal: number;
+  delivered_value: number;
+  remaining_value: number;
+  by_customer: { customer: string; sales_count: number; total: number }[];
+  by_product: { product_id: number; name: string; type: string | null; unit: string | null; quantity: number; delivered_quantity: number; total: number }[];
+  by_cashier: { cashier: string; sales_count: number; total: number }[];
+  reliquats: { sale_id: number; number: string; customer: string; product: string; unit: string | null; ordered: number; delivered: number; remaining: number; remaining_value: number }[];
+  kpis: {
+    sales_count: number;
+    total: number;
+    avg_basket: number;
+    customers_count: number;
+    delivered_value: number;
+    remaining_value: number;
+    delivery_rate: number;
+    quotes_count: number;
+    quotes_validated: number;
+  };
 }
 
 export interface Notification {

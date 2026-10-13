@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+
 class UserController extends Controller
 {
     private const MANAGE_ROLES = ['SUPERADMIN'];
@@ -64,7 +65,7 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'role' => 'required|string|in:AG_LOGISTIQUE,CAISSIER,DIRECTION,SUPERADMIN',
+            'role' => 'required|string|in:LG_ADMIN,CAISSIER,DG_ADMIN,SUPERADMIN,CDG_ADMIN',
         ]);
 
         $code = $this->generateUniqueCode();
@@ -75,7 +76,7 @@ class UserController extends Controller
             'role' => $validated['role'],
             'password' => 'Password123',
             'permissions' => [],
-            'is_admin' => in_array($validated['role'], ['AG_LOGISTIQUE', 'SUPERADMIN'], true),
+            'is_admin' => in_array($validated['role'], ['LG_ADMIN', 'DG_ADMIN', 'CDG_ADMIN', 'SUPERADMIN'], true),
         ]);
 
         return response()->json(['data' => $user], 201);
@@ -94,7 +95,7 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'role' => 'required|string|in:AG_LOGISTIQUE,CAISSIER,DIRECTION,SUPERADMIN',
+            'role' => 'required|string|in:LG_ADMIN,CAISSIER,DG_ADMIN,SUPERADMIN,CDG_ADMIN',
             'permissions' => 'sometimes|array',
         ]);
 
@@ -102,7 +103,7 @@ class UserController extends Controller
             'name' => $validated['name'],
             'role' => $validated['role'],
             'permissions' => $validated['permissions'] ?? $user->permissions,
-            'is_admin' => in_array($validated['role'], ['AG_LOGISTIQUE', 'SUPERADMIN'], true),
+            'is_admin' => in_array($validated['role'], ['LG_ADMIN', 'DG_ADMIN', 'CDG_ADMIN', 'SUPERADMIN'], true),
         ]);
 
         return response()->json(['data' => $user]);

@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { ModuleTabs } from "@/components/ui";
-import { CAISSE_TABS } from "@/app/moduleTabs";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
@@ -12,9 +10,9 @@ import { useAuth } from "@/lib/auth";
 import { money, qty } from "@/lib/format";
 import { Badge, Button, Card, ErrorState, Input, Loading, PageHeader, SearchInput, Select } from "@/components/ui";
 
-interface Line { product: PosProduct; quantity: number; delivered: number }
+interface Line { product: PosProduct; quantity: number; delivered: number; unit_price: number }
 interface Payload {
-  items: { product_id: number; quantity: number; delivered_quantity: number }[];
+  items: { product_id: number; quantity: number; delivered_quantity: number; unit_price: number }[];
   tax_ids: number[];
   payment_method: PaymentMethod;
   customer_name: string | null;
@@ -89,7 +87,7 @@ export function PosPage() {
     return Array.from(byName.entries()).map(([key, list]) => ({ key, list, single: list.length === 1 }));
   }, [products.data]);
 
-  const subtotal = cart.reduce((s, l) => s + l.product.sale_price * l.quantity, 0);
+  const subtotal = cart.reduce((s, l) => s + l.unit_price * l.quantity, 0);
   const discount = remise === "" ? 0 : Math.round(subtotal * Number(remise) / 100);
   const netSubtotal = subtotal - discount;
   const rate = selectedTaxes.reduce((s, t) => s + (t.type === "AUCUNE" ? 0 : (t.type === "TPS" ? -Number(t.rate) : Number(t.rate))), 0) / 100;
@@ -103,26 +101,27 @@ export function PosPage() {
       const ex = c.find((l) => l.product.id === p.id);
       // La quantité commandée peut dépasser le stock : le reste sera livré plus tard.
       if (ex) return c.map((l) => (l.product.id === p.id ? { ...l, quantity: l.quantity + 1, delivered: Math.min(l.quantity + 1, p.available_quantity) } : l));
-      return [...c, { product: p, quantity: 1, delivered: Math.min(1, p.available_quantity) }];
+      return [...c, { product: p, quantity: 1, delivered: Math.min(1, p.available_quantity), unit_price: Number(p.sale_price) }];
     });
     setFamily(null);
   };
   const setQty = (id: number, q: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, quantity: Math.max(0, q), delivered: Math.min(Math.max(0, q), l.product.available_quantity) } : l)).filter((l) => l.quantity > 0));
   const setDelivered = (id: number, d: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, delivered: Math.max(0, Math.min(d, l.quantity, l.product.available_quantity)) } : l)));
+  // Prix majorable uniquement : jamais en dessous du barème de la ville choisie.
+  const setPrice = (id: number, p: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, unit_price: Math.max(l.product.sale_price, p) } : l)));
 
   const pay = useAction<Payload, PosSale>(() => "/pos/sales", { keys: ["pos-products", "pos-sales", "products", "stock-movements", "dashboard"], success: "Vente enregistrée", body: (v) => v });
 
   const checkout = () => {
     if (zoneId === "") return;
     pay
-      .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity, delivered_quantity: partial ? Math.min(l.delivered, l.quantity, l.product.available_quantity) : l.quantity })), tax_ids: taxIds, payment_method: method, customer_name: customer || null, customer_phone: customerPhone || null, customer_address: customerAddress || null, discount_rate: remise === "" ? null : Number(remise), amount_received: received === "" ? null : Number(received), zone_id: zoneId })
+      .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity, delivered_quantity: partial ? Math.min(l.delivered, l.quantity, l.product.available_quantity) : l.quantity, unit_price: l.unit_price })), tax_ids: taxIds, payment_method: method, customer_name: customer || null, customer_phone: customerPhone || null, customer_address: customerAddress || null, discount_rate: remise === "" ? null : Number(remise), amount_received: received === "" ? null : Number(received), zone_id: zoneId })
       .then((s) => { setCart([]); setReceived(""); setCustomer(""); setCustomerPhone(""); setCustomerAddress(""); setRemise(""); setTaxIds([]); setPartial(false); navigate(`/caisse/ventes/${s.id}`); })
       .catch(() => {});
   };
 
   return (
     <>
-      <ModuleTabs tabs={CAISSE_TABS} />
       <PageHeader title="Point de vente" subtitle="Vente par ville. Prix selon le barème de la zone sélectionnée." breadcrumb="Caisse" />
       <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
         <div>
@@ -158,6 +157,7 @@ export function PosPage() {
                       {p.image_url ? <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" /> : <span className="font-display text-3xl font-extrabold text-ge7-bronze/60">{p.name.slice(0, 2).toUpperCase()}</span>}
                     </div>
                     <p className="font-bold leading-tight">{p.name}</p>
+                    <p className="font-mono text-[11px] font-semibold text-ge7-black/40">{p.reference}</p>
                     <p className="text-xs text-ge7-black/50">{single ? (p.type ?? "") : `${list.length} types disponibles`}</p>
                     <div className="mt-2 flex items-end justify-between">
                       <span className="font-extrabold text-ge7-bronze">{single ? money(p.sale_price) : `dès ${money(minPrice)}`}</span>
@@ -184,7 +184,7 @@ export function PosPage() {
               cart.map((l) => (
                 <div key={l.product.id} className="rounded-2xl bg-ge7-cream p-3">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0"><p className="truncate font-semibold">{l.product.name}{l.product.type ? <span className="text-ge7-black/50"> · {l.product.type}</span> : null}</p><p className="text-xs text-ge7-black/50">{money(l.product.sale_price)} / {l.product.unit?.symbol}</p></div>
+                    <div className="min-w-0"><p className="truncate font-semibold">{l.product.name}{l.product.type ? <span className="text-ge7-black/50"> · {l.product.type}</span> : null}</p><p className="font-mono text-[11px] text-ge7-black/40">{l.product.reference}</p><p className="text-xs text-ge7-black/50">{money(l.product.sale_price)} / {l.product.unit?.symbol}</p></div>
                     <button onClick={() => setQty(l.product.id, 0)} className="text-rose-600"><Trash2 size={15} /></button>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
@@ -193,7 +193,11 @@ export function PosPage() {
                       <input type="number" min={0} step="any" value={l.quantity} onChange={(e) => setQty(l.product.id, Number(e.target.value))} className="w-16 rounded-lg border border-ge7-black/10 px-2 py-1 text-center text-sm" />
                       <button onClick={() => setQty(l.product.id, l.quantity + 1)} className="grid size-8 place-items-center rounded-lg bg-white"><Plus size={14} /></button>
                     </div>
-                    <span className="font-bold">{money(l.product.sale_price * l.quantity)}</span>
+                    <span className="font-bold">{money(l.unit_price * l.quantity)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-ge7-black/5 pt-2 text-xs">
+                    <span className="text-ge7-black/60">P.U  min {money(l.product.sale_price)}</span>
+                    <input type="number" min={l.product.sale_price} step="any" value={l.unit_price} onChange={(e) => setPrice(l.product.id, Number(e.target.value))} className="w-24 rounded-lg border border-ge7-black/10 px-2 py-1 text-right text-sm" />
                   </div>
                   {partial && (
                     <div className="mt-2 flex items-center justify-between gap-2 border-t border-ge7-black/5 pt-2 text-xs">
@@ -291,7 +295,7 @@ export function PosPage() {
             <div className="mt-4 grid gap-2">
               {family.map((p) => (
                 <button key={p.id} disabled={p.available_quantity <= 0} onClick={() => add(p)} className="flex items-center justify-between rounded-2xl border border-ge7-black/10 p-4 text-left transition hover:border-ge7-gold hover:bg-ge7-gold-soft/40 disabled:opacity-50">
-                  <div><p className="font-bold">{p.type}</p><p className="text-xs text-ge7-black/50">dispo {qty(p.available_quantity, p.unit?.symbol)}</p></div>
+                  <div><p className="font-bold">{p.type}</p><p className="font-mono text-[11px] text-ge7-black/40">{p.reference}</p><p className="text-xs text-ge7-black/50">dispo {qty(p.available_quantity, p.unit?.symbol)}</p></div>
                   <span className="font-extrabold text-ge7-bronze">{money(p.sale_price)}</span>
                 </button>
               ))}

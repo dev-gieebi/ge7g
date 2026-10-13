@@ -38,7 +38,7 @@ export function DriversPage() {
       <ModuleTabs tabs={LOGISTIQUE_TABS} />
       <PageHeader
         title="Chauffeurs"
-        subtitle="Chauffeurs G7 Energy — ils réalisent leurs missions via l'application mobile."
+        subtitle="Chauffeurs G7 Energy ils réalisent leurs missions via l'application mobile."
         breadcrumb="Logistique"
         action={<Button onClick={() => { setEditId(null); setForm({ name: "", phone: "", license_number: "", status: "DISPONIBLE" }); }}><Plus size={16} /> Nouveau chauffeur</Button>}
       />

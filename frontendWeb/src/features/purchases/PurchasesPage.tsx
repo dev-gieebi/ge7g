@@ -39,7 +39,7 @@ export function PurchasesPage() {
 
   const receive = useAction<{ id: number; items: { item_id: number; quantity: number }[] }>((v) => `/purchases/${v.id}/receive`, {
     keys: ["purchases", "purchase", "products", "stock-movements", "dashboard"],
-    success: "Réception enregistrée — stock mis à jour",
+    success: "Réception enregistrée  stock mis à jour",
     body: (v) => ({ items: v.items }),
   });
 

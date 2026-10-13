@@ -3,16 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AuditLogController extends Controller
 {
-    private const ROLES = ['ADMIN', 'DIRECTION', 'SUPERADMIN'];
+    private const ROLES = ['ADMIN', 'DG_ADMIN', 'SUPERADMIN'];
 
-    private function authorizeUser(Request $request): \App\Models\User
+    private function authorizeUser(Request $request): User
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         if (! in_array($user->role, self::ROLES, true)) {

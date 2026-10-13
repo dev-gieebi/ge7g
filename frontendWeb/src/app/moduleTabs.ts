@@ -1,27 +1,28 @@
 import type { ModuleTab } from "@/components/ui";
 import type { Role } from "@/types";
 
-const ADMIN_DIR: Role[] = ["AG_LOGISTIQUE", "DIRECTION"];
+const ADMIN_DIR: Role[] = ["LG_ADMIN", "DG_ADMIN"];
+const ADMINS: Role[] = [...ADMIN_DIR, "CDG_ADMIN"];
 const SUPERADMIN_ONLY: Role[] = ["SUPERADMIN"];
 
 /** Onglets des hubs — chaque entrée de sidebar ouvre une page à onglets. */
 export const COMMERCIAL_TABS: ModuleTab[] = [
-  { label: "Clients", to: "/clients", roles: ADMIN_DIR },
-  { label: "Commandes", to: "/commandes", roles: ADMIN_DIR },
-  { label: "Factures", to: "/factures", roles: ADMIN_DIR },
+  { label: "Clients", to: "/clients", roles: ADMINS },
+  { label: "Commandes", to: "/commandes", roles: ADMINS },
+  { label: "Factures", to: "/factures", roles: ADMINS },
 ];
 
 export const CATALOGUE_TABS: ModuleTab[] = [
-  { label: "Produits", to: "/produits", roles: ADMIN_DIR },
-  { label: "Catégories", to: "/categories", roles: ADMIN_DIR },
-  { label: "Unités", to: "/unites", roles: ADMIN_DIR },
-  { label: "Prix / Barème", to: "/prix", roles: ADMIN_DIR },
+  { label: "Produits", to: "/produits", roles: ADMINS },
+  { label: "Catégories", to: "/categories", roles: ADMINS },
+  { label: "Unités", to: "/unites", roles: ADMINS },
+  { label: "Prix / Barème", to: "/prix", roles: ADMINS },
 ];
 
 export const APPRO_TABS: ModuleTab[] = [
-  { label: "Stock", to: "/stock", roles: ADMIN_DIR },
-  { label: "Fournisseurs", to: "/fournisseurs", roles: ADMIN_DIR },
-  { label: "Achats", to: "/achats", roles: ADMIN_DIR },
+  { label: "Stock", to: "/stock", roles: ADMINS },
+  { label: "Fournisseurs", to: "/fournisseurs", roles: ADMINS },
+  { label: "Achats", to: "/achats", roles: ADMINS },
 ];
 
 export const LOGISTIQUE_TABS: ModuleTab[] = [
@@ -33,12 +34,11 @@ export const LOGISTIQUE_TABS: ModuleTab[] = [
   { label: "Livraisons", to: "/livraisons", roles: ADMIN_DIR },
 ];
 
-export const CAISSE_TABS: ModuleTab[] = [
-  { label: "Point de vente", to: "/caisse", roles: ["AG_LOGISTIQUE", "CAISSIER"] },
-  { label: "Historique ventes", to: "/caisse/ventes", roles: ADMIN_DIR },
+export const DEVIS_TABS: ModuleTab[] = [
+  { label: "Devis", to: "/devis", roles: ADMINS },
 ];
 
 export const SYSTEME_TABS: ModuleTab[] = [
-  { label: "Paramètres", to: "/parametres", roles: ADMIN_DIR },
+  { label: "Paramètres", to: "/parametres", roles: ["SUPERADMIN"] },
   { label: "Audit", to: "/audit", roles: SUPERADMIN_ONLY },
 ];

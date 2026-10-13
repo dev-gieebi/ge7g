@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Tax;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -10,12 +11,13 @@ use Illuminate\Support\Facades\Cache;
 
 class TaxController extends Controller
 {
-    private const MANAGE_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN'];
-    private const VIEW_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN', 'CAISSIER'];
+    private const MANAGE_ROLES = ['SUPERADMIN'];
 
-    private function authorizeUser(Request $request, array $roles = self::MANAGE_ROLES): \App\Models\User
+    private const VIEW_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'];
+
+    private function authorizeUser(Request $request, array $roles = self::MANAGE_ROLES): User
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         if (! in_array($user->role, $roles, true)) {

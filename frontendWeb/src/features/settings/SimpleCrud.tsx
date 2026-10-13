@@ -77,12 +77,12 @@ export function SimpleCrud<T extends { id: number }>({
       </div>
       <DataTable columns={cols} data={data} isLoading={isLoading} error={errorMessage} rowKey={(r) => r.id} page={list.page} onPageChange={list.setPage} dense />
       {deleteTarget && (
-        <Modal title={`Supprimer — ${title}`} size="sm" onClose={() => setDeleteTarget(null)} footer={<><Button variant="secondary" onClick={() => setDeleteTarget(null)}>Annuler</Button><Button variant="danger" loading={crud.remove.isPending} onClick={() => crud.remove.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })}>Supprimer</Button></>}>
+        <Modal title={`Supprimer  ${title}`} size="sm" onClose={() => setDeleteTarget(null)} footer={<><Button variant="secondary" onClick={() => setDeleteTarget(null)}>Annuler</Button><Button variant="danger" loading={crud.remove.isPending} onClick={() => crud.remove.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })}>Supprimer</Button></>}>
           <p className="text-sm text-ge7-black/80">Confirmer la suppression de <span className="font-semibold">{String((deleteTarget as any).name ?? deleteTarget.id)}</span> ?</p>
         </Modal>
       )}
       {form && (
-        <Modal title={editId ? `Modifier — ${title}` : `Ajouter — ${title}`} size="sm" onClose={() => setForm(null)} footer={<><Button variant="secondary" onClick={() => setForm(null)}>Annuler</Button><Button type="submit" form={`crud-${queryKey}`} loading={crud.create.isPending || crud.update.isPending}>Enregistrer</Button></>}>
+        <Modal title={editId ? `Modifier  ${title}` : `Ajouter  ${title}`} size="sm" onClose={() => setForm(null)} footer={<><Button variant="secondary" onClick={() => setForm(null)}>Annuler</Button><Button type="submit" form={`crud-${queryKey}`} loading={crud.create.isPending || crud.update.isPending}>Enregistrer</Button></>}>
           <form id={`crud-${queryKey}`} onSubmit={submit}>
             <FormGrid cols={2}>
               {fields.filter((f) => !(editId && f.hideOnEdit)).map((f) => {
@@ -91,7 +91,7 @@ export function SimpleCrud<T extends { id: number }>({
                 if (f.type === "select")
                   return (
                     <Select key={f.name} label={f.label} required={f.required} value={String(val ?? "")} onChange={(e) => setForm({ ...form, [f.name]: e.target.value })} error={errors[f.name]} className={cls}>
-                      {!f.required && <option value="">—</option>}
+                      {!f.required && <option value=""></option>}
                       {f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </Select>
                   );

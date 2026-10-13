@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class UserSeeder extends Seeder
@@ -25,14 +24,14 @@ class UserSeeder extends Seeder
                 'code' => '41234567',
                 'name' => 'Agent Logistique',
                 'password' => 'password123',
-                'role' => 'AG_LOGISTIQUE',
+                'role' => 'LG_ADMIN',
                 'is_admin' => true,
             ],
             [
                 'code' => '30000003',
                 'name' => 'Direction G7',
                 'password' => 'direction123',
-                'role' => 'DIRECTION',
+                'role' => 'DG_ADMIN',
                 'is_admin' => true,
             ],
         ];

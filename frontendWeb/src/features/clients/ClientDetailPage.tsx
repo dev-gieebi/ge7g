@@ -18,12 +18,12 @@ export function ClientDetailPage() {
   const chantierCols: Column<Chantier>[] = [
     { key: "name", header: "Chantier", render: (x) => <span className="font-semibold">{x.name}</span> },
     { key: "address", header: "Adresse", render: (x) => x.address },
-    { key: "zone", header: "Zone", render: (x) => x.zone?.name ?? "—" },
+    { key: "zone", header: "Zone", render: (x) => x.zone?.name ?? "" },
     { key: "status", header: "Statut", render: (x) => <StatusBadge status={x.status} /> },
   ];
   const orderCols: Column<Order>[] = [
     { key: "number", header: "N°", render: (o) => <Link to={`/commandes/${o.id}`} className="font-semibold text-ge7-purple hover:underline">{o.number}</Link> },
-    { key: "chantier", header: "Chantier", render: (o) => o.chantier?.name ?? "—" },
+    { key: "chantier", header: "Chantier", render: (o) => o.chantier?.name ?? "" },
     { key: "created_at", header: "Date", render: (o) => date(o.created_at) },
     { key: "total", header: "Total", align: "right", render: (o) => <span className="font-semibold">{money(o.total)}</span> },
     { key: "status", header: "Statut", render: (o) => <StatusBadge status={o.status} /> },
@@ -50,11 +50,11 @@ export function ClientDetailPage() {
         <Card>
           <CardHeader title="Coordonnées" />
           <ul className="space-y-2 text-sm">
-            <li className="flex items-center gap-2"><Phone size={15} className="text-ge7-bronze" /> {c.phone || "—"}</li>
-            <li className="flex items-center gap-2"><Mail size={15} className="text-ge7-bronze" /> {c.email || "—"}</li>
-            <li className="flex items-center gap-2"><MapPin size={15} className="text-ge7-bronze" /> {c.address || "—"}</li>
+            <li className="flex items-center gap-2"><Phone size={15} className="text-ge7-bronze" /> {c.phone || ""}</li>
+            <li className="flex items-center gap-2"><Mail size={15} className="text-ge7-bronze" /> {c.email || ""}</li>
+            <li className="flex items-center gap-2"><MapPin size={15} className="text-ge7-bronze" /> {c.address || ""}</li>
           </ul>
-          <p className="mt-4 text-xs text-ge7-black/50">Contact : {c.contact_name || "—"}</p>
+          <p className="mt-4 text-xs text-ge7-black/50">Contact : {c.contact_name || ""}</p>
           <p className="text-xs text-ge7-black/50">Client depuis le {date(c.created_at)}</p>
         </Card>
         <div className="lg:col-span-2 space-y-6">

@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\StockMovement;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -14,11 +15,11 @@ use Illuminate\Support\Str;
 
 class PurchaseController extends Controller
 {
-    private const MANAGE_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN'];
+    private const MANAGE_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CDG_ADMIN'];
 
-    private function authorizeUser(Request $request): \App\Models\User
+    private function authorizeUser(Request $request): User
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         if (! in_array($user->role, self::MANAGE_ROLES, true)) {
@@ -105,7 +106,7 @@ class PurchaseController extends Controller
 
             $total = $this->syncItems($purchase, $validated['items']);
             $purchase->total = $total;
-            $purchase->number = 'ACH-' . now()->format('Y') . '-' . str_pad((string) $purchase->id, 5, '0', STR_PAD_LEFT);
+            $purchase->number = 'ACH-'.now()->format('Y').'-'.str_pad((string) $purchase->id, 5, '0', STR_PAD_LEFT);
             $purchase->save();
 
             return $purchase;
@@ -198,7 +199,7 @@ class PurchaseController extends Controller
                 $qty = (float) $input['quantity'];
 
                 if ($qty > $remaining) {
-                    throw new \InvalidArgumentException('La quantité reçue dépasse le reste à réceptionner pour ' . $item->product->name . '.');
+                    throw new \InvalidArgumentException('La quantité reçue dépasse le reste à réceptionner pour '.$item->product->name.'.');
                 }
 
                 $item->received_quantity = (float) $item->received_quantity + $qty;

@@ -9,6 +9,8 @@ use App\Http\Controllers\PriceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\PusherTestController;
+use App\Http\Controllers\QuoteController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\SupplierController;
@@ -43,6 +45,7 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('purchases', PurchaseController::class);
 
     Route::get('stocks', [StockController::class, 'index']);
+    Route::get('stock-movements/export', [StockMovementController::class, 'export']);
     Route::apiResource('stock-movements', StockMovementController::class);
 
     Route::get('pos/products', [PosController::class, 'products']);
@@ -51,6 +54,12 @@ Route::middleware('auth:api')->group(function () {
     Route::get('pos/sales/{sale}', [PosController::class, 'show']);
     Route::post('pos/sales/{sale}/discount', [PosController::class, 'applyDiscount']);
     Route::post('pos/sales/{sale}/deliver', [PosController::class, 'deliver']);
+
+    Route::post('quotes/{quote}/status', [QuoteController::class, 'updateStatus']);
+    Route::apiResource('quotes', QuoteController::class);
+
+    Route::get('reports/sales/export', [ReportController::class, 'exportSales']);
+    Route::get('reports/sales', [ReportController::class, 'sales']);
 
     Route::get('dashboard', [DashboardController::class, 'index']);
     Route::get('dashboard/sales-series', [DashboardController::class, 'salesSeries']);

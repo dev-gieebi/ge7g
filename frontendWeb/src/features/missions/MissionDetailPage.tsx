@@ -13,7 +13,7 @@ const KEYS = ["mission", "missions", "orders", "order", "logistics", "dashboard"
 export function MissionDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
-  const canAct = hasRole(user, "AG_LOGISTIQUE", "DIRECTION");
+  const canAct = hasRole(user, "LG_ADMIN", "DG_ADMIN");
   const mission = useOne<Mission>("mission", id ? `/missions/${id}` : null);
 
   const depart = useAction(() => `/missions/${id}/depart`, { keys: KEYS, success: "Départ enregistré" });
@@ -59,7 +59,7 @@ export function MissionDetailPage() {
             <CardHeader title="Chauffeur & véhicule" />
             <p className="font-bold">{m.driver?.name}</p>
             <p className="text-sm text-ge7-black/60">{m.driver?.phone}</p>
-            <p className="mt-2 text-sm">Véhicule : <span className="font-semibold">{m.vehicle ? `${m.vehicle.plate} · ${m.vehicle.model}` : "—"}</span></p>
+            <p className="mt-2 text-sm">Véhicule : <span className="font-semibold">{m.vehicle ? `${m.vehicle.plate} · ${m.vehicle.model}` : ""}</span></p>
           </Card>
           <Card>
             <CardHeader title="Destination" />

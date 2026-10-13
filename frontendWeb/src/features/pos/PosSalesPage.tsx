@@ -1,6 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import { ModuleTabs } from "@/components/ui";
-import { CAISSE_TABS } from "@/app/moduleTabs";
 import type { PosSale } from "@/types";
 import { useListState, usePaginated } from "@/lib/hooks";
 import { useZones } from "@/features/shared/refData";
@@ -28,7 +26,6 @@ export function PosSalesPage() {
 
   return (
     <>
-      <ModuleTabs tabs={CAISSE_TABS} />
       <PageHeader title="Historique des ventes" subtitle="Tickets et factures émis en caisse." breadcrumb="Caisse" />
       <div className="mb-4 grid gap-3 sm:grid-cols-5">
         <SearchInput value={list.search} onChange={list.setSearch} placeholder="N° ticket, client…" />

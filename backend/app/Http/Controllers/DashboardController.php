@@ -8,7 +8,6 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -16,7 +15,7 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        if (! in_array($user->role, ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN', 'CAISSIER'], true)) {
+        if (! in_array($user->role, ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'], true)) {
             abort(403, 'Accès réservé.');
         }
 
@@ -67,7 +66,7 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        if (! in_array($user->role, ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN', 'CAISSIER'], true)) {
+        if (! in_array($user->role, ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'], true)) {
             abort(403, 'Accès réservé.');
         }
 

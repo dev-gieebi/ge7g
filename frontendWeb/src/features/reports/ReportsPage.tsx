@@ -1,107 +1,237 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CalendarDays, FileSpreadsheet } from "lucide-react";
 import { api, toApiError } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
-import { canSeeCosts } from "@/lib/rbac";
-import { money, percent, qty } from "@/lib/format";
+import type { SalesReport } from "@/types";
+import { money, qty } from "@/lib/format";
 import { Button, Card, CardHeader, ErrorState, Input, Loading, PageHeader } from "@/components/ui";
 
-interface Report {
-  period: { from: string; to: string };
-  sales: { label: string; orders: number; pos: number }[];
-  totals: { orders_revenue: number; pos_revenue: number; purchases: number; margin?: number; margin_percent?: number };
-  top_products: { name: string; quantity: number; revenue: number; unit: string }[];
-  top_clients: { name: string; orders: number; revenue: number }[];
-  deliveries: { completed: number; partial: number; on_time_rate: number };
+// Semaine écoulée par défaut : lundi → dimanche derniers (rapport du lundi, procédure §6).
+const lastWeek = (): { from: string; to: string } => {
+  const now = new Date();
+  const f = (d: Date) => d.toISOString().slice(0, 10);
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7) - 7);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { from: f(monday), to: f(sunday) };
+};
+
+function Stat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <Card className="!p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ge7-black/50">{label}</p>
+      <p className={`mt-1 text-xl font-extrabold ${accent ? "text-ge7-bronze" : ""}`}>{value}</p>
+    </Card>
+  );
 }
 
-const firstOfMonth = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10); };
+function ReportTables({ r }: { r: SalesReport }) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-2">
+      <Card>
+        <CardHeader title="Ventes par client" />
+        <table className="mt-3 w-full text-sm">
+          <thead>
+            <tr className="border-b border-ge7-black/10 text-left text-xs uppercase text-ge7-black/50">
+              <th className="py-1.5">Client</th>
+              <th className="py-1.5 text-center">Factures</th>
+              <th className="py-1.5 text-right">Montant</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.by_customer.map((c) => (
+              <tr key={c.customer} className="border-b border-ge7-black/5">
+                <td className="py-2 font-semibold">{c.customer}</td>
+                <td className="py-2 text-center">{c.sales_count}</td>
+                <td className="py-2 text-right font-bold">{money(c.total)}</td>
+              </tr>
+            ))}
+            {r.by_customer.length === 0 && <tr><td colSpan={3} className="py-6 text-center text-ge7-black/50">Aucune vente</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+      <Card>
+        <CardHeader title="Ventes par produit" />
+        <table className="mt-3 w-full text-sm">
+          <thead>
+            <tr className="border-b border-ge7-black/10 text-left text-xs uppercase text-ge7-black/50">
+              <th className="py-1.5">Produit</th>
+              <th className="py-1.5 text-center">Facturé</th>
+              <th className="py-1.5 text-center">Livré</th>
+              <th className="py-1.5 text-right">Montant</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.by_product.map((p) => (
+              <tr key={p.product_id} className="border-b border-ge7-black/5">
+                <td className="py-2 font-semibold">{p.name}{p.type ? <span className="text-ge7-black/50"> · {p.type}</span> : null}</td>
+                <td className="py-2 text-center">{qty(p.quantity, p.unit ?? undefined)}</td>
+                <td className="py-2 text-center">{qty(p.delivered_quantity, p.unit ?? undefined)}</td>
+                <td className="py-2 text-right font-bold">{money(p.total)}</td>
+              </tr>
+            ))}
+            {r.by_product.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-ge7-black/50">Aucune vente</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+      <Card>
+        <CardHeader title="Performance par vendeur" subtitle="Factures et chiffre d'affaires par agent de vente." />
+        <table className="mt-3 w-full text-sm">
+          <thead>
+            <tr className="border-b border-ge7-black/10 text-left text-xs uppercase text-ge7-black/50">
+              <th className="py-1.5">Vendeur</th>
+              <th className="py-1.5 text-center">Factures</th>
+              <th className="py-1.5 text-right">Montant</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.by_cashier.map((v) => (
+              <tr key={v.cashier} className="border-b border-ge7-black/5">
+                <td className="py-2 font-semibold">{v.cashier}</td>
+                <td className="py-2 text-center">{v.sales_count}</td>
+                <td className="py-2 text-right font-bold">{money(v.total)}</td>
+              </tr>
+            ))}
+            {r.by_cashier.length === 0 && <tr><td colSpan={3} className="py-6 text-center text-ge7-black/50">Aucune vente</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+      <Card className="xl:col-span-2">
+        <CardHeader title="Reliquats à livrer" subtitle="Quantités facturées non encore livrées, par facture et par produit." />
+        <table className="mt-3 w-full text-sm">
+          <thead>
+            <tr className="border-b border-ge7-black/10 text-left text-xs uppercase text-ge7-black/50">
+              <th className="py-1.5">Facture</th>
+              <th className="py-1.5">Client</th>
+              <th className="py-1.5">Produit</th>
+              <th className="py-1.5 text-center">Facturé</th>
+              <th className="py-1.5 text-center">Livré</th>
+              <th className="py-1.5 text-center">Reste</th>
+              <th className="py-1.5 text-right">Valeur</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.reliquats.map((l, i) => (
+              <tr key={`${l.sale_id}-${i}`} className="border-b border-ge7-black/5">
+                <td className="py-2 font-semibold">{l.number}</td>
+                <td className="py-2">{l.customer}</td>
+                <td className="py-2">{l.product}</td>
+                <td className="py-2 text-center">{qty(l.ordered, l.unit ?? undefined)}</td>
+                <td className="py-2 text-center">{qty(l.delivered, l.unit ?? undefined)}</td>
+                <td className="py-2 text-center font-bold text-amber-700">{qty(l.remaining, l.unit ?? undefined)}</td>
+                <td className="py-2 text-right font-bold">{money(l.remaining_value)}</td>
+              </tr>
+            ))}
+            {r.reliquats.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-ge7-black/50">Aucun reliquat  tout est livré.</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
 
 export function ReportsPage() {
-  const { user } = useAuth();
-  const [from, setFrom] = useState(firstOfMonth());
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["reports", from, to],
-    queryFn: async () => (await api.get<{ data: Report }>("/reports/overview", { params: { from, to } })).data.data,
+  const week = lastWeek();
+  const [from, setFrom] = useState(week.from);
+  const [to, setTo] = useState(week.to);
+  const [exporting, setExporting] = useState(false);
+
+  const exportXlsx = async () => {
+    setExporting(true);
+    try {
+      const { data } = await api.get<Blob>("/reports/sales/export", {
+        params: { from, to },
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rapport-commercial-${from}_${to}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const period = useQuery({
+    queryKey: ["report-sales", from, to],
+    queryFn: async () => (await api.get<{ data: SalesReport }>("/reports/sales", { params: { from, to } })).data.data,
+  });
+  const cumulative = useQuery({
+    queryKey: ["report-sales-cumul"],
+    queryFn: async () => (await api.get<{ data: SalesReport }>("/reports/sales")).data.data,
   });
 
-  const exportCsv = async () => {
-    const res = await api.get("/reports/export", { params: { from, to }, responseType: "blob" });
-    const url = URL.createObjectURL(res.data as Blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `rapport-${from}-${to}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const r = period.data;
+  const c = cumulative.data;
 
   return (
     <>
-      <PageHeader title="Rapports" subtitle="Ventes, achats, marges et performance logistique sur une période." breadcrumb="Pilotage" action={<Button variant="secondary" onClick={() => void exportCsv()}><Download size={15} /> Export CSV</Button>} />
+      <PageHeader
+        title="Rapports de suivi"
+        subtitle="Suivi des factures, livraisons et reliquats  procédure de gestion commerciale."
+        breadcrumb="Pilotage"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => { const w = lastWeek(); setFrom(w.from); setTo(w.to); }}><CalendarDays size={15} /> Semaine écoulée</Button>
+            <Button variant="purple" loading={exporting} onClick={() => void exportXlsx()}><FileSpreadsheet size={15} /> Exporter Excel</Button>
+          </div>
+        }
+      />
+
       <div className="mb-6 flex flex-wrap items-end gap-3">
         <Input label="Du" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         <Input label="Au" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
-      {isLoading ? (
+
+      {period.isLoading ? (
         <Loading />
-      ) : error || !data ? (
-        <ErrorState message={toApiError(error).message} onRetry={() => void refetch()} />
+      ) : period.error || !r ? (
+        <ErrorState message={toApiError(period.error).message} onRetry={() => void period.refetch()} />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Stat label="CA commandes" value={money(data.totals.orders_revenue)} />
-            <Stat label="CA caisse" value={money(data.totals.pos_revenue)} />
-            <Stat label="Achats" value={money(data.totals.purchases)} />
-            {canSeeCosts(user) && data.totals.margin !== undefined ? <Stat label="Marge brute" value={`${money(data.totals.margin)} · ${percent(data.totals.margin_percent)}`} accent /> : <Stat label="Livraisons à l'heure" value={percent(data.deliveries.on_time_rate)} />}
+          <h2 className="mb-3 font-display text-lg font-extrabold">A. Situation de la période</h2>
+          <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Stat label="Factures émises" value={String(r.sales_count)} />
+            <Stat label="Montant facturé" value={money(r.total)} accent />
+            <Stat label="Valeur livrée" value={money(r.delivered_value)} />
+            <Stat label="Reliquat à livrer" value={money(r.remaining_value)} />
           </div>
-          <Card className="mt-6">
-            <CardHeader title="Chiffre d'affaires par période" />
-            <div className="h-80">
-              <ResponsiveContainer>
-                <BarChart data={data.sales}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#00000010" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} width={48} />
-                  <Tooltip formatter={(v: number) => money(v)} />
-                  <Legend />
-                  <Bar dataKey="orders" name="Commandes" stackId="a" fill="#c9a227" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="pos" name="Caisse" stackId="a" fill="#6a3fd1" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader title="Top produits" />
-              <table className="w-full text-sm"><tbody className="divide-y divide-ge7-black/5">{data.top_products.map((p) => <tr key={p.name}><td className="py-2 font-semibold">{p.name}</td><td className="py-2 text-right text-ge7-black/60">{qty(p.quantity, p.unit)}</td><td className="py-2 text-right font-bold">{money(p.revenue)}</td></tr>)}</tbody></table>
-            </Card>
-            <Card>
-              <CardHeader title="Top clients" />
-              <table className="w-full text-sm"><tbody className="divide-y divide-ge7-black/5">{data.top_clients.map((c) => <tr key={c.name}><td className="py-2 font-semibold">{c.name}</td><td className="py-2 text-right text-ge7-black/60">{c.orders} cmd</td><td className="py-2 text-right font-bold">{money(c.revenue)}</td></tr>)}</tbody></table>
-            </Card>
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-ge7-black/60">Indicateurs de performance</h3>
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Stat label="Panier moyen" value={money(r.kpis.avg_basket)} accent />
+            <Stat label="Taux de livraison" value={`${r.kpis.delivery_rate} %`} />
+            <Stat label="Clients actifs" value={String(r.kpis.customers_count)} />
+            <Stat label="Devis émis / validés" value={`${r.kpis.quotes_count} / ${r.kpis.quotes_validated}`} />
           </div>
-          <Card className="mt-6">
-            <CardHeader title="Logistique" />
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Stat label="Livraisons complètes" value={data.deliveries.completed} />
-              <Stat label="Livraisons partielles" value={data.deliveries.partial} />
-              <Stat label="Taux à l'heure" value={percent(data.deliveries.on_time_rate)} />
-            </div>
-          </Card>
+          <ReportTables r={r} />
+        </>
+      )}
+
+      <h2 className="mb-3 mt-10 font-display text-lg font-extrabold">B. Situation cumulée depuis le démarrage</h2>
+      {cumulative.isLoading ? (
+        <Loading />
+      ) : cumulative.error || !c ? (
+        <ErrorState message={toApiError(cumulative.error).message} onRetry={() => void cumulative.refetch()} />
+      ) : (
+        <>
+          <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Stat label="Factures émises" value={String(c.sales_count)} />
+            <Stat label="Chiffre d'affaires cumulé" value={money(c.total)} accent />
+            <Stat label="Valeur livrée" value={money(c.delivered_value)} />
+            <Stat label="Reliquat à livrer" value={money(c.remaining_value)} />
+          </div>
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Stat label="Panier moyen" value={money(c.kpis.avg_basket)} accent />
+            <Stat label="Taux de livraison" value={`${c.kpis.delivery_rate} %`} />
+            <Stat label="Clients actifs" value={String(c.kpis.customers_count)} />
+            <Stat label="Devis émis / validés" value={`${c.kpis.quotes_count} / ${c.kpis.quotes_validated}`} />
+          </div>
+          <ReportTables r={c} />
         </>
       )}
     </>
-  );
-}
-
-function Stat({ label, value, accent }: { label: string; value: string | number; accent?: boolean }) {
-  return (
-    <div className={`rounded-3xl border p-5 ${accent ? "border-ge7-gold/40 bg-gradient-to-br from-ge7-gold-soft to-white" : "border-ge7-black/5 bg-white"} shadow-soft`}>
-      <p className="text-xs font-semibold uppercase tracking-wider text-ge7-black/50">{label}</p>
-      <p className="mt-2 font-display text-xl font-extrabold">{value}</p>
-    </div>
   );
 }

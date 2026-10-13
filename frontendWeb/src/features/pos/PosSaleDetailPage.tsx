@@ -4,6 +4,7 @@ import { ArrowLeft, Printer, Receipt, Truck } from "lucide-react";
 import type { PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/rbac";
 import { qty } from "@/lib/format";
 import { Badge, Button, Card, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/ui";
 import { PrintableDocument } from "@/features/invoices/PrintableDocument";
@@ -17,6 +18,9 @@ export function PosSaleDetailPage() {
   // Le ticket papier caisse est réservé au caissier ; l'agent voit la facture A4.
   const isCashier = user?.role === "CAISSIER";
   const mode = isCashier ? "ticket" : "invoice";
+  // Remise : rôles de facturation. Saisie des livraisons : rôles opérationnels + CDG_ADMIN.
+  const canDiscount = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
+  const canDeliver = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
   const [deliverQty, setDeliverQty] = useState<Record<number, number>>({});
   const [discountRate, setDiscountRate] = useState<number | null>(null);
 
@@ -78,7 +82,7 @@ export function PosSaleDetailPage() {
           }
         />
       </div>
-      {(s.items ?? []).length > 0 && s.delivery_status !== "LIVREE" && (
+      {canDeliver && (s.items ?? []).length > 0 && s.delivery_status !== "LIVREE" && (
         <Card className="no-print mx-auto mb-6 max-w-2xl">
           <h3 className="flex items-center gap-2 font-extrabold"><Truck size={16} className="text-ge7-bronze" /> Livraison <StatusBadge status={s.delivery_status} /></h3>
           <div className="mt-3 space-y-2">
@@ -119,7 +123,7 @@ export function PosSaleDetailPage() {
           </div>
         </Card>
       )}
-      {!isCashier && (
+      {!isCashier && canDiscount && (
         <div className="no-print mx-auto mb-4 flex max-w-3xl items-center justify-end gap-2 text-sm">
           <label className="font-semibold">Remise %</label>
           <input

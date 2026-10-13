@@ -80,7 +80,7 @@ export function ProductsPage() {
       sortable: true,
       render: (p) => <span className="font-semibold">{p.name}</span>,
     },
-    { key: "category", header: "Catégorie", render: (p) => p.category?.name ?? "—" },
+    { key: "category", header: "Catégorie", render: (p) => p.category?.name ?? "" },
     { key: "stock", header: "Stock dispo", align: "right", render: (p) => qty(p.available_quantity, p.unit?.symbol) },
     { key: "min_stock", header: "Stock minimum", align: "right", render: (p) => qty(p.min_stock, p.unit?.symbol) },
     {
@@ -157,7 +157,16 @@ export function ProductsPage() {
         >
           <form id="product-form" onSubmit={submit}>
             <FormGrid cols={3}>
-              <Input label="Référence" value={editing.reference ?? ""} onChange={(e) => setEditing({ ...editing, reference: e.target.value })} error={errors.reference} />
+              <div>
+                <span className="mb-1.5 block text-sm font-semibold text-ge7-black/80">Référence</span>
+                <div className="rounded-xl border border-ge7-black/10 bg-ge7-black/[0.03] px-3 py-2.5">
+                  {editId && editing.reference ? (
+                    <span className="font-mono text-xs font-bold">{editing.reference}</span>
+                  ) : (
+                    <span className="text-xs text-ge7-black/50">Générée automatiquement selon la catégorie (ex. CARB-0001)</span>
+                  )}
+                </div>
+              </div>
               <Input label="Désignation" required value={editing.name ?? ""} onChange={(e) => setEditing({ ...editing, name: e.target.value })} error={errors.name} className="sm:col-span-2" />
               <Select label="Catégorie" required value={String(editing.category_id ?? "")} onChange={(e) => setEditing({ ...editing, category_id: e.target.value ? Number(e.target.value) : undefined })} error={errors.category_id}>
                 <option value="">Choisir une catégorie</option>

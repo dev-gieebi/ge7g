@@ -8,7 +8,16 @@ import { Logo } from "@/components/ui";
 
 export function AppShell() {
   const [open, setOpen] = useState(false);
+  // Sidebar repliable (desktop) — état persisté entre les sessions.
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("ge7.sidebar.collapsed") === "1");
   const { user, logout } = useAuth();
+
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      localStorage.setItem("ge7.sidebar.collapsed", c ? "0" : "1");
+      return !c;
+    });
+  };
 
   // La caissière n'a accès qu'à l'écran de vente : pas de sidebar ni de navigation.
   if (user?.role === "CAISSIER") {
@@ -33,7 +42,7 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar open={open} onClose={() => setOpen(false)} />
+      <Sidebar open={open} onClose={() => setOpen(false)} collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       <div className="flex min-w-0 flex-1 flex-col">
         {/*<Header onMenu={() => setOpen(true)} />*/}
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">

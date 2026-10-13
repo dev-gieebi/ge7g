@@ -18,7 +18,7 @@ export function DeliveryDetailPage() {
   if (delivery.isLoading) return <Loading />;
   if (!delivery.data) return <ErrorState message="Livraison introuvable" />;
   const d = delivery.data;
-  const canConfirm = d.status === "LIVREE" && hasRole(user, "AG_LOGISTIQUE", "DIRECTION");
+  const canConfirm = d.status === "LIVREE" && hasRole(user, "LG_ADMIN", "DG_ADMIN");
 
   return (
     <>
@@ -43,7 +43,7 @@ export function DeliveryDetailPage() {
                       <td className="px-5 py-3 font-semibold">{it.product?.name}</td>
                       <td className="px-5 py-3 text-right">{qty(it.planned_quantity, it.product?.unit?.symbol)}</td>
                       <td className="px-5 py-3 text-right font-bold">{qty(it.delivered_quantity, it.product?.unit?.symbol)}</td>
-                      <td className={`px-5 py-3 text-right ${diff < 0 ? "text-rose-600" : "text-ge7-black/50"}`}>{diff === 0 ? "—" : qty(diff)}</td>
+                      <td className={`px-5 py-3 text-right ${diff < 0 ? "text-rose-600" : "text-ge7-black/50"}`}>{diff === 0 ? "" : qty(diff)}</td>
                     </tr>
                   );
                 })}

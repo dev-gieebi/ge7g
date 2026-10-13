@@ -11,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 
 class PriceController extends Controller
 {
-    private const MANAGE_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN'];
+    private const MANAGE_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CDG_ADMIN'];
 
     private function authorizeUser(Request $request): User
     {

@@ -1,4 +1,4 @@
-import { ShoppingCart, Package, Settings, Warehouse, LayoutDashboard, type LucideIcon } from "lucide-react";
+import { ShoppingCart, Package, Settings, Warehouse, LayoutDashboard, FileSignature, BarChart3, Receipt, type LucideIcon } from "lucide-react";
 import type { Role } from "@/types";
 
 export interface NavItem {
@@ -17,7 +17,13 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-const ADMIN_DIR: Role[] = ["AG_LOGISTIQUE", "DIRECTION"];
+const ADMIN_DIR: Role[] = ["LG_ADMIN", "DG_ADMIN"];
+
+/** Pilotage + Commercial + Gestion : CDG_ADMIN a accès à tout ce périmètre. */
+const ADMINS: Role[] = [...ADMIN_DIR, "CDG_ADMIN"];
+
+/** Rapports de suivi : Direction et CDG_ADMIN (LG_ADMIN n'y a pas accès). */
+const REPORTS: Role[] = ["DG_ADMIN", "CDG_ADMIN"];
 
 /**
  * Menu principal Web — plateforme interne G7 Energy.
@@ -29,17 +35,25 @@ export const NAVIGATION: NavGroup[] = [
   {
     title: "Pilotage",
     items: [
-      { label: "Tableau de bord", to: "/dashboard", icon: LayoutDashboard, roles: ADMIN_DIR },
-      /*{ label: "Rapports", to: "/rapports", icon: BarChart3, roles: ADMIN_DIR },
-      { label: "Notifications", to: "/notifications", icon: Bell, roles: ADMIN_DIR },
+      { label: "Tableau de bord", to: "/dashboard", icon: LayoutDashboard, roles: ADMINS },
+      { label: "Rapports", to: "/rapports", icon: BarChart3, roles: REPORTS },
+      /*{ label: "Notifications", to: "/notifications", icon: Bell, roles: ADMIN_DIR },
     */],
+  },
+  {
+    title: "Commercial",
+    items: [
+      { label: "Caisse", to: "/caisse", icon: ShoppingCart, roles: ["LG_ADMIN", "CAISSIER"], end: true },
+      { label: "Devis", to: "/devis", icon: FileSignature, roles: ADMINS, paths: ["/devis"] },
+      { label: "Ventes", to: "/caisse/ventes", icon: Receipt, roles: [...ADMINS, "CAISSIER"], paths: ["/caisse/ventes"] },
+    ],
   },
   {
     title: "Gestion",
     items: [
       // { label: "Commercial", to: "/clients", icon: Users, roles: ADMIN_DIR, paths: ["/clients", "/commandes", "/factures"] },
-      { label: "Catalogue", to: "/produits", icon: Package, roles: ADMIN_DIR, paths: ["/produits", "/categories", "/unites", "/prix"] },
-      { label: "Approvisionnement", to: "/stock", icon: Warehouse, roles: ADMIN_DIR, paths: ["/stock", "/fournisseurs", "/achats"] },
+      { label: "Catalogue", to: "/produits", icon: Package, roles: ADMINS, paths: ["/produits", "/categories", "/unites", "/prix"] },
+      { label: "Approvisionnement", to: "/stock", icon: Warehouse, roles: ADMINS, paths: ["/stock", "/fournisseurs", "/achats"] },
     ],
   },
  /* {
@@ -55,14 +69,8 @@ export const NAVIGATION: NavGroup[] = [
     ],
   },*/
   {
-    title: "Caisse",
-    items: [
-      { label: "Caisse", to: "/caisse", icon: ShoppingCart, roles: ["AG_LOGISTIQUE", "CAISSIER"], paths: ["/caisse", "/caisse/ventes"] },
-    ],
-  },
-  {
     title: "Système",
-    items: [{ label: "Paramètres", to: "/parametres", icon: Settings, roles: ADMIN_DIR, paths: ["/parametres", "/audit"] }],
+    items: [{ label: "Paramètres", to: "/parametres", icon: Settings, roles: ["SUPERADMIN"], paths: ["/parametres", "/audit"] }],
   },
 ];
 

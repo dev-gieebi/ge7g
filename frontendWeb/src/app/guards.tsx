@@ -9,7 +9,7 @@ export function RequireAuth() {
   const location = useLocation();
   if (loading) return <Loading label="Vérification de la session…" />;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
-  // L'application Web est réservée aux rôles internes (ADMIN, CAISSIER, DIRECTION).
+  // L'application Web est réservée aux rôles internes (LG_ADMIN, DG_ADMIN, CDG_ADMIN, CAISSIER, SUPERADMIN).
   // CLIENT et CHAUFFEUR utilisent exclusivement l'application mobile.
   if (!isWebRole(user.role)) return <Navigate to="/403" replace />;
   return <Outlet />;

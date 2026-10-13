@@ -100,7 +100,7 @@ export function SettingsPage() {
             columns={[
               { key: "code", header: "Code", render: (u) => <span className="font-mono text-xs font-semibold">{u.code}</span> },
               { key: "name", header: "Nom", render: (u) => <span className="font-semibold">{u.name}</span> },
-              { key: "role", header: "Rôle", render: (u) => <Badge tone={u.role === "SUPERADMIN" ? "dark" : u.role === "AG_LOGISTIQUE" ? "dark" : u.role === "CAISSIER" ? "gold" : "purple"}>{ROLE_LABELS[u.role]}</Badge> },
+              { key: "role", header: "Rôle", render: (u) => <Badge tone={u.role === "SUPERADMIN" ? "dark" : u.role === "LG_ADMIN" ? "dark" : u.role === "CAISSIER" ? "gold" : "purple"}>{ROLE_LABELS[u.role]}</Badge> },
             ]}
             fields={[
               { name: "name", label: "Nom", required: true, span: 2 },
@@ -116,7 +116,7 @@ export function SettingsPage() {
           />
           {passwordUser && (
             <Modal
-              title={`Modifier le mot de passe — ${passwordUser.name}`}
+              title={`Modifier le mot de passe  ${passwordUser.name}`}
               size="sm"
               onClose={() => { setPasswordUser(null); setPassword(""); }}
               footer={

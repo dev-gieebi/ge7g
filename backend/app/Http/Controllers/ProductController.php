@@ -2,24 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
-    private const MANAGE_ROLES = ['AG_LOGISTIQUE', 'DIRECTION', 'SUPERADMIN'];
+    private const MANAGE_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CDG_ADMIN'];
 
-    private function authorizeUser(Request $request): \App\Models\User
+    /** Lecture catalogue : circuit commercial (devis, factures, suivi). */
+    private const VIEW_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'];
+
+    private function authorizeUser(Request $request, array $roles = self::MANAGE_ROLES): User
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
-        if (! in_array($user->role, self::MANAGE_ROLES, true)) {
+        if (! in_array($user->role, $roles, true)) {
             abort(403, 'Accès réservé.');
         }
 
@@ -28,7 +32,7 @@ class ProductController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $this->authorizeUser($request);
+        $this->authorizeUser($request, self::VIEW_ROLES);
 
         $query = Product::query()->with(['category', 'unit']);
 
@@ -67,7 +71,6 @@ class ProductController extends Controller
         $this->authorizeUser($request);
 
         $validated = $request->validate([
-            'reference' => 'nullable|string|max:100|unique:products,reference',
             'name' => 'required|string|max:255',
             'category_id' => 'required|integer|exists:categories,id',
             'unit_id' => 'required|integer|exists:units,id',
@@ -78,6 +81,7 @@ class ProductController extends Controller
         ]);
 
         $data = $this->prepareData($validated);
+        $data['reference'] = $this->generateReference((int) $validated['category_id']);
 
         $product = Product::create($data);
 
@@ -95,7 +99,7 @@ class ProductController extends Controller
 
     public function show(Request $request, Product $product): JsonResponse
     {
-        $this->authorizeUser($request);
+        $this->authorizeUser($request, self::VIEW_ROLES);
 
         $product->load(['category', 'unit']);
 
@@ -107,7 +111,6 @@ class ProductController extends Controller
         $this->authorizeUser($request);
 
         $validated = $request->validate([
-            'reference' => ['nullable', 'string', 'max:100', Rule::unique('products', 'reference')->ignore($product->id)],
             'name' => 'required|string|max:255',
             'category_id' => 'required|integer|exists:categories,id',
             'unit_id' => 'required|integer|exists:units,id',
@@ -119,6 +122,10 @@ class ProductController extends Controller
 
         $data = $this->prepareData($validated);
         $imageUrl = $this->handleImage($validated['image_url'] ?? null, $product);
+
+        if ((int) $validated['category_id'] !== $product->category_id || ! Str::startsWith($product->reference, $this->categoryPrefix((int) $validated['category_id']).'-')) {
+            $data['reference'] = $this->generateReference((int) $validated['category_id']);
+        }
 
         $product->update([...$data, 'image_url' => $imageUrl]);
 
@@ -144,13 +151,7 @@ class ProductController extends Controller
         $margin = $salePrice - $purchasePrice;
         $marginPercent = $purchasePrice > 0 ? ($margin / $purchasePrice) * 100 : 0;
 
-        $reference = $validated['reference'] ?? null;
-        if (empty($reference)) {
-            $reference = 'REF-' . now()->format('Ymd-His-u') . '-' . strtoupper(Str::random(4));
-        }
-
         return [
-            'reference' => $reference,
             'name' => $validated['name'],
             'category_id' => $validated['category_id'],
             'unit_id' => $validated['unit_id'],
@@ -162,10 +163,41 @@ class ProductController extends Controller
         ];
     }
 
+    /**
+     * Référence automatique : 4 premières lettres de la catégorie + compteur
+     * propre à la catégorie (chaque catégorie commence à 0001).
+     */
+    private function generateReference(int $categoryId): string
+    {
+        $prefix = $this->categoryPrefix($categoryId);
+
+        $next = Product::query()
+            ->where('category_id', $categoryId)
+            ->where('reference', 'like', $prefix.'-%')
+            ->pluck('reference')
+            ->map(fn (string $ref) => (int) substr($ref, strlen($prefix) + 1))
+            ->max() + 1;
+
+        do {
+            $reference = sprintf('%s-%04d', $prefix, $next++);
+        } while (Product::where('reference', $reference)->exists());
+
+        return $reference;
+    }
+
+    private function categoryPrefix(int $categoryId): string
+    {
+        $name = (string) Category::findOrFail($categoryId)->name;
+        $prefix = Str::upper(Str::substr(preg_replace('/[^A-Za-z0-9]/', '', Str::ascii($name)) ?? '', 0, 4));
+
+        return $prefix === '' ? 'PRD' : $prefix;
+    }
+
     private function handleImage(mixed $imageUrl, Product $product): ?string
     {
         if (empty($imageUrl)) {
             $this->deleteImage($product->image_url);
+
             return null;
         }
 
@@ -197,12 +229,12 @@ class ProductController extends Controller
             $extension = 'gif';
         }
 
-        $folder = 'products/' . $product->id . '-' . Str::slug($product->name);
-        $path = $folder . '/image.' . $extension;
+        $folder = 'products/'.$product->id.'-'.Str::slug($product->name);
+        $path = $folder.'/image.'.$extension;
 
         Storage::disk('public')->put($path, $decoded);
 
-        return url('storage/' . $path);
+        return url('storage/'.$path);
     }
 
     private function deleteImage(?string $imageUrl): void

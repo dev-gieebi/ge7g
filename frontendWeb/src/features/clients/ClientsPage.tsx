@@ -63,7 +63,7 @@ export function ClientsPage() {
     { key: "company_name", header: "Client", sortable: true, render: (c) => <span className="font-semibold">{c.company_name}</span> },
     { key: "contact_name", header: "Contact", render: (c) => c.contact_name },
     { key: "phone", header: "Téléphone", render: (c) => c.phone },
-    { key: "zone", header: "Zone", render: (c) => c.zone?.name ?? "—" },
+    { key: "zone", header: "Zone", render: (c) => c.zone?.name ?? "" },
     { key: "client_type", header: "Type", render: (c) => <StatusBadge status={c.client_type} /> },
     { key: "chantiers_count", header: "Chantiers", align: "center", render: (c) => c.chantiers_count ?? 0 },
     { key: "orders_count", header: "Commandes", align: "center", render: (c) => c.orders_count ?? 0 },
@@ -165,7 +165,7 @@ export function ClientsPage() {
               </Select>
               <Input label="Adresse" value={editing.address ?? ""} onChange={(e) => setEditing({ ...editing, address: e.target.value })} error={errors.address} className="sm:col-span-2" />
               <Select label="Zone" value={String(editing.zone_id ?? "")} onChange={(e) => setEditing({ ...editing, zone_id: e.target.value ? Number(e.target.value) : null })} error={errors.zone_id}>
-                <option value="">—</option>
+                <option value=""></option>
                 {zones?.map((z: Zone) => (
                   <option key={z.id} value={z.id}>
                     {z.name}
