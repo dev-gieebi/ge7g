@@ -88,6 +88,6 @@ const STATUS_TONES: Record<string, Tone> = {
 };
 
 export function StatusBadge({ status }: { status: string | null | undefined }) {
-  if (!status) return <Badge></Badge>;
+  if (!status) return null;
   return <Badge tone={STATUS_TONES[status] ?? "gray"}>{humanize(status)}</Badge>;
 }
