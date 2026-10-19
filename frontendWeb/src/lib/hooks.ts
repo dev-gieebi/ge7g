@@ -46,11 +46,12 @@ export function usePaginated<T>(key: string, url: string, params: ListParams, en
   return { ...q, errorMessage: q.error ? toApiError(q.error).message : null };
 }
 
-export function useOne<T>(key: string, url: string | null) {
+export function useOne<T>(key: string, url: string | null, refetchInterval?: number) {
   return useQuery<T>({
     queryKey: [key, url],
     queryFn: () => getOne<T>(url as string),
     enabled: !!url,
+    refetchInterval,
   });
 }
 

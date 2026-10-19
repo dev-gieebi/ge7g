@@ -22,7 +22,7 @@ export function ClientDetailPage() {
     { key: "status", header: "Statut", render: (x) => <StatusBadge status={x.status} /> },
   ];
   const orderCols: Column<Order>[] = [
-    { key: "number", header: "N°", render: (o) => <Link to={`/commandes/${o.id}`} className="font-semibold text-ge7-purple hover:underline">{o.number}</Link> },
+    { key: "number", header: "N°", render: (o) => <Link to={`/admin/commandes/${o.id}`} className="font-semibold text-ge7-purple hover:underline">{o.number}</Link> },
     { key: "chantier", header: "Chantier", render: (o) => o.chantier?.name ?? "" },
     { key: "created_at", header: "Date", render: (o) => date(o.created_at) },
     { key: "total", header: "Total", align: "right", render: (o) => <span className="font-semibold">{money(o.total)}</span> },
@@ -33,7 +33,7 @@ export function ClientDetailPage() {
     <>
       <PageHeader
         breadcrumb={
-          <Link to="/clients" className="inline-flex items-center gap-1 hover:underline">
+          <Link to="/admin/clients" className="inline-flex items-center gap-1 hover:underline">
             <ArrowLeft size={12} /> Clients
           </Link>
         }

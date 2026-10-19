@@ -36,7 +36,7 @@ export function PreparationPage() {
             <Card key={o.id} className="!p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <Link to={`/commandes/${o.id}`} className="font-bold text-ge7-purple hover:underline">{o.number}</Link>
+                  <Link to={`/admin/commandes/${o.id}`} className="font-bold text-ge7-purple hover:underline">{o.number}</Link>
                   <p className="text-sm font-semibold">{o.client?.company_name}</p>
                   <p className="text-xs text-ge7-black/60">{o.chantier?.name} · souhaité {datetime(o.requested_date)}</p>
                 </div>

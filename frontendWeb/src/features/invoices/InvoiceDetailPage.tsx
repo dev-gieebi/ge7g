@@ -37,7 +37,7 @@ export function InvoiceDetailPage() {
     <>
       <div className="no-print">
         <PageHeader
-          breadcrumb={<Link to="/factures" className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Factures</Link>}
+          breadcrumb={<Link to="/admin/factures" className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Factures</Link>}
           title={inv.number}
           subtitle={<span className="flex items-center gap-2"><StatusBadge status={inv.status} />{remaining > 0 && <span className="text-sm text-ge7-black/60">Reste à payer : <strong>{money(remaining)}</strong></span>}</span>}
           action={

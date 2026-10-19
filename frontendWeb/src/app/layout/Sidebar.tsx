@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, LogOut, X } from "lucide-react";
 import { Logo } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
+import type { CommandeStats } from "@/types";
 import { navigationFor } from "../navigation";
 import { ROLE_LABELS } from "@/lib/rbac";
 
@@ -20,6 +23,17 @@ export function Sidebar({
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const [tooltip, setTooltip] = useState<{ label: string; top: number; left: number } | null>(null);
+
+  // Badge « commandes en attente » sur l'entrée Commandes en ligne (30 s).
+  const { data: commandeStats } = useQuery({
+    queryKey: ["commande-stats"],
+    queryFn: async () => (await api.get<{ data: CommandeStats }>("/commandes/stats")).data.data,
+    refetchInterval: 30_000,
+    retry: false,
+    enabled: !!user && ["LG_ADMIN", "DG_ADMIN", "CDG_ADMIN", "SUPERADMIN"].includes(user.role),
+  });
+  const enAttente = commandeStats?.en_attente ?? 0;
+
   if (!user) return null;
   const groups = navigationFor(user.role);
   const isActive = (item: { to: string; paths?: string[]; end?: boolean }) =>
@@ -31,7 +45,7 @@ export function Sidebar({
       <aside
         className={`no-print fixed inset-y-0 left-0 z-40 flex h-screen flex-col bg-ge7-black text-white transition-all duration-200 lg:sticky lg:top-0 lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
-        } ${collapsed ? "w-60 lg:w-[76px]" : "w-60"}`}
+        } ${collapsed ? "w-60 lg:w-[76px]" : "w-68"}`}
       >
         {/* Bouton de repli (desktop) — chevron sur le bord droit, comme la maquette. */}
         <button
@@ -80,8 +94,18 @@ export function Sidebar({
                           : "text-white/70 hover:bg-white/5 hover:text-white"
                       }`}
                     >
-                      <item.icon size={18} className="shrink-0 transition group-hover:text-ge7-gold-light" />
+                      <span className="relative shrink-0">
+                        <item.icon size={18} className="transition group-hover:text-ge7-gold-light" />
+                        {collapsed && item.to === "/admin/commandes" && enAttente > 0 && (
+                          <span className="absolute -right-1.5 -top-1.5 hidden size-2.5 rounded-full bg-rose-500 lg:block" />
+                        )}
+                      </span>
                       <span className={collapsed ? "lg:hidden" : ""}>{item.label}</span>
+                      {item.to === "/admin/commandes" && enAttente > 0 && (
+                        <span className={`ml-auto rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white ${collapsed ? "lg:hidden" : ""}`}>
+                          {enAttente}
+                        </span>
+                      )}
                     </Link>
                   </div>
                 ))}

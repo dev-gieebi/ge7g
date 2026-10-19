@@ -5,6 +5,7 @@ import { api, toApiError } from "@/lib/api";
 import type { SalesReport } from "@/types";
 import { money, qty } from "@/lib/format";
 import { Button, Card, CardHeader, ErrorState, Input, Loading, PageHeader } from "@/components/ui";
+import { PilotageSection } from "./PilotageSection";
 
 // Semaine écoulée par défaut : lundi → dimanche derniers (rapport du lundi, procédure §6).
 const lastWeek = (): { from: string; to: string } => {
@@ -232,6 +233,9 @@ export function ReportsPage() {
           <ReportTables r={c} />
         </>
       )}
+
+      <h2 className="mb-3 mt-10 font-display text-lg font-extrabold">C. Pilotage du magasin</h2>
+      <PilotageSection />
     </>
   );
 }

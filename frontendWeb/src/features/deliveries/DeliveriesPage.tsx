@@ -46,7 +46,7 @@ export function DeliveriesPage() {
           <option value="RECEPTION_CONFIRMEE">Réception confirmée</option>
         </Select>
       </div>
-      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(d) => d.id} onRowClick={(d) => navigate(`/livraisons/${d.id}`)} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucune livraison" />
+      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(d) => d.id} onRowClick={(d) => navigate(`/admin/livraisons/${d.id}`)} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucune livraison" />
     </>
   );
 }

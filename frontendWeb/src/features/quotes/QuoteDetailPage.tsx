@@ -28,7 +28,7 @@ export function QuoteDetailPage() {
       <div className="no-print">
         <PageHeader
           breadcrumb={
-            <Link to="/devis" className="inline-flex items-center gap-1 hover:underline">
+            <Link to="/admin/devis" className="inline-flex items-center gap-1 hover:underline">
               <ArrowLeft size={12} /> Devis
             </Link>
           }
@@ -57,7 +57,7 @@ export function QuoteDetailPage() {
         />
       </div>
       <Devis quote={q} />
-      <div className="no-print mt-6 text-center"><Link to="/devis"><Button variant="purple">Retour aux devis</Button></Link></div>
+      <div className="no-print mt-6 text-center"><Link to="/admin/devis"><Button variant="purple">Retour aux devis</Button></Link></div>
     </>
   );
 }

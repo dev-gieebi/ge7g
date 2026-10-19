@@ -23,6 +23,7 @@ export function SimpleCrud<T extends { id: number }>({
   fields,
   empty,
   allowDelete,
+  allowEdit,
   searchable = true,
   extraActions,
 }: {
@@ -33,6 +34,7 @@ export function SimpleCrud<T extends { id: number }>({
   fields: Field<T>[];
   empty: Partial<T>;
   allowDelete?: (row: T) => boolean;
+  allowEdit?: (row: T) => boolean;
   searchable?: boolean;
   extraActions?: (row: T) => ReactNode;
 }) {
@@ -59,7 +61,7 @@ export function SimpleCrud<T extends { id: number }>({
       render: (row) => (
         <div className="flex justify-end gap-1">
           {extraActions?.(row)}
-          <Button size="sm" variant="ghost" onClick={() => { setEditId(row.id); setForm({ ...row }); }}><Pencil size={14} /></Button>
+          {(allowEdit?.(row) ?? true) && <Button size="sm" variant="ghost" onClick={() => { setEditId(row.id); setForm({ ...row }); }}><Pencil size={14} /></Button>}
           {allowDelete?.(row) && <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(row)}><Trash2 size={14} className="text-rose-600" /></Button>}
         </div>
       ),

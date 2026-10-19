@@ -20,9 +20,9 @@ export function MissionsPage() {
     { key: "order", header: "Commande", render: (m) => m.order?.number },
     { key: "client", header: "Client / chantier", render: (m) => <div><p>{m.order?.client?.company_name}</p><p className="text-xs text-ge7-black/50">{m.order?.chantier?.name}</p></div> },
     { key: "driver", header: "Chauffeur", render: (m) => m.driver?.name },
-    { key: "vehicle", header: "Véhicule", render: (m) => m.vehicle?.plate ?? "—" },
+    { key: "vehicle", header: "Véhicule", render: (m) => m.vehicle?.plate ?? "" },
     { key: "scheduled_at", header: "Prévu", sortable: true, render: (m) => datetime(m.scheduled_at) },
-    { key: "gps", header: "Dernier GPS", render: (m) => (m.last_location ? <span className="text-xs text-ge7-black/60">{relative(m.last_location.recorded_at)}</span> : "—") },
+    { key: "gps", header: "Dernier GPS", render: (m) => (m.last_location ? <span className="text-xs text-ge7-black/60">{relative(m.last_location.recorded_at)}</span> : "") },
     { key: "status", header: "Statut", render: (m) => <StatusBadge status={m.status} /> },
   ];
 
@@ -41,7 +41,7 @@ export function MissionsPage() {
           {drivers?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </Select>
       </div>
-      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(m) => m.id} onRowClick={(m) => navigate(`/missions/${m.id}`)} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucune mission" />
+      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(m) => m.id} onRowClick={(m) => navigate(`/admin/missions/${m.id}`)} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucune mission" />
     </>
   );
 }

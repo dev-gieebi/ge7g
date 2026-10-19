@@ -129,7 +129,7 @@ export function ClientsPage() {
         isLoading={isLoading}
         error={errorMessage}
         rowKey={(c) => c.id}
-        onRowClick={(c) => navigate(`/clients/${c.id}`)}
+        onRowClick={(c) => navigate(`/admin/clients/${c.id}`)}
         page={list.page}
         onPageChange={list.setPage}
         sort={list.sort}

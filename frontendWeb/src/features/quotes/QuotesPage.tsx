@@ -38,7 +38,7 @@ export function QuotesPage() {
         title="Devis"
         subtitle="Propositions commerciales établies pour les clients."
         breadcrumb="Commercial"
-        action={canCreate ? <Button onClick={() => navigate("/devis/nouveau")}><Plus size={15} /> Nouveau devis</Button> : undefined}
+        action={canCreate ? <Button onClick={() => navigate("/admin/devis/nouveau")}><Plus size={15} /> Nouveau devis</Button> : undefined}
       />
       <div className="mb-4 grid gap-3 sm:grid-cols-4">
         <SearchInput value={list.search} onChange={list.setSearch} placeholder="N° devis, client…" />
@@ -52,7 +52,7 @@ export function QuotesPage() {
         <Input type="date" value={String(list.filters.from ?? "")} onChange={(e) => list.setFilter("from", e.target.value)} />
         <Input type="date" value={String(list.filters.to ?? "")} onChange={(e) => list.setFilter("to", e.target.value)} />
       </div>
-      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(q) => q.id} onRowClick={(q) => navigate(`/devis/${q.id}`)} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucun devis" />
+      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(q) => q.id} onRowClick={(q) => navigate(`/admin/devis/${q.id}`)} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucun devis" />
     </>
   );
 }

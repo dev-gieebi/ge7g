@@ -2,14 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CreditCard,
+  Globe,
   Package,
   PackageX,
+  ShoppingBag,
   ShoppingCart,
 } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link } from "react-router-dom";
-import { getOne, toApiError } from "@/lib/api";
-import type { DashboardStats, SalesSeriesPoint } from "@/types";
+import { api, getOne, toApiError } from "@/lib/api";
+import type { CommandeStats, DashboardStats, SalesSeriesPoint } from "@/types";
 import { money, relative } from "@/lib/format";
 import { Card, CardHeader, ErrorState, KpiCard, Loading, PageHeader } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
@@ -31,6 +33,13 @@ export function DashboardPage() {
     queryFn: () => getOne<SalesSeriesPoint[]>(`/dashboard/sales-series?year=${year}&month=${month}`),
   });
 
+  const { data: boutique } = useQuery({
+    queryKey: ["commande-stats"],
+    queryFn: async () => (await api.get<{ data: CommandeStats }>("/commandes/stats")).data.data,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+
   if (isLoading) return <Loading />;
   if (error || !data) return <ErrorState message={toApiError(error).message} onRetry={() => void refetch()} />;
 
@@ -44,17 +53,27 @@ export function DashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {/*<KpiCard label="Chiffre d'affaires" value={money(data.revenue)} trend={data.revenue_trend} hint="vs période précédente" icon={Banknote} tone="gold" />
-        <KpiCard label="Commandes" value={data.orders_count} icon={ShoppingCart} tone="purple" to="/commandes" />
-        <KpiCard label="Ventes en ligne" value={money(data.online_sales)} icon={Globe} tone="purple" to="/commandes" />
-        <KpiCard label="En attente de validation" value={data.pending_orders} icon={Clock} tone="dark" to="/commandes?status=EN_ATTENTE" />
-        <KpiCard label="Livraisons en cours" value={data.deliveries_in_progress} icon={Truck} tone="purple" to="/missions" />
-        <KpiCard label="Livraisons terminées" value={data.deliveries_completed} icon={PackageCheck} tone="green" to="/livraisons" />*/}
-        <KpiCard label="Produits" value={data.products_count} icon={Package} tone="dark" to="/produits" />
-        <KpiCard label="Produits vendus aujourd'hui" value={data.products_sold_today} icon={ShoppingCart} tone="purple" to="/caisse/ventes" />
-        <KpiCard label="Stock faible" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock ? "red" : "green"} to="/stock?alert=low" />
-        <KpiCard label="Ruptures" value={data.out_of_stock} icon={PackageX} tone={data.out_of_stock ? "red" : "green"} to="/stock?alert=out" />
-        <KpiCard label="Ventes caisse" value={money(data.pos_sales)} icon={CreditCard} tone="gold" to="/caisse/ventes" />
+        <KpiCard label="Commandes" value={data.orders_count} icon={ShoppingCart} tone="purple" to="/admin/commandes" />
+        <KpiCard label="Ventes en ligne" value={money(data.online_sales)} icon={Globe} tone="purple" to="/admin/commandes" />
+        <KpiCard label="En attente de validation" value={data.pending_orders} icon={Clock} tone="dark" to="/admin/commandes?status=EN_ATTENTE" />
+        <KpiCard label="Livraisons en cours" value={data.deliveries_in_progress} icon={Truck} tone="purple" to="/admin/missions" />
+        <KpiCard label="Livraisons terminées" value={data.deliveries_completed} icon={PackageCheck} tone="green" to="/admin/livraisons" />*/}
+        <KpiCard label="Produits" value={data.products_count} icon={Package} tone="dark" to="/admin/produits" />
+        <KpiCard label="Produits vendus aujourd'hui" value={data.products_sold_today} icon={ShoppingCart} tone="purple" to="/admin/caisse/ventes" />
+        <KpiCard label="Stock faible" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock ? "red" : "green"} to="/admin/stock?alert=low" />
+        <KpiCard label="Ruptures" value={data.out_of_stock} icon={PackageX} tone={data.out_of_stock ? "red" : "green"} to="/admin/stock?alert=out" />
+        <KpiCard label="Ventes caisse" value={money(data.pos_sales)} icon={CreditCard} tone="gold" to="/admin/caisse/ventes" />
       </div>
+
+      {boutique && (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <KpiCard label="Commandes en attente" value={boutique.en_attente} icon={ShoppingBag} tone={boutique.en_attente ? "red" : "green"} to="/admin/commandes?statut=en_attente" />
+          <KpiCard label="Commandes du jour" value={boutique.commandes_jour} icon={ShoppingBag} tone="purple" to="/admin/commandes" />
+          <KpiCard label="CA boutique (jour)" value={money(boutique.ca_boutique_jour)} icon={Globe} tone="gold" to="/admin/commandes" />
+          <KpiCard label="CA boutique (mois)" value={money(boutique.ca_boutique_mois)} icon={Globe} tone="purple" to="/admin/commandes" />
+          <KpiCard label="Taux de livraison" value={`${boutique.taux_livrees} %`} icon={Package} tone="green" to="/admin/commandes?statut=livree" />
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">

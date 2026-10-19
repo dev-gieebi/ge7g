@@ -18,8 +18,8 @@ export function InvoicesPage() {
     { key: "type", header: "Type", render: (i) => <Badge tone={i.type === "AVOIR" ? "red" : i.type === "TICKET" ? "gray" : "gold"}>{i.type}</Badge> },
     { key: "date", header: "Date", sortable: true, render: (i) => date(i.date) },
     { key: "client", header: "Client", render: (i) => i.client?.company_name ?? "Comptoir" },
-    { key: "chantier", header: "Chantier", render: (i) => i.chantier?.name ?? "—" },
-    { key: "tax", header: "Taxe", render: (i) => (i.tax_type === "AUCUNE" ? "—" : `${i.tax_type} ${(Number(i.tax_rate) * 100).toFixed(0)} %`) },
+    { key: "chantier", header: "Chantier", render: (i) => i.chantier?.name ?? "" },
+    { key: "tax", header: "Taxe", render: (i) => (i.tax_type === "AUCUNE" ? "" : `${i.tax_type} ${(Number(i.tax_rate) * 100).toFixed(0)} %`) },
     { key: "total", header: "Total", align: "right", sortable: true, render: (i) => <span className="font-bold">{money(i.total)}</span> },
     { key: "paid", header: "Payé", align: "right", render: (i) => money(i.paid_amount) },
     { key: "status", header: "Statut", render: (i) => <StatusBadge status={i.status} /> },
@@ -42,7 +42,7 @@ export function InvoicesPage() {
         <Input type="date" value={String(list.filters.from ?? "")} onChange={(e) => list.setFilter("from", e.target.value)} />
         <Input type="date" value={String(list.filters.to ?? "")} onChange={(e) => list.setFilter("to", e.target.value)} />
       </div>
-      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(i) => i.id} onRowClick={(i) => navigate(`/factures/${i.id}`)} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucune facture" />
+      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(i) => i.id} onRowClick={(i) => navigate(`/admin/factures/${i.id}`)} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucune facture" />
     </>
   );
 }

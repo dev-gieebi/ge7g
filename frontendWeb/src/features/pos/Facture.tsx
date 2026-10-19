@@ -3,11 +3,18 @@ import type { PosSale } from "@/types";
 import { datetime, money, qty } from "@/lib/format";
 import { GE7_COMPANY, cfaNumber } from "@/features/shared/companyInfo";
 
-export function Facture({ sale }: { sale: PosSale }) {
+/**
+ * Document A4 du modèle papier (achat caisse et commande en ligne) :
+ * facture ou bon de livraison selon `docTitle`. `originLabel` distingue la
+ * provenance — ex. « Commande en ligne : CMD-… ».
+ */
+export function Facture({ sale, originLabel, docTitle = "FACTURE" }: { sale: PosSale; originLabel?: string; docTitle?: string }) {
   const s = sale;
   // Transforme le N° de vente « VNT-2026-00012 » en N° de facture « FAC-00012-2026 ».
   const parts = s.number.split("-");
-  const number = s.invoice?.number ?? (parts.length === 3 ? `FAC-${parts[2]}-${parts[1]}` : s.number);
+  // Le n° de facture suit la pièce comptable ; un autre document (bon de
+  // livraison, bon de commande) porte le n° de la pièce d'origine.
+  const number = docTitle === "FACTURE" ? (s.invoice?.number ?? (parts.length === 3 ? `FAC-${parts[2]}-${parts[1]}` : s.number)) : s.number;
   const ratePct = (Number(s.tax_rate) * 100).toFixed(2).replace(/\.?0+$/, "");
   const discountRate = Number(s.discount_rate ?? 0);
   const discountAmount = Math.round(Number(s.subtotal) * discountRate / 100);
@@ -37,15 +44,18 @@ export function Facture({ sale }: { sale: PosSale }) {
       </div>
       <div className="px-6 print:pt-36">
         <h1 className="mt-6 text-center text-4xl font-bold tracking-wide text-[#065baf] underline underline-offset-4">
-          FACTURE
+          {docTitle}
         </h1>
+        {originLabel && (
+          <p className="mt-1 text-center text-sm font-bold uppercase tracking-widest text-[#065baf]">{originLabel}</p>
+        )}
 
         <div className="mt-8 space-y-1">
           <p>
             <span className="font-bold underline">Date</span> : {datetime(s.created_at)}
           </p>
           <p>
-            <span className="font-bold underline">N° de facture</span> : {number}
+            <span className="font-bold underline">N° de {docTitle === "FACTURE" ? "facture" : docTitle.toLowerCase()}</span> : {number}
           </p>
         </div>
 
@@ -121,7 +131,7 @@ export function Facture({ sale }: { sale: PosSale }) {
         </div>
 
         <p className="mt-2">
-          <span className="font-bold italic underline">Arrêtée la présente facture au montant de :</span>{" "}
+          <span className="font-bold italic underline">{docTitle === "FACTURE" ? "Arrêtée la présente facture" : "Arrêté le présent document"} au montant de :</span>{" "}
           <strong>{money(s.total)}</strong>
         </p>
 

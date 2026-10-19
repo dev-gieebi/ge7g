@@ -124,6 +124,11 @@ class PosController extends Controller
             $query->where('zone_id', (int) $request->input('zone_id'));
         }
 
+        // Source : ventes de caisse ou commandes de la boutique en ligne.
+        if ($request->filled('source')) {
+            $query->where('source', $request->input('source'));
+        }
+
         if ($request->has('payment_method') && $request->input('payment_method') !== '') {
             $query->where('payment_method', $request->input('payment_method'));
         }

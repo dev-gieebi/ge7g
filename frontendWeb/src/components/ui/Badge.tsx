@@ -72,9 +72,22 @@ const STATUS_TONES: Record<string, Tone> = {
   LIVRAISON: "blue",
   TRANSFERT: "blue",
   VENTE: "gold",
+  // Statuts des commandes de la boutique en ligne (minuscules côté API).
+  en_attente: "amber",
+  validee: "blue",
+  en_preparation: "purple",
+  en_livraison: "blue",
+  livree: "green",
+  echec_livraison: "amber",
+  refusee: "red",
+  annulee: "red",
+  // Statuts de paiement des factures boutique.
+  non_payee: "amber",
+  partiellement_payee: "amber",
+  payee: "green",
 };
 
 export function StatusBadge({ status }: { status: string | null | undefined }) {
-  if (!status) return <Badge>—</Badge>;
+  if (!status) return <Badge></Badge>;
   return <Badge tone={STATUS_TONES[status] ?? "gray"}>{humanize(status)}</Badge>;
 }

@@ -1,4 +1,4 @@
-import { ShoppingCart, Package, Settings, Warehouse, LayoutDashboard, FileSignature, BarChart3, Receipt, type LucideIcon } from "lucide-react";
+import { ShoppingCart, ShoppingBag, Package, Settings, Warehouse, LayoutDashboard, FileSignature, BarChart3, Receipt, Truck, type LucideIcon } from "lucide-react";
 import type { Role } from "@/types";
 
 export interface NavItem {
@@ -26,57 +26,66 @@ const ADMINS: Role[] = [...ADMIN_DIR, "CDG_ADMIN"];
 const REPORTS: Role[] = ["DG_ADMIN", "CDG_ADMIN"];
 
 /**
- * Menu principal Web — plateforme interne G7 Energy.
- * Chaque entrée mène à une page hub ; les sous-pages sont accessibles
- * via les onglets (ModuleTabs) en haut de chaque page.
- * Les rôles CLIENT et CHAUFFEUR n'ont aucun accès Web (application mobile).
+ * Menu principal Web — plateforme interne G7 Energy, montée sous /admin.
+ * La boutique publique occupe la racine du site.
  */
 export const NAVIGATION: NavGroup[] = [
   {
     title: "Pilotage",
     items: [
-      { label: "Tableau de bord", to: "/dashboard", icon: LayoutDashboard, roles: ADMINS },
-      { label: "Rapports", to: "/rapports", icon: BarChart3, roles: REPORTS },
-      /*{ label: "Notifications", to: "/notifications", icon: Bell, roles: ADMIN_DIR },
-    */],
+      { label: "Tableau de bord", to: "/admin/dashboard", icon: LayoutDashboard, roles: ADMINS },
+      { label: "Rapports", to: "/admin/rapports", icon: BarChart3, roles: REPORTS },
+    ],
   },
   {
     title: "Commercial",
     items: [
-      { label: "Caisse", to: "/caisse", icon: ShoppingCart, roles: ["LG_ADMIN", "CAISSIER"], end: true },
-      { label: "Devis", to: "/devis", icon: FileSignature, roles: ADMINS, paths: ["/devis"] },
-      { label: "Ventes", to: "/caisse/ventes", icon: Receipt, roles: [...ADMINS, "CAISSIER"], paths: ["/caisse/ventes"] },
+      { label: "Caisse", to: "/admin/caisse", icon: ShoppingCart, roles: ["LG_ADMIN", "CAISSIER"], end: true },
+      { label: "Commandes en ligne", to: "/admin/commandes", icon: ShoppingBag, roles: ADMINS, paths: ["/admin/commandes"] },
+      { label: "Devis", to: "/admin/devis", icon: FileSignature, roles: ADMINS, paths: ["/admin/devis"] },
+      { label: "Ventes", to: "/admin/caisse/ventes", icon: Receipt, roles: [...ADMINS, "CAISSIER"], paths: ["/admin/caisse/ventes"] },
     ],
   },
   {
     title: "Gestion",
     items: [
-      // { label: "Commercial", to: "/clients", icon: Users, roles: ADMIN_DIR, paths: ["/clients", "/commandes", "/factures"] },
-      { label: "Catalogue", to: "/produits", icon: Package, roles: ADMINS, paths: ["/produits", "/categories", "/unites", "/prix"] },
-      { label: "Approvisionnement", to: "/stock", icon: Warehouse, roles: ADMINS, paths: ["/stock", "/fournisseurs", "/achats"] },
+      { label: "Catalogue", to: "/admin/produits", icon: Package, roles: ADMINS, paths: ["/admin/produits", "/admin/categories", "/admin/unites", "/admin/prix"] },
+      { label: "Approvisionnement", to: "/admin/stock", icon: Warehouse, roles: ADMINS, paths: ["/admin/stock", "/admin/fournisseurs", "/admin/achats"] },
     ],
   },
- /* {
+  {
     title: "Logistique",
     items: [
       {
         label: "Logistique",
-        to: "/logistique",
+        to: "/admin/logistique",
         icon: Truck,
         roles: ADMIN_DIR,
-        paths: ["/logistique", "/preparation", "/chauffeurs", "/vehicules", "/missions", "/livraisons", "/livraisons/nouvelle"],
+        paths: ["/admin/logistique", "/admin/preparation", "/admin/chauffeurs", "/admin/vehicules", "/admin/missions", "/admin/livraisons"],
       },
     ],
-  },*/
+  },
+  {
+    title: "Livraisons",
+    items: [
+      { label: "Mes livraisons", to: "/admin/mes-livraisons", icon: Truck, roles: ["CHAUFFEUR"], paths: ["/admin/mes-livraisons"] },
+    ],
+  },
   {
     title: "Système",
-    items: [{ label: "Paramètres", to: "/parametres", icon: Settings, roles: ["SUPERADMIN"], paths: ["/parametres", "/audit"] }],
+    items: [{ label: "Paramètres", to: "/admin/parametres", icon: Settings, roles: ["SUPERADMIN"], paths: ["/admin/parametres", "/admin/audit"] }],
   },
 ];
 
+/**
+ * Entrées visibles pour un rôle. SUPERADMIN voit tout le périmètre admin
+ * sauf les espaces personnels réservés à un autre rôle (ex. « Mes
+ * livraisons », qui n'a de sens que pour le chauffeur connecté).
+ */
+const visibleFor = (item: NavItem, role: Role): boolean =>
+  role === "SUPERADMIN" ? !item.roles.every((r) => r === "CHAUFFEUR") : item.roles.includes(role);
+
 export const navigationFor = (role: Role): NavGroup[] =>
-  role === "SUPERADMIN"
-    ? NAVIGATION
-    : NAVIGATION.map((g) => ({ ...g, items: g.items.filter((i) => i.roles.includes(role)) })).filter(
-        (g) => g.items.length > 0,
-      );
+  NAVIGATION.map((g) => ({ ...g, items: g.items.filter((i) => visibleFor(i, role)) })).filter(
+    (g) => g.items.length > 0,
+  );

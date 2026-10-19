@@ -23,7 +23,7 @@ export function DeliveryDetailPage() {
   return (
     <>
       <PageHeader
-        breadcrumb={<Link to="/livraisons" className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Livraisons</Link>}
+        breadcrumb={<Link to="/admin/livraisons" className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Livraisons</Link>}
         title={`Livraison ${d.mission?.number ?? `#${d.id}`}`}
         subtitle={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={d.status} />{d.is_partial && <Badge tone="amber">Partielle</Badge>}<span className="text-ge7-black/60">{datetime(d.delivered_at)}</span></span>}
         action={canConfirm && <Button loading={confirm.isPending} onClick={() => confirm.mutate()}><CheckCircle2 size={16} /> Confirmer la réception</Button>}
@@ -76,8 +76,8 @@ export function DeliveryDetailPage() {
           <Card>
             <CardHeader title="Contexte" />
             <dl className="space-y-2 text-sm">
-              <div><dt className="text-xs text-ge7-black/50">Commande</dt><dd><Link to={`/commandes/${d.order_id}`} className="font-semibold text-ge7-purple hover:underline">{d.order?.number}</Link></dd></div>
-              <div><dt className="text-xs text-ge7-black/50">Mission</dt><dd><Link to={`/missions/${d.mission_id}`} className="font-semibold text-ge7-purple hover:underline">{d.mission?.number}</Link></dd></div>
+              <div><dt className="text-xs text-ge7-black/50">Commande</dt><dd><Link to={`/admin/commandes/${d.order_id}`} className="font-semibold text-ge7-purple hover:underline">{d.order?.number}</Link></dd></div>
+              <div><dt className="text-xs text-ge7-black/50">Mission</dt><dd><Link to={`/admin/missions/${d.mission_id}`} className="font-semibold text-ge7-purple hover:underline">{d.mission?.number}</Link></dd></div>
               <div><dt className="text-xs text-ge7-black/50">Chauffeur</dt><dd>{d.mission?.driver?.name}</dd></div>
               <div><dt className="text-xs text-ge7-black/50">Chantier</dt><dd><Link to={`/chantiers/${d.chantier_id}`} className="font-semibold text-ge7-purple hover:underline">{d.chantier?.name}</Link></dd></div>
             </dl>

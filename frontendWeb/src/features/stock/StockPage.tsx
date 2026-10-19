@@ -2,7 +2,8 @@ import { useState } from "react";
 import { ModuleTabs } from "@/components/ui";
 import { APPRO_TABS } from "@/app/moduleTabs";
 import { useSearchParams } from "react-router-dom";
-import { ArrowLeftRight, ChevronLeft, ChevronRight, FileSpreadsheet, History, Inbox, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeftRight, ChevronLeft, ChevronRight, FileSpreadsheet, History, Inbox, Loader2, AlertCircle, Table2 } from "lucide-react";
+import { EtatStockTable } from "./EtatStockTable";
 import type { Product, StockMovement } from "@/types";
 import { api } from "@/lib/api";
 import { useListState, usePaginated } from "@/lib/hooks";
@@ -13,7 +14,7 @@ import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/rbac";
 import { Badge, Button, DataTable, Input, PageHeader, SearchInput, Select, type Column } from "@/components/ui";
 
-type Tab = "levels" | "movements";
+type Tab = "levels" | "etat" | "movements";
 
 /** N° interne → N° du document imprimé (VNT-2026-00012 → FAC-00012-2026, ACH-… → BC-…). */
 const docNumber = (n?: string | null) => {
@@ -78,7 +79,7 @@ export function StockPage() {
       />
       {canSeeMovements && (
         <div className="mb-4 flex gap-2">
-          {([["levels", "Niveaux de stock", ArrowLeftRight], ["movements", "Mouvements", History]] as const).map(([k, label, Icon]) => (
+          {([["levels", "Niveaux de stock", ArrowLeftRight], ["etat", "État du stock", Table2], ["movements", "Mouvements", History]] as const).map(([k, label, Icon]) => (
             <button key={k} onClick={() => setTab(k)} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${tab === k ? "bg-ge7-black text-ge7-gold-light" : "bg-white text-ge7-black/70 hover:bg-ge7-gold-soft/50"}`}>
               <Icon size={15} /> {label}
             </button>
@@ -86,7 +87,9 @@ export function StockPage() {
         </div>
       )}
 
-      {!canSeeMovements || tab === "levels" ? (
+      {tab === "etat" && canSeeMovements ? (
+        <EtatStockTable />
+      ) : !canSeeMovements || tab === "levels" ? (
         <>
           <div className="mb-4 grid gap-3 sm:grid-cols-3">
             <SearchInput value={levels.search} onChange={levels.setSearch} placeholder="Produit, référence…" className="sm:col-span-2" />

@@ -52,13 +52,13 @@ export function NewDeliveryPage() {
         client_signer_name: signer,
         driver_signature: driverSig,
       })
-      .then((d) => navigate(`/livraisons/${d.id}`))
+      .then((d) => navigate(`/admin/livraisons/${d.id}`))
       .catch(() => {});
   };
 
   return (
     <>
-      <PageHeader breadcrumb={<Link to={`/missions/${m.id}`} className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> {m.number}</Link>} title="Effectuer la livraison" subtitle={`${m.order?.chantier?.name} · ${m.order?.client?.company_name}`} />
+      <PageHeader breadcrumb={<Link to={`/admin/missions/${m.id}`} className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> {m.number}</Link>} title="Effectuer la livraison" subtitle={`${m.order?.chantier?.name} · ${m.order?.client?.company_name}`} />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader title="Quantités livrées" subtitle="Ajustez si la livraison est partielle." />
@@ -80,7 +80,7 @@ export function NewDeliveryPage() {
           <div className="space-y-5">
             <Input label="Nom du signataire client" required value={signer} onChange={(e) => setSigner(e.target.value)} placeholder="ex. Chef de chantier" />
             <SignaturePad label="Signature client" onChange={setClientSig} />
-            <SignaturePad label={`Signature chauffeur — ${m.driver?.name ?? ""}`} onChange={setDriverSig} />
+            <SignaturePad label={`Signature chauffeur ${m.driver?.name ?? ""}`} onChange={setDriverSig} />
           </div>
           <Button className="mt-6 w-full" size="lg" disabled={!clientSig || !driverSig || !signer} loading={create.isPending} onClick={submit}>
             <PackageCheck size={18} /> Confirmer la livraison

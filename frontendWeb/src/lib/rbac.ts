@@ -6,6 +6,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   DG_ADMIN: "Direction",
   SUPERADMIN: "Super administrateur",
   CDG_ADMIN: "Contrôle de gestion",
+  CHAUFFEUR: "Chauffeur",
 };
 
 export const can = (user: User | null, permission: string) =>
@@ -17,20 +18,22 @@ export const hasRole = (user: User | null, ...roles: Role[]) =>
 export const canSeeCosts = (user: User | null) =>
   hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN") || hasRole(user, "SUPERADMIN") || can(user, "products.view_cost");
 
-/** Rôles autorisés sur l'application Web (plateforme interne G7 Energy). */
-export const WEB_ROLES: Role[] = ["LG_ADMIN", "CAISSIER", "DG_ADMIN", "SUPERADMIN", "CDG_ADMIN"];
+/** Rôles autorisés sur l'application Web — le chauffeur a son espace livraisons. */
+export const WEB_ROLES: Role[] = ["LG_ADMIN", "CAISSIER", "DG_ADMIN", "SUPERADMIN", "CDG_ADMIN", "CHAUFFEUR"];
 
 export const isWebRole = (role: Role) => WEB_ROLES.includes(role);
 
 export const homeFor = (role: Role): string => {
   switch (role) {
     case "CAISSIER":
-      return "/caisse";
+      return "/admin/caisse";
+    case "CHAUFFEUR":
+      return "/admin/mes-livraisons";
     case "LG_ADMIN":
     case "DG_ADMIN":
     case "SUPERADMIN":
     case "CDG_ADMIN":
-      return "/dashboard";
+      return "/admin/dashboard";
     default:
       // CLIENT : application mobile uniquement
       return "/403";

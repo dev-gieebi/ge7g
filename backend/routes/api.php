@@ -3,7 +3,10 @@
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ChauffeurController;
+use App\Http\Controllers\CommandeController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FactureController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PriceController;
 use App\Http\Controllers\ProductController;
@@ -11,6 +14,7 @@ use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\PusherTestController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ShopController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\SupplierController;
@@ -25,6 +29,17 @@ Route::post('pusher/trigger', [PusherTestController::class, 'trigger']);
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
 
+// Boutique publique — sans authentification, débit limité contre l'abus.
+Route::prefix('public')->group(function () {
+    Route::get('categories', [ShopController::class, 'categories']);
+    Route::get('zones', [ShopController::class, 'zones']);
+    Route::get('produits', [ShopController::class, 'produits']);
+    Route::get('produits/{id}', [ShopController::class, 'produit']);
+    // 5 commandes par heure et par IP + 3 en attente par téléphone (service).
+    Route::post('commandes', [ShopController::class, 'commander'])->middleware('throttle:5,60');
+    Route::post('suivi', [ShopController::class, 'suivi'])->middleware('throttle:10,1');
+});
+
 Route::middleware('auth:api')->group(function () {
     Route::get('me', [AuthController::class, 'me']);
     Route::post('logout', [AuthController::class, 'logout']);
@@ -32,6 +47,8 @@ Route::middleware('auth:api')->group(function () {
 
     Route::patch('users/{user}/password', [UserController::class, 'updatePassword']);
     Route::apiResource('users', UserController::class);
+    // Chauffeurs : fiche métier + compte plateforme créé à l'enregistrement.
+    Route::apiResource('drivers', ChauffeurController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::apiResource('zones', ZoneController::class);
     Route::apiResource('taxes', TaxController::class);
     Route::get('audit-logs', [AuditLogController::class, 'index']);
@@ -60,6 +77,25 @@ Route::middleware('auth:api')->group(function () {
 
     Route::get('reports/sales/export', [ReportController::class, 'exportSales']);
     Route::get('reports/sales', [ReportController::class, 'sales']);
+    Route::get('reports/pilotage/export', [ReportController::class, 'exportPilotage']);
+    Route::get('reports/pilotage', [ReportController::class, 'pilotage']);
+    Route::post('reports/inventaire', [ReportController::class, 'saveInventaire']);
+
+    // Commandes de la boutique en ligne (validation → facture + vente + stock).
+    Route::get('commandes/stats', [CommandeController::class, 'stats']);
+    Route::get('commandes', [CommandeController::class, 'index']);
+    Route::get('commandes/{commande}', [CommandeController::class, 'show']);
+    Route::post('commandes/{commande}/valider', [CommandeController::class, 'valider']);
+    Route::post('commandes/{commande}/refuser', [CommandeController::class, 'refuser']);
+    Route::post('commandes/{commande}/preparer', [CommandeController::class, 'preparer']);
+    Route::post('commandes/{commande}/affecter', [CommandeController::class, 'affecter']);
+    Route::post('commandes/{commande}/demarrer', [CommandeController::class, 'demarrer']);
+    Route::post('commandes/{commande}/position', [CommandeController::class, 'position']);
+    Route::post('commandes/{commande}/expedier', [CommandeController::class, 'expedier']);
+    Route::post('commandes/{commande}/livrer', [CommandeController::class, 'livrer']);
+    Route::post('commandes/{commande}/echec', [CommandeController::class, 'echec']);
+    Route::post('commandes/{commande}/annuler', [CommandeController::class, 'annuler']);
+    Route::get('factures/{facture}/pdf', [FactureController::class, 'pdf']);
 
     Route::get('dashboard', [DashboardController::class, 'index']);
     Route::get('dashboard/sales-series', [DashboardController::class, 'salesSeries']);

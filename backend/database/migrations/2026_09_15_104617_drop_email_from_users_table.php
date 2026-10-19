@@ -13,6 +13,8 @@ return new class extends Migration
     {
         if (Schema::hasColumn('users', 'email')) {
             Schema::table('users', function (Blueprint $table) {
+                // SQLite exige la suppression de l'index unique avant la colonne.
+                $table->dropUnique(['email']);
                 $table->dropColumn('email');
             });
         }

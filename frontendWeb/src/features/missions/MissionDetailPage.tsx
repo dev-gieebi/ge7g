@@ -28,15 +28,15 @@ export function MissionDetailPage() {
   return (
     <>
       <PageHeader
-        breadcrumb={<Link to="/missions" className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Missions</Link>}
+        breadcrumb={<Link to="/admin/missions" className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Missions</Link>}
         title={m.number}
-        subtitle={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={m.status} /><span className="text-ge7-black/60">Commande <Link to={`/commandes/${m.order_id}`} className="font-semibold text-ge7-purple hover:underline">{o?.number}</Link></span></span>}
+        subtitle={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={m.status} /><span className="text-ge7-black/60">Commande <Link to={`/admin/commandes/${m.order_id}`} className="font-semibold text-ge7-purple hover:underline">{o?.number}</Link></span></span>}
         action={
           canAct && (
             <>
               {m.status === "AFFECTEE" && <Button variant="purple" loading={depart.isPending} onClick={() => depart.mutate()}><Navigation size={16} /> Valider le départ</Button>}
               {(m.status === "DEPART" || m.status === "EN_LIVRAISON") && <Button loading={arrive.isPending} onClick={() => arrive.mutate()}><Flag size={16} /> Arrivée au chantier</Button>}
-              {m.status === "ARRIVEE" && <Link to={`/livraisons/nouvelle?mission=${m.id}`}><Button><PackageCheck size={16} /> Effectuer la livraison</Button></Link>}
+              {m.status === "ARRIVEE" && <Link to={`/admin/livraisons/nouvelle?mission=${m.id}`}><Button><PackageCheck size={16} /> Effectuer la livraison</Button></Link>}
             </>
           )
         }

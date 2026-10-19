@@ -16,7 +16,7 @@ export const percent = (v: number | null | undefined) =>
   `${num.format(Number(v ?? 0))} %`;
 
 export const date = (v: string | null | undefined) =>
-  v ? new Date(v).toLocaleDateString("fr-FR") : "—";
+  v ? new Date(v).toLocaleDateString("fr-FR") : "";
 
 export const datetime = (v: string | null | undefined) =>
   v
@@ -27,10 +27,10 @@ export const datetime = (v: string | null | undefined) =>
         hour: "2-digit",
         minute: "2-digit",
       })
-    : "—";
+    : "";
 
 export const relative = (v: string | null | undefined) => {
-  if (!v) return "—";
+  if (!v) return "";
   const diff = Math.round((Date.now() - new Date(v).getTime()) / 1000);
   if (diff < 60) return `il y a ${diff} s`;
   if (diff < 3600) return `il y a ${Math.floor(diff / 60)} min`;

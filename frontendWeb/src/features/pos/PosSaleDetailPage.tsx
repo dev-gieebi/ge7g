@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCallback, useState } from "react";
-import { ArrowLeft, Printer, Receipt, Truck } from "lucide-react";
+import { ArrowLeft, Printer, Truck } from "lucide-react";
 import type { PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
@@ -23,6 +23,8 @@ export function PosSaleDetailPage() {
   const canDeliver = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
   const [deliverQty, setDeliverQty] = useState<Record<number, number>>({});
   const [discountRate, setDiscountRate] = useState<number | null>(null);
+  // Document affiché/imprimé : facture A4 ou bon de commande (même modèle).
+  const [bonCommande, setBonCommande] = useState(false);
 
   const deliver = useAction<{ item_id: number; quantity: number }, PosSale>(
     () => `/pos/sales/${id}/deliver`,
@@ -37,7 +39,7 @@ export function PosSaleDetailPage() {
   const handlePrint = useCallback(() => {
     const onAfter = () => {
       window.removeEventListener("afterprint", onAfter);
-      navigate("/caisse");
+      navigate("/admin/caisse");
     };
     window.addEventListener("afterprint", onAfter);
     window.print();
@@ -76,7 +78,9 @@ export function PosSaleDetailPage() {
           subtitle={<span className="inline-flex items-center gap-2"><StatusBadge status={s.status} /><StatusBadge status={s.delivery_status} />{s.zone ? <Badge tone="purple">{s.zone.name}</Badge> : null}</span>}
           action={
             <>
-              <Button onClick={handlePrint}>{isCashier ? <Receipt size={15} /> : <Printer size={15} />} {isCashier ? "Ticket" : "Facture"}</Button>
+              {!isCashier && (
+                <Button variant={bonCommande ? "secondary" : "purple"} onClick={() => setBonCommande(!bonCommande)}><Truck size={15} /> {bonCommande ? "Facture" : "Bon de commande"}</Button>
+              )}
               <Button onClick={handlePrint}><Printer size={15} /> Imprimer</Button>
             </>
           }
@@ -148,9 +152,9 @@ export function PosSaleDetailPage() {
       {isCashier ? (
         <PrintableDocument compact doc={doc} />
       ) : (
-        <Facture sale={s} />
+        <Facture sale={s} docTitle={bonCommande ? "BON DE COMMANDE" : "FACTURE"} />
       )}
-      <div className="no-print mt-6 text-center"><Link to="/caisse"><Button variant="purple">Nouvelle vente</Button></Link></div>
+      <div className="no-print mt-6 text-center"><Link to="/admin/caisse"><Button variant="purple">Nouvelle vente</Button></Link></div>
     </>
   );
 }

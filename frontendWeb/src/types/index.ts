@@ -1,4 +1,4 @@
-export type Role = "LG_ADMIN" | "CAISSIER" | "DG_ADMIN" | "SUPERADMIN" | "CDG_ADMIN";
+export type Role = "LG_ADMIN" | "CAISSIER" | "DG_ADMIN" | "SUPERADMIN" | "CDG_ADMIN" | "CHAUFFEUR";
 
 export interface User {
   id: number;
@@ -24,6 +24,8 @@ export interface Paginated<T> {
       entries: { quantity: number; amount: number };
       exits: { quantity: number; amount: number };
     };
+    /** Compteur des commandes boutique en attente (liste /commandes). */
+    en_attente?: number;
   };
 }
 
@@ -118,6 +120,10 @@ export interface Product {
   available_quantity: number;
   min_stock: number;
   image_url: string | null;
+  /** Vitrine boutique en ligne. */
+  visible_boutique?: boolean;
+  description_publique?: string | null;
+  mis_en_avant?: boolean;
 }
 
 export interface Price {
@@ -255,6 +261,8 @@ export interface Driver {
   phone: string;
   license_number: string | null;
   status: "DISPONIBLE" | "EN_MISSION" | "INDISPONIBLE";
+  /** Code de connexion à 8 chiffres du compte plateforme lié. */
+  code?: string | null;
 }
 
 export interface Vehicle {
@@ -366,7 +374,7 @@ export interface Tax {
   status?: Status;
 }
 
-export type PaymentMethod = "ESPECES" | "CARTE" | "CHEQUE" | "VIREMENT" | "MOBILE_MONEY" | "AUTRE";
+export type PaymentMethod = "ESPECES" | "CARTE" | "CHEQUE" | "VIREMENT" | "MOBILE_MONEY" | "AUTRE" | "LIVRAISON";
 
 export interface Payment {
   id: number;
@@ -439,7 +447,10 @@ export interface PosSale {
   tax_details?: { type: string; name: string; rate: number; amount: number }[] | null;
   total: number;
   payment_method: PaymentMethod;
-  status: "PAYEE" | "ANNULEE";
+  status: "PAYEE" | "ANNULEE" | "EMISE";
+  /** Origine de la vente : caisse ou commande de la boutique en ligne. */
+  source?: "caisse" | "boutique_en_ligne";
+  annulee?: boolean;
   delivery_status?: "LIVREE" | "PARTIELLEMENT_LIVREE" | "A_LIVRER";
   invoice?: Invoice | null;
   items?: { id: number; product?: PosProduct; quantity: number; delivered_quantity: number; remaining_quantity: number; unit_price: number; total: number }[];
@@ -504,6 +515,43 @@ export interface SalesReport {
   };
 }
 
+/** Ligne « État du stock » du tableau de bord pilotage. */
+export interface EtatStockLigne {
+  product_id: number;
+  reference: string;
+  designation: string;
+  unit: string | null;
+  stock_initial: number;
+  entrees: number;
+  sorties: number;
+  mouvements_nets: number;
+  stock_theorique: number;
+  stock_minimum: number;
+  alerte: "OK" | "À RÉAPPROVISIONNER" | "STOCK NÉGATIF";
+  cout_unitaire: number;
+  valeur_stock: number;
+  /** Prix de vente caisse (barème POS, sinon prix de base). */
+  prix_vente: number;
+  /** Barème boutique par ville (« Toutes villes » si zone nulle). */
+  prix_zones: { zone: string; amount: number }[];
+  stock_physique: number | null;
+  physical_stock_at: string | null;
+  ecart: number | null;
+}
+
+export interface PilotageReport {
+  indicateurs: {
+    ca_facture: number;
+    valeur_stock: number;
+    achats: number;
+    marge_livree: number;
+    restant_a_livrer: number;
+    articles_alerte: number;
+    ecarts_physiques: number;
+  };
+  etat_stock: EtatStockLigne[];
+}
+
 export interface Notification {
   id: string;
   type: string;
@@ -555,10 +603,108 @@ export interface DashboardStats {
 }
 
 export interface LogisticsStats {
-  to_prepare: number;
-  ready: number;
-  to_assign: number;
-  in_progress: number;
-  completed: number;
-  awaiting_reception: number;
+  /** Commandes validées/en préparation sans chauffeur. */
+  a_affecter: number;
+  en_livraison: number;
+  livrees_jour: number;
+  livrees_total: number;
+  chauffeurs: number;
+  chauffeurs_en_mission: number;
+}
+
+/* ===== Boutique en ligne ===== */
+
+export type StatutCommande =
+  | "en_attente"
+  | "validee"
+  | "refusee"
+  | "en_preparation"
+  | "en_livraison"
+  | "livree"
+  | "echec_livraison"
+  | "annulee";
+
+/** Ligne de la liste back-office des commandes boutique. */
+export interface CommandeListItem {
+  id: number;
+  numero: string;
+  statut: StatutCommande;
+  statut_libelle: string;
+  client: string;
+  telephone: string;
+  quartier: string;
+  ville: string;
+  total: number;
+  chauffeur: string | null;
+  cree_le: string;
+}
+
+export interface CommandeLigne {
+  id: number;
+  produit_id: number;
+  designation: string;
+  prix_unitaire: number;
+  quantite: number;
+  total_ligne: number;
+  unite: string | null;
+  stock_disponible: number;
+}
+
+export interface CommandeHistoriqueItem {
+  ancien_statut: StatutCommande | null;
+  nouveau_statut: StatutCommande;
+  nouveau_statut_libelle: string;
+  user: string;
+  commentaire: string | null;
+  created_at: string;
+}
+
+export interface CommandeDetail {
+  id: number;
+  numero: string;
+  statut: StatutCommande;
+  statut_libelle: string;
+  motif: string | null;
+  cree_le: string;
+  client: { nom: string; telephone: string };
+  adresse: { ville: string; quartier: string; point_repere: string };
+  note: string | null;
+  total: number;
+  lignes: CommandeLigne[];
+  valideur: string | null;
+  validee_le: string | null;
+  chauffeur: { id: number; nom: string } | null;
+  facture: {
+    id: number;
+    numero: string;
+    statut_paiement: "non_payee" | "partiellement_payee" | "payee" | "annulee";
+    montant_total: number;
+    encaisse: number;
+    avoir: { numero: string; montant: number } | null;
+  } | null;
+  livraison: {
+    depart_le: string | null;
+    livree_le: string | null;
+    receptionnaire: string | null;
+    signature: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    position_le: string | null;
+  } | null;
+  historique: CommandeHistoriqueItem[];
+}
+
+export interface CommandeStats {
+  en_attente: number;
+  commandes_jour: number;
+  ca_boutique_jour: number;
+  ca_boutique_mois: number;
+  taux_livrees: number;
+  /** Pilotage logistique. */
+  a_affecter: number;
+  en_livraison: number;
+  livrees_jour: number;
+  livrees_total: number;
+  chauffeurs: number;
+  chauffeurs_en_mission: number;
 }

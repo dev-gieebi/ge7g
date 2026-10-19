@@ -16,6 +16,8 @@ use App\Models\Tax;
 use App\Models\Unit;
 use App\Models\User;
 use App\Models\Zone;
+use App\Services\LogNotificationService;
+use App\Services\NotificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -27,7 +29,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Notifications boutique : journalisation par défaut — un fournisseur
+        // SMS/WhatsApp se branche ici en remplaçant l'implémentation.
+        $this->app->bind(NotificationService::class, LogNotificationService::class);
     }
 
     /**

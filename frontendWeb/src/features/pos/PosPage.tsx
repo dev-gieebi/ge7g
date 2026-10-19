@@ -116,7 +116,7 @@ export function PosPage() {
     if (zoneId === "") return;
     pay
       .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity, delivered_quantity: partial ? Math.min(l.delivered, l.quantity, l.product.available_quantity) : l.quantity, unit_price: l.unit_price })), tax_ids: taxIds, payment_method: method, customer_name: customer || null, customer_phone: customerPhone || null, customer_address: customerAddress || null, discount_rate: remise === "" ? null : Number(remise), amount_received: received === "" ? null : Number(received), zone_id: zoneId })
-      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setCustomerPhone(""); setCustomerAddress(""); setRemise(""); setTaxIds([]); setPartial(false); navigate(`/caisse/ventes/${s.id}`); })
+      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setCustomerPhone(""); setCustomerAddress(""); setRemise(""); setTaxIds([]); setPartial(false); navigate(`/admin/caisse/ventes/${s.id}`); })
       .catch(() => {});
   };
 

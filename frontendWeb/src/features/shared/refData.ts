@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { Category, Chantier, Client, Driver, Product, Supplier, Tax, Unit, Vehicle, Zone } from "@/types";
+import type { Category, Chantier, Client, Driver, Product, Supplier, Tax, Unit, User, Vehicle, Zone } from "@/types";
 
 async function all<T>(url: string, params?: Record<string, unknown>) {
   const { data } = await api.get<{ data: T[] }>(url, { params: { per_page: 500, ...params } });
@@ -24,3 +24,17 @@ export const useChantiersRef = (clientId?: number | null) =>
 export const useProductsRef = () => useQuery({ queryKey: ["ref", "products"], queryFn: () => all<Product>("/products"), ...opts });
 export const useDriversRef = () => useQuery({ queryKey: ["ref", "drivers"], queryFn: () => all<Driver>("/drivers"), ...opts });
 export const useVehiclesRef = () => useQuery({ queryKey: ["ref", "vehicles"], queryFn: () => all<Vehicle>("/vehicles"), ...opts });
+/**
+ * Chauffeurs affectables aux commandes boutique : fiches liées à un compte
+ * CHAUFFEUR actif — l'affectation envoie l'identifiant utilisateur.
+ */
+export const useChauffeurs = (enabled = true) =>
+  useQuery({
+    queryKey: ["ref", "chauffeurs"],
+    queryFn: async () =>
+      (await all<Driver>("/drivers"))
+        .filter((d) => d.user_id !== null && d.status !== "INDISPONIBLE")
+        .map((d) => ({ id: d.user_id as number, name: d.name }) as Pick<User, "id" | "name">),
+    enabled,
+    ...opts,
+  });

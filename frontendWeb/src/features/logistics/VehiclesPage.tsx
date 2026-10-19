@@ -27,7 +27,7 @@ export function VehiclesPage() {
   const columns: Column<Vehicle>[] = [
     { key: "plate", header: "Immatriculation", sortable: true, render: (v) => <span className="font-semibold">{v.plate}</span> },
     { key: "model", header: "Modèle", render: (v) => v.model },
-    { key: "capacity", header: "Capacité", render: (v) => v.capacity ?? "—" },
+    { key: "capacity", header: "Capacité", render: (v) => v.capacity ?? "" },
     { key: "status", header: "Statut", render: (v) => <StatusBadge status={v.status} /> },
     { key: "actions", header: "", align: "right", render: (v) => <Button size="sm" variant="ghost" onClick={() => { setEditId(v.id); setForm({ ...v }); }}><Pencil size={14} /></Button> },
   ];

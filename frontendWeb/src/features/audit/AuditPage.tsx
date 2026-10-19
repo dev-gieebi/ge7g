@@ -23,7 +23,7 @@ export function AuditPage() {
         </span>
       ),
     },
-    { key: "ip", header: "IP", render: (a) => <span className="text-xs text-ge7-black/50">{a.ip ?? "—"}</span> },
+    { key: "ip", header: "IP", render: (a) => <span className="text-xs text-ge7-black/50">{a.ip ?? ""}</span> },
     {
       key: "diff",
       header: "Changements",
@@ -36,7 +36,7 @@ export function AuditPage() {
             </pre>
           </details>
         ) : (
-          "—"
+          ""
         ),
     },
   ];

@@ -9,16 +9,21 @@ export function RequireAuth() {
   const location = useLocation();
   if (loading) return <Loading label="Vérification de la session…" />;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
-  // L'application Web est réservée aux rôles internes (LG_ADMIN, DG_ADMIN, CDG_ADMIN, CAISSIER, SUPERADMIN).
-  // CLIENT et CHAUFFEUR utilisent exclusivement l'application mobile.
+  // L'application Web est réservée aux rôles internes et aux chauffeurs
+  // (espace livraisons). CLIENT n'y a pas accès.
   if (!isWebRole(user.role)) return <Navigate to="/403" replace />;
   return <Outlet />;
 }
 
-export function RequireRole({ roles }: { roles: Role[] }) {
+/**
+ * `strict` désactive le passe-droit SUPERADMIN : pour les espaces
+ * personnels (ex. les livraisons du chauffeur connecté).
+ */
+export function RequireRole({ roles, strict = false }: { roles: Role[]; strict?: boolean }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (!hasRole(user, ...roles)) return <Navigate to="/403" replace />;
+  const allowed = strict ? roles.includes(user.role) : hasRole(user, ...roles);
+  if (!allowed) return <Navigate to="/403" replace />;
   return <Outlet />;
 }
 

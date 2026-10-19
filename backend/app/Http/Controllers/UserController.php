@@ -36,6 +36,10 @@ class UserController extends Controller
             });
         }
 
+        if ($request->filled('role')) {
+            $query->where('role', $request->input('role'));
+        }
+
         if ($sort = $request->input('sort')) {
             $direction = $request->input('dir') === 'desc' ? 'desc' : 'asc';
             $query->orderBy($sort, $direction);
@@ -65,6 +69,8 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            // CHAUFFEUR exclu : les chauffeurs se créent dans Logistique →
+            // Chauffeurs, qui génère la fiche métier + le compte lié.
             'role' => 'required|string|in:LG_ADMIN,CAISSIER,DG_ADMIN,SUPERADMIN,CDG_ADMIN',
         ]);
 
@@ -95,9 +101,15 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'role' => 'required|string|in:LG_ADMIN,CAISSIER,DG_ADMIN,SUPERADMIN,CDG_ADMIN',
+            'role' => 'required|string|in:LG_ADMIN,CAISSIER,DG_ADMIN,SUPERADMIN,CDG_ADMIN,CHAUFFEUR',
             'permissions' => 'sometimes|array',
         ]);
+
+        // Le rôle CHAUFFEUR ne peut pas être attribué ici (compte lié à une
+        // fiche chauffeur), mais un chauffeur existant peut changer de rôle.
+        if ($user->role !== 'CHAUFFEUR' && $validated['role'] === 'CHAUFFEUR') {
+            abort(422, "Le rôle Chauffeur s'attribue via une fiche chauffeur.");
+        }
 
         $user->update([
             'name' => $validated['name'],
@@ -126,6 +138,12 @@ class UserController extends Controller
     public function destroy(Request $request, User $user): Response
     {
         $this->authorizeUser($request);
+
+        // Un compte chauffeur est lié à sa fiche : la suppression passe par
+        // Logistique → Chauffeurs, jamais par la gestion des utilisateurs.
+        if ($user->role === 'CHAUFFEUR') {
+            abort(422, 'Un compte chauffeur se gère depuis Logistique → Chauffeurs.');
+        }
 
         $user->delete();
 

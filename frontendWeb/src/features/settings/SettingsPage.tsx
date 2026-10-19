@@ -104,10 +104,13 @@ export function SettingsPage() {
             ]}
             fields={[
               { name: "name", label: "Nom", required: true, span: 2 },
-              { name: "role", label: "Rôle", type: "select", required: true, span: 2, options: (Object.keys(ROLE_LABELS) as Role[]).map((r) => ({ value: r, label: ROLE_LABELS[r] })) },
+              // Les chauffeurs se créent et se gèrent dans Logistique → Chauffeurs
+              // (fiche + compte lié) — le rôle CHAUFFEUR n'est pas proposé ici.
+              { name: "role", label: "Rôle", type: "select", required: true, span: 2, options: (Object.keys(ROLE_LABELS) as Role[]).filter((r) => r !== "CHAUFFEUR").map((r) => ({ value: r, label: ROLE_LABELS[r] })) },
             ]}
             empty={{ name: "", role: "CAISSIER" }}
-            allowDelete={(u) => u.id !== user?.id}
+            allowEdit={(u) => u.role !== "CHAUFFEUR"}
+            allowDelete={(u) => u.id !== user?.id && u.role !== "CHAUFFEUR"}
             extraActions={(u) => (
               <Button size="sm" variant="ghost" onClick={() => { setPasswordUser(u); setPassword(generatePassword()); }}>
                 <Key size={14} />

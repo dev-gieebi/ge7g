@@ -78,6 +78,9 @@ class ProductController extends Controller
             'purchase_price' => 'sometimes|numeric|min:0',
             'min_stock' => 'sometimes|numeric|min:0',
             'image_url' => 'nullable',
+            'visible_boutique' => 'sometimes|boolean',
+            'description_publique' => 'nullable|string|max:2000',
+            'mis_en_avant' => 'sometimes|boolean',
         ]);
 
         $data = $this->prepareData($validated);
@@ -118,9 +121,17 @@ class ProductController extends Controller
             'purchase_price' => 'sometimes|numeric|min:0',
             'min_stock' => 'sometimes|numeric|min:0',
             'image_url' => 'nullable',
+            'visible_boutique' => 'sometimes|boolean',
+            'description_publique' => 'nullable|string|max:2000',
+            'mis_en_avant' => 'sometimes|boolean',
         ]);
 
         $data = $this->prepareData($validated);
+        // Vitrine : les champs absents conservent la valeur existante.
+        $data['visible_boutique'] = (bool) ($validated['visible_boutique'] ?? $product->visible_boutique);
+        $data['mis_en_avant'] = (bool) ($validated['mis_en_avant'] ?? $product->mis_en_avant);
+        $data['description_publique'] = array_key_exists('description_publique', $validated) ? $validated['description_publique'] : $product->description_publique;
+
         $imageUrl = $this->handleImage($validated['image_url'] ?? null, $product);
 
         if ((int) $validated['category_id'] !== $product->category_id || ! Str::startsWith($product->reference, $this->categoryPrefix((int) $validated['category_id']).'-')) {
@@ -160,6 +171,10 @@ class ProductController extends Controller
             'margin' => $margin,
             'margin_percent' => $marginPercent,
             'min_stock' => (float) ($validated['min_stock'] ?? 0),
+            // Vitrine boutique en ligne : visibilité, description publique, mise en avant.
+            'visible_boutique' => (bool) ($validated['visible_boutique'] ?? false),
+            'description_publique' => $validated['description_publique'] ?? null,
+            'mis_en_avant' => (bool) ($validated['mis_en_avant'] ?? false),
         ];
     }
 
@@ -229,12 +244,29 @@ class ProductController extends Controller
             $extension = 'gif';
         }
 
-        $folder = 'products/'.$product->id.'-'.Str::slug($product->name);
+        $folder = $this->imageFolder($product);
         $path = $folder.'/image.'.$extension;
 
         Storage::disk('public')->put($path, $decoded);
 
         return url('storage/'.$path);
+    }
+
+    /**
+     * Dossier de l'image : `products/{nom-du-produit}`. Si un autre produit
+     * porte le même nom, l'identifiant est ajouté pour éviter d'écraser
+     * son image.
+     */
+    private function imageFolder(Product $product): string
+    {
+        $slug = Str::slug($product->name);
+        $base = 'products/'.($slug !== '' ? $slug : 'produit-'.$product->id);
+
+        $occupe = Product::where('id', '!=', $product->id)
+            ->where('image_url', 'like', '%/storage/'.$base.'/%')
+            ->exists();
+
+        return $occupe ? $base.'-'.$product->id : $base;
     }
 
     private function deleteImage(?string $imageUrl): void

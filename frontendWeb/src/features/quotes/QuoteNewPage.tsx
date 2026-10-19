@@ -106,7 +106,7 @@ export function QuoteNewPage() {
         valid_until: validUntil || null,
         notes: notes || null,
       })
-      .then((q) => navigate(`/devis/${q.id}`))
+      .then((q) => navigate(`/admin/devis/${q.id}`))
       .catch(() => {});
   };
 
@@ -116,7 +116,7 @@ export function QuoteNewPage() {
       <PageHeader
         title="Nouveau devis"
         subtitle="Proposition commerciale  n'affecte ni le stock ni les ventes."
-        breadcrumb={<button onClick={() => navigate("/devis")} className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Devis</button>}
+        breadcrumb={<button onClick={() => navigate("/admin/devis")} className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Devis</button>}
       />
       <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
         <div>
