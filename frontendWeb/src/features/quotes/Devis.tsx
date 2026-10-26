@@ -1,6 +1,6 @@
 import { Mail, MapPin, Phone } from "lucide-react";
 import type { Quote } from "@/types";
-import { datetime, money, qty } from "@/lib/format";
+import { datetime, money, moneyInWords, qty } from "@/lib/format";
 import { GE7_COMPANY, cfaNumber } from "@/features/shared/companyInfo";
 
 export function Devis({ quote }: { quote: Quote }) {
@@ -128,12 +128,13 @@ export function Devis({ quote }: { quote: Quote }) {
 
         <p className="mt-2">
           <span className="font-bold italic underline">Arrêté le présent devis au montant de :</span>{" "}
-          <strong>{money(q.total)}</strong>
+          <strong>{moneyInWords(q.total)} ({money(q.total)})</strong>
         </p>
 
         <div className="mt-6 text-center">
           <p className="font-semibold underline">{GE7_COMPANY.signatoryTitle}</p>
-          <p className="mt-20 font-semibold underline">{GE7_COMPANY.signatoryName}</p>
+          <img src="/signature.png" alt="" className="mx-auto -my-2 h-24 object-contain" />
+          <p className="font-semibold underline">{GE7_COMPANY.signatoryName}</p>
         </div>
       </div>
       <footer className="mt-70 border-t border-ge7-black/60 bg-white pt-2 text-center text-[10px] print:fixed print:inset-x-0 print:bottom-0">
