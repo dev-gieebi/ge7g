@@ -132,7 +132,7 @@ export function Facture({ sale, originLabel, docTitle = "FACTURE" }: { sale: Pos
 
         <p className="mt-2">
           <span className="font-bold italic underline">{docTitle === "FACTURE" ? "Arrêtée la présente facture" : "Arrêté le présent document"} au montant de :</span>{" "}
-          <strong>{moneyInWords(s.total)} ({money(s.total)})</strong>
+          <strong>{moneyInWords(s.total)}</strong>
         </p>
 
         <div className="mt-6 text-center">

@@ -128,7 +128,7 @@ export function Devis({ quote }: { quote: Quote }) {
 
         <p className="mt-2">
           <span className="font-bold italic underline">Arrêté le présent devis au montant de :</span>{" "}
-          <strong>{moneyInWords(q.total)} ({money(q.total)})</strong>
+          <strong>{moneyInWords(q.total)}</strong>
         </p>
 
         <div className="mt-6 text-center">

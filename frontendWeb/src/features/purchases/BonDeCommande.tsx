@@ -84,7 +84,7 @@ export function BonDeCommande({ purchase }: { purchase: Purchase }) {
 
         <p className="mt-2">
           <span className="font-bold italic underline">Arrêté le présent bon de commande au montant de :</span>{" "}
-          <strong>{moneyInWords(p.total)} ({money(p.total)})</strong>
+          <strong>{moneyInWords(p.total)}</strong>
         </p>
 
         <div className="mt-6 text-center">
