@@ -38,13 +38,13 @@ export function BonDeCommande({ purchase }: { purchase: Purchase }) {
 
         <div className="mt-4 space-y-1 border border-ge7-black/70 px-2 py-2">
           <p>
-            <span className="underline font-bold">Nom de la société</span> : G-ENERGIE 7 GROUPE
+            <span className="underline font-bold">Nom de la société</span> : {p.supplier?.name ?? ""}
           </p>
           <p>
-            <span className="underline font-bold">Téléphone</span> : +241 062 18 04 92
+            <span className="underline font-bold">Téléphone</span> : {p.supplier?.phone ?? ""}
           </p>
           <p>
-            <span className="underline font-bold">Adresse</span> : Ntoum-Gabon
+            <span className="underline font-bold">Adresse</span> : {p.supplier?.address ?? ""}
           </p>
         </div>
 
