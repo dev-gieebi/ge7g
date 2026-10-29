@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 #[Fillable(['reference', 'name', 'category_id', 'unit_id', 'sale_price', 'purchase_price', 'margin', 'margin_percent', 'stock_quantity', 'reserved_quantity', 'min_stock', 'physical_stock', 'physical_stock_at', 'image_url', 'visible_boutique', 'description_publique', 'mis_en_avant'])]
 class Product extends Model
@@ -37,6 +38,21 @@ class Product extends Model
     {
         return Attribute::make(
             get: fn () => $this->stock_quantity - $this->reserved_quantity,
+        );
+    }
+
+    /**
+     * `image_url` stocke un chemin relatif (`products/…/image.jpg`) : l'URL
+     * absolue affichable est générée ici pour suivre le domaine qui sert
+     * l'API. Les URL externes (http…) et data-URI restent inchangées.
+     */
+    protected function imageUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value
+                && ! Str::startsWith($value, ['http://', 'https://', 'data:', '/'])
+                ? url('storage/'.$value)
+                : $value,
         );
     }
 

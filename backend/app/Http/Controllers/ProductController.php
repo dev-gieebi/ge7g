@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -247,9 +248,17 @@ class ProductController extends Controller
         $folder = $this->imageFolder($product);
         $path = $folder.'/image.'.$extension;
 
-        Storage::disk('public')->put($path, $decoded);
+        // Échouer explicitement si l'écriture ne passe pas (stockage non
+        // inscriptible) plutôt que d'enregistrer un chemin vers rien.
+        if (! Storage::disk('public')->put($path, $decoded)) {
+            throw ValidationException::withMessages([
+                'image_url' => "Impossible d'enregistrer l'image sur le serveur.",
+            ]);
+        }
 
-        return url('storage/'.$path);
+        // Chemin relatif uniquement : l'URL absolue est générée à la lecture
+        // (accessor image_url) pour suivre l'environnement qui sert l'API.
+        return $path;
     }
 
     /**
@@ -263,7 +272,7 @@ class ProductController extends Controller
         $base = 'products/'.($slug !== '' ? $slug : 'produit-'.$product->id);
 
         $occupe = Product::where('id', '!=', $product->id)
-            ->where('image_url', 'like', '%/storage/'.$base.'/%')
+            ->where('image_url', 'like', $base.'/%')
             ->exists();
 
         return $occupe ? $base.'-'.$product->id : $base;
@@ -275,9 +284,12 @@ class ProductController extends Controller
             return;
         }
 
-        $relativePath = Str::after($imageUrl, '/storage/');
+        // Gère les anciennes URL absolues (…/storage/x) et les chemins relatifs.
+        $relativePath = Str::contains($imageUrl, '/storage/')
+            ? Str::after($imageUrl, '/storage/')
+            : $imageUrl;
 
-        if ($relativePath !== $imageUrl && Storage::disk('public')->exists($relativePath)) {
+        if (Storage::disk('public')->exists($relativePath)) {
             Storage::disk('public')->delete($relativePath);
         }
     }
