@@ -24,7 +24,7 @@ class PosController extends Controller
     /** Consultation : circuit commercial (CDG_ADMIN consulte les ventes). */
     private const VIEW_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'];
 
-    /** Catalogue + barème ville : caisse et création de devis (CDG_ADMIN inclus). */
+    /** Catalogue + barème ville : caisse et création de proformas (CDG_ADMIN inclus). */
     private const PRODUCT_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'];
 
     /** Saisie des livraisons : rôles opérationnels + CDG_ADMIN. */

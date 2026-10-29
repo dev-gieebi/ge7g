@@ -31,7 +31,7 @@ export const LOGISTIQUE_TABS: ModuleTab[] = [
 ];
 
 export const DEVIS_TABS: ModuleTab[] = [
-  { label: "Devis", to: "/admin/devis", roles: ADMINS },
+  { label: "Proforma", to: "/admin/devis", roles: ADMINS },
 ];
 
 export const SYSTEME_TABS: ModuleTab[] = [

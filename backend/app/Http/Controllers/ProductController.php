@@ -16,7 +16,7 @@ class ProductController extends Controller
 {
     private const MANAGE_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CDG_ADMIN'];
 
-    /** Lecture catalogue : circuit commercial (devis, factures, suivi). */
+    /** Lecture catalogue : circuit commercial (proformas, factures, suivi). */
     private const VIEW_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'];
 
     private function authorizeUser(Request $request, array $roles = self::MANAGE_ROLES): User

@@ -17,13 +17,13 @@ use Illuminate\Validation\ValidationException;
 
 class QuoteController extends Controller
 {
-    /** Consultation des devis : circuit commercial. */
+    /** Consultation des proformas : circuit commercial. */
     private const VIEW_ROLES = ['CDG_ADMIN', 'LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN'];
 
-    /** Émission et modification des devis. */
+    /** Émission et modification des proformas. */
     private const MANAGE_ROLES = ['CDG_ADMIN', 'LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN'];
 
-    /** Validation / annulation d'un devis : décision interne encadrée. */
+    /** Validation / annulation d'une proforma : décision interne encadrée. */
     private const STATUS_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN'];
 
     private function authorizeUser(Request $request, array $roles): User
@@ -132,7 +132,7 @@ class QuoteController extends Controller
         $this->authorizeUser($request, self::MANAGE_ROLES);
 
         if (in_array($quote->status, ['VALIDE', 'ANNULE'], true)) {
-            abort(422, 'Un devis validé ou annulé ne peut plus être modifié.');
+            abort(422, 'Une proforma validée ou annulée ne peut plus être modifiée.');
         }
 
         $validated = $request->validate($this->rules());
@@ -161,7 +161,7 @@ class QuoteController extends Controller
         $this->authorizeUser($request, self::MANAGE_ROLES);
 
         if ($quote->status === 'VALIDE') {
-            abort(422, 'Un devis validé ne peut pas être supprimé.');
+            abort(422, 'Une proforma validée ne peut pas être supprimée.');
         }
 
         $quote->delete();

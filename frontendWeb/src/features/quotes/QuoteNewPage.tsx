@@ -91,7 +91,7 @@ export function QuoteNewPage() {
   // Prix majorable uniquement : jamais en dessous du barème de la ville choisie.
   const setPrice = (id: number, p: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, unit_price: Math.max(l.product.sale_price, p) } : l)));
 
-  const create = useAction<Payload, Quote>(() => "/quotes", { keys: ["quotes"], success: "Devis enregistré", body: (v) => v });
+  const create = useAction<Payload, Quote>(() => "/quotes", { keys: ["quotes"], success: "Proforma enregistrée", body: (v) => v });
 
   const submit = () => {
     create
@@ -114,9 +114,9 @@ export function QuoteNewPage() {
     <>
       <ModuleTabs tabs={DEVIS_TABS} />
       <PageHeader
-        title="Nouveau devis"
+        title="Nouvelle proforma"
         subtitle="Proposition commerciale  n'affecte ni le stock ni les ventes."
-        breadcrumb={<button onClick={() => navigate("/admin/devis")} className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Devis</button>}
+        breadcrumb={<button onClick={() => navigate("/admin/devis")} className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Proforma</button>}
       />
       <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
         <div>
@@ -170,7 +170,7 @@ export function QuoteNewPage() {
         </div>
 
         <Card className="xl:sticky xl:top-20 xl:self-start">
-          <h3 className="flex items-center gap-2 text-lg font-extrabold"><FileSignature size={18} className="text-ge7-bronze" /> Devis{zone ? <Badge tone="purple"><MapPin size={11} /> {zone.name}</Badge> : null}</h3>
+          <h3 className="flex items-center gap-2 text-lg font-extrabold"><FileSignature size={18} className="text-ge7-bronze" /> Proforma{zone ? <Badge tone="purple"><MapPin size={11} /> {zone.name}</Badge> : null}</h3>
           <div className="mt-4 max-h-[30vh] space-y-2 overflow-y-auto pr-1">
             {cart.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-ge7-black/15 p-8 text-center text-sm text-ge7-black/50">Aucune ligne</p>
@@ -235,7 +235,7 @@ export function QuoteNewPage() {
               <div className="flex justify-between text-ge7-black/60"><span>{selectedTaxes.length === 0 ? "Taxe" : `${selectedTaxes.map((t) => t.name).join(" + ")} ${(rate * 100).toFixed(2).replace(/\.?0+$/, "")} %`}</span><span>{money(taxAmount)}</span></div>
               <div className="flex justify-between text-xl font-extrabold"><span>TOTAL</span><span className="text-ge7-bronze">{money(total)}</span></div>
             </div>
-            <Button size="lg" className="w-full" disabled={!cart.length || !customer.trim() || zoneId === ""} loading={create.isPending} onClick={submit}>Enregistrer le devis {money(total)}</Button>
+            <Button size="lg" className="w-full" disabled={!cart.length || !customer.trim() || zoneId === ""} loading={create.isPending} onClick={submit}>Enregistrer la proforma {money(total)}</Button>
           </div>
         </Card>
       </div>

@@ -73,7 +73,7 @@ class ReportController extends Controller
         $rows[] = $pad(7, [['Factures émises', 3], [(int) $k['sales_count'], 4], ['Chiffre d\'affaires', 3], [$k['total'], 4]]);
         $rows[] = $pad(7, [['Panier moyen', 3], [$k['avg_basket'], 4], ['Clients actifs', 3], [(int) $k['customers_count'], 4]]);
         $rows[] = $pad(7, [['Valeur livrée', 3], [$k['delivered_value'], 4], ['Taux de livraison', 3], [$k['delivery_rate'].' %', 4]]);
-        $rows[] = $pad(7, [['Reliquat à livrer', 3], [$k['remaining_value'], 4], ['Devis émis / validés', 3], ["{$k['quotes_count']} / {$k['quotes_validated']}", 4]]);
+        $rows[] = $pad(7, [['Reliquat à livrer', 3], [$k['remaining_value'], 4], ['Proformas émises / validées', 3], ["{$k['quotes_count']} / {$k['quotes_validated']}", 4]]);
 
         $rows[] = $blank;
         $wide('VENTES PAR CLIENT', 2);
@@ -393,7 +393,7 @@ class ReportController extends Controller
             ->sortByDesc('total')
             ->values();
 
-        // Devis émis sur la même période (et validés) — taux de conversion commercial.
+        // Proformas émises sur la même période (et validées) — taux de conversion commercial.
         $quotes = Quote::query();
         if ($from) {
             $quotes->whereDate('created_at', '>=', $from);

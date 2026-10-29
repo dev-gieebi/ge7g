@@ -37,7 +37,7 @@ export function Devis({ quote }: { quote: Quote }) {
       </div>
       <div className="px-6 print:pt-36">
         <h1 className="mt-6 text-center text-4xl font-bold tracking-wide text-[#065baf] underline underline-offset-4">
-          DEVIS
+          PROFORMA
         </h1>
 
         <div className="mt-8 space-y-1">
@@ -45,7 +45,7 @@ export function Devis({ quote }: { quote: Quote }) {
             <span className="font-bold underline">Date</span> : {datetime(q.created_at)}
           </p>
           <p>
-            <span className="font-bold underline">N° de devis</span> : {number}
+            <span className="font-bold underline">N° de proforma</span> : {number}
           </p>
           {q.valid_until && (
             <p>
@@ -64,9 +64,7 @@ export function Devis({ quote }: { quote: Quote }) {
           <p>
             <span className="underline font-bold">Adresse</span> : {q.customer_address ?? ""}
           </p>
-          <p>
-            <span className="underline font-bold">Ville</span> : {q.zone?.name ?? ""}
-          </p>
+          
         </div>
 
         <table className="mt-4 w-full border-collapse">
@@ -127,7 +125,7 @@ export function Devis({ quote }: { quote: Quote }) {
         </div>
 
         <p className="mt-2">
-          <span className="font-bold italic underline">Arrêté le présent devis au montant de :</span>{" "}
+          <span className="font-bold italic underline">Arrêtée la présente proforma au montant de :</span>{" "}
           <strong>{moneyInWords(q.total)}</strong>
         </p>
 

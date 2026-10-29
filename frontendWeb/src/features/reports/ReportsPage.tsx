@@ -205,7 +205,7 @@ export function ReportsPage() {
             <Stat label="Panier moyen" value={money(r.kpis.avg_basket)} accent />
             <Stat label="Taux de livraison" value={`${r.kpis.delivery_rate} %`} />
             <Stat label="Clients actifs" value={String(r.kpis.customers_count)} />
-            <Stat label="Devis émis / validés" value={`${r.kpis.quotes_count} / ${r.kpis.quotes_validated}`} />
+            <Stat label="Proformas émises / validées" value={`${r.kpis.quotes_count} / ${r.kpis.quotes_validated}`} />
           </div>
           <ReportTables r={r} />
         </>
@@ -228,7 +228,7 @@ export function ReportsPage() {
             <Stat label="Panier moyen" value={money(c.kpis.avg_basket)} accent />
             <Stat label="Taux de livraison" value={`${c.kpis.delivery_rate} %`} />
             <Stat label="Clients actifs" value={String(c.kpis.customers_count)} />
-            <Stat label="Devis émis / validés" value={`${c.kpis.quotes_count} / ${c.kpis.quotes_validated}`} />
+            <Stat label="Proformas émises / validées" value={`${c.kpis.quotes_count} / ${c.kpis.quotes_validated}`} />
           </div>
           <ReportTables r={c} />
         </>

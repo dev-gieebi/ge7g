@@ -20,7 +20,7 @@ export function QuoteDetailPage() {
   );
 
   if (quote.isLoading) return <Loading />;
-  if (!quote.data) return <ErrorState message="Devis introuvable" />;
+  if (!quote.data) return <ErrorState message="Proforma introuvable" />;
   const q = quote.data;
 
   return (
@@ -29,7 +29,7 @@ export function QuoteDetailPage() {
         <PageHeader
           breadcrumb={
             <Link to="/admin/devis" className="inline-flex items-center gap-1 hover:underline">
-              <ArrowLeft size={12} /> Devis
+              <ArrowLeft size={12} /> Proforma
             </Link>
           }
           title={q.number}
@@ -57,7 +57,7 @@ export function QuoteDetailPage() {
         />
       </div>
       <Devis quote={q} />
-      <div className="no-print mt-6 text-center"><Link to="/admin/devis"><Button variant="purple">Retour aux devis</Button></Link></div>
+      <div className="no-print mt-6 text-center"><Link to="/admin/devis"><Button variant="purple">Retour aux proformas</Button></Link></div>
     </>
   );
 }

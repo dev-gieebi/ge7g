@@ -42,7 +42,7 @@ export const NAVIGATION: NavGroup[] = [
     items: [
       { label: "Caisse", to: "/admin/caisse", icon: ShoppingCart, roles: ["LG_ADMIN", "CAISSIER"], end: true },
       { label: "Commandes en ligne", to: "/admin/commandes", icon: ShoppingBag, roles: ADMINS, paths: ["/admin/commandes"] },
-      { label: "Devis", to: "/admin/devis", icon: FileSignature, roles: ADMINS, paths: ["/admin/devis"] },
+      { label: "Proforma", to: "/admin/devis", icon: FileSignature, roles: ADMINS, paths: ["/admin/devis"] },
       { label: "Ventes", to: "/admin/caisse/ventes", icon: Receipt, roles: [...ADMINS, "CAISSIER"], paths: ["/admin/caisse/ventes"] },
     ],
   },
