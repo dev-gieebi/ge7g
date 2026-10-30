@@ -45,7 +45,7 @@ export function AppShell() {
       <Sidebar open={open} onClose={() => setOpen(false)} collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       <div className="flex min-w-0 flex-1 flex-col">
         {/*<Header onMenu={() => setOpen(true)} />*/}
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="flex-1 px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-6">
           <Outlet />
         </main>
       </div>
