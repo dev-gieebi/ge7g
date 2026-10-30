@@ -8,7 +8,7 @@ import { GE7_COMPANY, cfaNumber } from "@/features/shared/companyInfo";
  * facture ou bon de livraison selon `docTitle`. `originLabel` distingue la
  * provenance — ex. « Commande en ligne : CMD-… ».
  */
-export function Facture({ sale, originLabel, docTitle = "FACTURE" }: { sale: PosSale; originLabel?: string; docTitle?: string }) {
+export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false }: { sale: PosSale; originLabel?: string; docTitle?: string; solde?: boolean }) {
   const s = sale;
   // Transforme le N° de vente « VNT-2026-00012 » en N° de facture « FAC-00012-2026 ».
   const parts = s.number.split("-");
@@ -134,6 +134,14 @@ export function Facture({ sale, originLabel, docTitle = "FACTURE" }: { sale: Pos
           <span className="font-bold italic underline">{docTitle === "FACTURE" ? "Arrêtée la présente facture" : "Arrêté le présent document"} au montant de :</span>{" "}
           <strong>{moneyInWords(s.total)}</strong>
         </p>
+
+        {solde && (
+          <div className="mt-8 flex justify-center">
+            <span className="-rotate-12 rounded border-4 border-double border-red-600 px-10 py-2 text-4xl font-extrabold uppercase tracking-[0.35em] text-red-600">
+              Soldé
+            </span>
+          </div>
+        )}
 
         <div className="mt-6 text-center">
           <p className="font-semibold underline">{GE7_COMPANY.signatoryTitle}</p>

@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCallback, useState } from "react";
-import { ArrowLeft, Printer, Truck } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Printer, Truck } from "lucide-react";
 import type { PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
@@ -25,6 +25,8 @@ export function PosSaleDetailPage() {
   const [discountRate, setDiscountRate] = useState<number | null>(null);
   // Document affiché/imprimé : facture A4 ou bon de commande (même modèle).
   const [bonCommande, setBonCommande] = useState(false);
+  // Tampon « SOLDÉ » ajouté sur le document avant impression.
+  const [solde, setSolde] = useState(false);
 
   const deliver = useAction<{ item_id: number; quantity: number }, PosSale>(
     () => `/pos/sales/${id}/deliver`,
@@ -79,7 +81,10 @@ export function PosSaleDetailPage() {
           action={
             <>
               {!isCashier && (
-                <Button variant={bonCommande ? "secondary" : "purple"} onClick={() => setBonCommande(!bonCommande)}><Truck size={15} /> {bonCommande ? "Facture" : "Bon de commande"}</Button>
+                <>
+                  <Button variant={bonCommande ? "secondary" : "purple"} onClick={() => setBonCommande(!bonCommande)}><Truck size={15} /> {bonCommande ? "Facture" : "Bon de commande"}</Button>
+                  <Button variant={solde ? "secondary" : "purple"} onClick={() => setSolde(!solde)}><BadgeCheck size={15} /> Soldé</Button>
+                </>
               )}
               <Button onClick={handlePrint}><Printer size={15} /> Imprimer</Button>
             </>
@@ -152,7 +157,7 @@ export function PosSaleDetailPage() {
       {isCashier ? (
         <PrintableDocument compact doc={doc} />
       ) : (
-        <Facture sale={s} docTitle={bonCommande ? "BON DE COMMANDE" : "FACTURE"} />
+        <Facture sale={s} docTitle={bonCommande ? "BON DE COMMANDE" : "FACTURE"} solde={solde} />
       )}
       <div className="no-print mt-6 text-center"><Link to="/admin/caisse"><Button variant="purple">Nouvelle vente</Button></Link></div>
     </>

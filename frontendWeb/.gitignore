@@ -5,3 +5,6 @@ dist
 *.local
 *.tsbuildinfo
 .DS_Store
+# Artefacts de build frontend (Vite) — régénérés à chaque déploiement
+frontendWeb/dist/
+frontendWeb/build/

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  BadgeCheck,
   Ban,
   Check,
   ClipboardList,
@@ -82,6 +83,7 @@ export function OrderDetailPage() {
   const [expedier, setExpedier] = useState<{ chauffeur_id?: number } | null>(null);
   const [livrer, setLivrer] = useState<{ receptionnaire: string; montant: string; mode: string } | null>(null);
   const [impression, setImpression] = useState<"facture" | "bl" | null>(null);
+  const [solde, setSolde] = useState(false);
   // Position locale du chauffeur (même source que le partage GPS) : la carte
   // s'affiche pour lui dès le départ, sans attendre le retour du serveur.
   const [maPosition, setMaPosition] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -162,9 +164,12 @@ export function OrderDetailPage() {
       <>
         <div className="no-print mb-4 flex flex-wrap items-center gap-2">
           <Button variant="secondary" onClick={() => setImpression(null)}><ArrowLeft size={16} /> Retour</Button>
+          {!estBl && (
+            <Button variant={solde ? "secondary" : "purple"} onClick={() => setSolde(!solde)}><BadgeCheck size={16} /> Soldé</Button>
+          )}
           <Button onClick={() => window.print()}><Printer size={16} /> Imprimer / PDF</Button>
         </div>
-        <Facture sale={sale} originLabel={`Commande en ligne : ${c.numero}`} docTitle={estBl ? "BON DE LIVRAISON" : "FACTURE"} />
+        <Facture sale={sale} originLabel={`Commande en ligne : ${c.numero}`} docTitle={estBl ? "BON DE LIVRAISON" : "FACTURE"} solde={solde} />
       </>
     );
   }
