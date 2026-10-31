@@ -106,7 +106,7 @@ class CommandeController extends Controller
         $user = $this->authorizeUser($request, self::VIEW_ROLES);
         $this->authorizeChauffeur($user, $commande);
 
-        $commande->load(['lignes.produit.unit', 'historique.user', 'chauffeur', 'valideur', 'facture.paiements', 'facture.avoir', 'livraison']);
+        $commande->load(['lignes.produit.unit', 'historique.user', 'chauffeur', 'valideur', 'facture.paiements', 'facture.avoir', 'livraison', 'extras']);
 
         return new CommandeResource($commande);
     }
@@ -116,6 +116,34 @@ class CommandeController extends Controller
         $this->authorizeUser($request, self::MANAGE_ROLES);
         $commande = $this->service->valider($commande, $request->user());
         $commande->load(['lignes.produit.unit', 'historique.user', 'chauffeur', 'facture.paiements', 'facture.avoir', 'livraison']);
+
+        return new CommandeResource($commande);
+    }
+
+    /**
+     * Frais annexes (manutention, livraison…) affichés sur la facture imprimée
+     * de la commande : libellé + montant, ajoutés au TOTAL TTC du document.
+     */
+    public function saveExtras(Request $request, Commande $commande): CommandeResource
+    {
+        $this->authorizeUser($request, self::ASSIGN_ROLES);
+
+        $validated = $request->validate([
+            'extras' => 'present|array|max:20',
+            'extras.*.label' => 'required|string|max:80',
+            'extras.*.amount' => 'required|numeric|min:0|max:999999999',
+        ]);
+
+        $rows = collect($validated['extras'])
+            ->map(fn (array $x) => ['label' => trim($x['label']), 'amount' => (float) $x['amount']])
+            ->filter(fn (array $x) => $x['label'] !== '' && $x['amount'] > 0)
+            ->values()
+            ->all();
+
+        $commande->extras()->delete();
+        $commande->extras()->createMany($rows);
+
+        $commande->load(['lignes.produit.unit', 'historique.user', 'chauffeur', 'valideur', 'facture.paiements', 'facture.avoir', 'livraison', 'extras']);
 
         return new CommandeResource($commande);
     }

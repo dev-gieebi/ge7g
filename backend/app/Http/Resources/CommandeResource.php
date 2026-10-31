@@ -37,6 +37,7 @@ class CommandeResource extends JsonResource
             ],
             'note' => $this->note,
             'total' => (int) $this->total,
+            'extras' => $this->whenLoaded('extras', fn () => $this->extras->map(fn ($e) => ['label' => $e->label, 'amount' => (float) $e->amount])->values()),
             'lignes' => $this->lignes->map(fn ($l) => [
                 'id' => $l->id,
                 'produit_id' => $l->produit_id,

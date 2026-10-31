@@ -70,6 +70,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('pos/sales', [PosController::class, 'store']);
     Route::get('pos/sales/{sale}', [PosController::class, 'show']);
     Route::post('pos/sales/{sale}/discount', [PosController::class, 'applyDiscount']);
+    Route::post('pos/sales/{sale}/extras', [PosController::class, 'saveExtras']);
     Route::post('pos/sales/{sale}/deliver', [PosController::class, 'deliver']);
 
     Route::post('quotes/{quote}/status', [QuoteController::class, 'updateStatus']);
@@ -86,6 +87,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('commandes', [CommandeController::class, 'index']);
     Route::get('commandes/{commande}', [CommandeController::class, 'show']);
     Route::post('commandes/{commande}/valider', [CommandeController::class, 'valider']);
+    Route::post('commandes/{commande}/extras', [CommandeController::class, 'saveExtras']);
     Route::post('commandes/{commande}/refuser', [CommandeController::class, 'refuser']);
     Route::post('commandes/{commande}/preparer', [CommandeController::class, 'preparer']);
     Route::post('commandes/{commande}/affecter', [CommandeController::class, 'affecter']);

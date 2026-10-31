@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useCallback, useState } from "react";
-import { ArrowLeft, BadgeCheck, Printer, Truck } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ArrowLeft, BadgeCheck, Plus, Printer, Truck, X } from "lucide-react";
 import type { PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
@@ -27,6 +27,14 @@ export function PosSaleDetailPage() {
   const [bonCommande, setBonCommande] = useState(false);
   // Tampon « SOLDÉ » ajouté sur le document avant impression.
   const [solde, setSolde] = useState(false);
+  // Frais annexes (manutention, livraison…) : chargés depuis la vente, modifiables puis enregistrés.
+  const [extras, setExtras] = useState<{ label: string; amount: number }[]>([]);
+
+  useEffect(() => {
+    if (sale.data?.extras) {
+      setExtras(sale.data.extras);
+    }
+  }, [sale.data?.id, sale.data?.extras]);
 
   const deliver = useAction<{ item_id: number; quantity: number }, PosSale>(
     () => `/pos/sales/${id}/deliver`,
@@ -36,6 +44,11 @@ export function PosSaleDetailPage() {
   const applyDiscount = useAction<{ discount_rate: number }, PosSale>(
     () => `/pos/sales/${id}/discount`,
     { keys: ["pos-sale", "pos-sales", "dashboard"], success: "Remise appliquée", body: (v) => v },
+  );
+
+  const saveExtras = useAction<{ extras: { label: string; amount: number }[] }, PosSale>(
+    () => `/pos/sales/${id}/extras`,
+    { keys: ["pos-sale", "pos-sales"], success: "Frais annexes enregistrés", body: (v) => v },
   );
 
   const handlePrint = useCallback(() => {
@@ -154,10 +167,56 @@ export function PosSaleDetailPage() {
           </Button>
         </div>
       )}
+      {!isCashier && !solde && (
+        <Card className="no-print mx-auto mb-4 max-w-3xl" padded>
+          <h3 className="text-sm font-extrabold text-ge7-black/80">Frais annexes</h3>
+          <p className="mt-0.5 text-xs text-ge7-black/50">Manutention, coût de livraison… chaque ligne s'ajoute au TOTAL TTC du document.</p>
+          {extras.map((x, i) => (
+            <div key={i} className="mt-2 flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Libellé (ex. Manutention)"
+                value={x.label}
+                onChange={(e) => setExtras((xs) => xs.map((it, j) => (j === i ? { ...it, label: e.target.value } : it)))}
+                className="min-w-0 flex-1 rounded-lg border border-ge7-black/10 px-2 py-1.5 text-sm"
+              />
+              <input
+                type="number"
+                min={0}
+                step="any"
+                placeholder="Montant"
+                value={x.amount || ""}
+                onChange={(e) => setExtras((xs) => xs.map((it, j) => (j === i ? { ...it, amount: Number(e.target.value) } : it)))}
+                className="w-32 rounded-lg border border-ge7-black/10 px-2 py-1.5 text-right text-sm"
+              />
+              <button onClick={() => setExtras((xs) => xs.filter((_, j) => j !== i))} className="rounded-lg p-1.5 text-ge7-black/40 hover:bg-red-50 hover:text-red-600" title="Retirer">
+                <X size={15} />
+              </button>
+            </div>
+          ))}
+          <div className="mt-2 flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setExtras((xs) => [...xs, { label: "", amount: 0 }])}>
+              <Plus size={14} /> Ajouter un frais
+            </Button>
+            <Button
+              size="sm"
+              variant="purple"
+              loading={saveExtras.isPending}
+              onClick={() =>
+                saveExtras.mutateAsync({
+                  extras: extras.filter((x) => x.label.trim() !== "" && x.amount > 0),
+                }).catch(() => {})
+              }
+            >
+              Enregistrer
+            </Button>
+          </div>
+        </Card>
+      )}
       {isCashier ? (
         <PrintableDocument compact doc={doc} />
       ) : (
-        <Facture sale={s} docTitle={bonCommande ? "BON DE COMMANDE" : "FACTURE"} solde={solde} />
+        <Facture sale={s} docTitle={bonCommande ? "BON DE COMMANDE" : "FACTURE"} solde={solde} extras={solde ? [] : extras} />
       )}
       <div className="no-print mt-6 text-center"><Link to="/admin/caisse"><Button variant="purple">Nouvelle vente</Button></Link></div>
     </>

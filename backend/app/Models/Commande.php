@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 #[Fillable(['numero', 'client_id', 'zone_id', 'nom_livraison', 'telephone_livraison', 'ville', 'quartier', 'point_repere', 'note', 'total', 'statut', 'motif', 'validee_par', 'validee_le', 'chauffeur_id'])]
 class Commande extends Model
@@ -69,5 +70,11 @@ class Commande extends Model
     public function chauffeur(): BelongsTo
     {
         return $this->belongsTo(User::class, 'chauffeur_id');
+    }
+
+    /** Frais annexes (manutention, livraison…) imprimés sur la facture. */
+    public function extras(): MorphMany
+    {
+        return $this->morphMany(Extra::class, 'extraable');
     }
 }

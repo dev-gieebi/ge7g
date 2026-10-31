@@ -8,7 +8,7 @@ import { GE7_COMPANY, cfaNumber } from "@/features/shared/companyInfo";
  * facture ou bon de livraison selon `docTitle`. `originLabel` distingue la
  * provenance — ex. « Commande en ligne : CMD-… ».
  */
-export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false }: { sale: PosSale; originLabel?: string; docTitle?: string; solde?: boolean }) {
+export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false, extras = [] }: { sale: PosSale; originLabel?: string; docTitle?: string; solde?: boolean; extras?: { label: string; amount: number }[] }) {
   const s = sale;
   // Transforme le N° de vente « VNT-2026-00012 » en N° de facture « FAC-00012-2026 ».
   const parts = s.number.split("-");
@@ -28,6 +28,10 @@ export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false
       : s.tax_type === "AUCUNE" || Number(s.tax_amount) === 0
         ? []
         : [{ label: `${s.tax_type} ${ratePct} %`, amount: Number(s.tax_amount) }];
+  // Frais annexes saisis à l'impression (manutention, livraison…) : ils
+  // s'ajoutent au TOTAL TTC et au montant en toutes lettres.
+  const charges = extras.filter((x) => x.label.trim() !== "" && x.amount > 0);
+  const grandTotal = Number(s.total) + charges.reduce((t, x) => t + x.amount, 0);
 
   return (
     <div className="font-times mx-auto max-w-3xl bg-white px-4 py-2 text-[13px] leading-relaxed text-ge7-black shadow-soft print:max-w-none print:shadow-none">
@@ -122,17 +126,23 @@ export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false
                   <span className="font-bold">{money(t.amount)}</span>
                 </div>
               ))}
+              {charges.map((x, i) => (
+                <div key={i} className="flex justify-between">
+                  <span className="text-[#065baf]/70 font-bold">{x.label.toUpperCase()}</span>
+                  <span className="font-bold">{money(x.amount)}</span>
+                </div>
+              ))}
             </div>
             <div className="flex justify-between border border-ge7-black/80 pl-1 pr-1 font-extrabold">
               <span>TOTAL TTC</span>
-              <span className="font-bold">{money(s.total)}</span>
+              <span className="font-bold">{money(grandTotal)}</span>
             </div>
           </div>
         </div>
 
         <p className="mt-2">
           <span className="font-bold italic underline">{docTitle === "FACTURE" ? "Arrêtée la présente facture" : "Arrêté le présent document"} au montant de :</span>{" "}
-          <strong>{moneyInWords(s.total)}</strong>
+          <strong>{moneyInWords(grandTotal)}</strong>
         </p>
 
         {solde && (

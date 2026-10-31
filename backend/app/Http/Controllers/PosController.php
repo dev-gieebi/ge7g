@@ -349,11 +349,39 @@ class PosController extends Controller
         return response()->json(['data' => $sale]);
     }
 
+    /**
+     * Frais annexes (manutention, livraison…) : libellé + montant, ajoutés
+     * au TOTAL TTC du document imprimé sans toucher le total comptable.
+     */
+    public function saveExtras(Request $request, PosSale $sale): JsonResponse
+    {
+        $this->authorizeUser($request, self::DELIVER_ROLES);
+
+        $validated = $request->validate([
+            'extras' => 'present|array|max:20',
+            'extras.*.label' => 'required|string|max:80',
+            'extras.*.amount' => 'required|numeric|min:0|max:999999999',
+        ]);
+
+        $rows = collect($validated['extras'])
+            ->map(fn (array $x) => ['label' => trim($x['label']), 'amount' => (float) $x['amount']])
+            ->filter(fn (array $x) => $x['label'] !== '' && $x['amount'] > 0)
+            ->values()
+            ->all();
+
+        $sale->extras()->delete();
+        $sale->extras()->createMany($rows);
+
+        $sale->load(['cashier', 'zone', 'items.product.unit', 'extras']);
+
+        return response()->json(['data' => $sale]);
+    }
+
     public function show(Request $request, PosSale $sale): JsonResponse
     {
         $this->authorizeUser($request, self::VIEW_ROLES);
 
-        $sale->load(['cashier', 'zone', 'items.product.unit']);
+        $sale->load(['cashier', 'zone', 'items.product.unit', 'extras']);
 
         return response()->json(['data' => $sale]);
     }

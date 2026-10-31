@@ -446,6 +446,8 @@ export interface PosSale {
   tax_amount: number;
   tax_details?: { type: string; name: string; rate: number; amount: number }[] | null;
   total: number;
+  /** Frais annexes (manutention, livraison…) ajoutés au document imprimé. */
+  extras?: { label: string; amount: number }[] | null;
   payment_method: PaymentMethod;
   status: "PAYEE" | "ANNULEE" | "EMISE";
   /** Origine de la vente : caisse ou commande de la boutique en ligne. */
@@ -670,6 +672,8 @@ export interface CommandeDetail {
   adresse: { ville: string; quartier: string; point_repere: string };
   note: string | null;
   total: number;
+  /** Frais annexes (manutention, livraison…) ajoutés au document imprimé. */
+  extras?: { label: string; amount: number }[];
   lignes: CommandeLigne[];
   valideur: string | null;
   validee_le: string | null;

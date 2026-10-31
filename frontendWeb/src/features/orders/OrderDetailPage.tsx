@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Ban,
   Check,
+  Plus,
   ClipboardList,
   FileDown,
   MapPin,
@@ -84,6 +85,8 @@ export function OrderDetailPage() {
   const [livrer, setLivrer] = useState<{ receptionnaire: string; montant: string; mode: string } | null>(null);
   const [impression, setImpression] = useState<"facture" | "bl" | null>(null);
   const [solde, setSolde] = useState(false);
+  // Frais annexes (manutention, livraison…) : chargés depuis la commande, enregistrés en base.
+  const [extras, setExtras] = useState<{ label: string; amount: number }[]>([]);
   // Position locale du chauffeur (même source que le partage GPS) : la carte
   // s'affiche pour lui dès le départ, sans attendre le retour du serveur.
   const [maPosition, setMaPosition] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -101,6 +104,17 @@ export function OrderDetailPage() {
     () => `/commandes/${id}/livrer`,
     { keys: KEYS, success: "Livraison enregistrée", body: (v) => v },
   );
+  const saveExtras = useAction<{ extras: { label: string; amount: number }[] }, CommandeDetail>(
+    () => `/commandes/${id}/extras`,
+    { keys: KEYS, success: "Frais annexes enregistrés", body: (v) => v },
+  );
+
+  // Frais annexes persistés : on charge ceux enregistrés sur la commande.
+  useEffect(() => {
+    if (commande.data?.extras) {
+      setExtras(commande.data.extras);
+    }
+  }, [commande.data?.id, commande.data?.extras]);
 
   const enLivraison = commande.data?.statut === "en_livraison";
 
@@ -169,7 +183,53 @@ export function OrderDetailPage() {
           )}
           <Button onClick={() => window.print()}><Printer size={16} /> Imprimer / PDF</Button>
         </div>
-        <Facture sale={sale} originLabel={`Commande en ligne : ${c.numero}`} docTitle={estBl ? "BON DE LIVRAISON" : "FACTURE"} solde={solde} />
+        {!estBl && !solde && (
+          <Card className="no-print mx-auto mb-4 max-w-3xl" padded>
+            <h3 className="text-sm font-extrabold text-ge7-black/80">Frais annexes</h3>
+            <p className="mt-0.5 text-xs text-ge7-black/50">Manutention, coût de livraison… chaque ligne s'ajoute au TOTAL TTC du document.</p>
+            {extras.map((x, i) => (
+              <div key={i} className="mt-2 flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Libellé (ex. Manutention)"
+                  value={x.label}
+                  onChange={(e) => setExtras((xs) => xs.map((it, j) => (j === i ? { ...it, label: e.target.value } : it)))}
+                  className="min-w-0 flex-1 rounded-lg border border-ge7-black/10 px-2 py-1.5 text-sm"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  placeholder="Montant"
+                  value={x.amount || ""}
+                  onChange={(e) => setExtras((xs) => xs.map((it, j) => (j === i ? { ...it, amount: Number(e.target.value) } : it)))}
+                  className="w-32 rounded-lg border border-ge7-black/10 px-2 py-1.5 text-right text-sm"
+                />
+                <button onClick={() => setExtras((xs) => xs.filter((_, j) => j !== i))} className="rounded-lg p-1.5 text-ge7-black/40 hover:bg-red-50 hover:text-red-600" title="Retirer">
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
+            <div className="mt-2 flex items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setExtras((xs) => [...xs, { label: "", amount: 0 }])}>
+                <Plus size={14} /> Ajouter un frais
+              </Button>
+              <Button
+                size="sm"
+                variant="purple"
+                loading={saveExtras.isPending}
+                onClick={() =>
+                  saveExtras.mutateAsync({
+                    extras: extras.filter((x) => x.label.trim() !== "" && x.amount > 0),
+                  }).catch(() => {})
+                }
+              >
+                Enregistrer
+              </Button>
+            </div>
+          </Card>
+        )}
+        <Facture sale={sale} originLabel={`Commande en ligne : ${c.numero}`} docTitle={estBl ? "BON DE LIVRAISON" : "FACTURE"} solde={solde} extras={solde ? [] : extras} />
       </>
     );
   }
