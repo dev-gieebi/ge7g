@@ -21,6 +21,10 @@ export function Devis({ quote }: { quote: Quote }) {
       : q.tax_type === "AUCUNE" || Number(q.tax_amount) === 0
         ? []
         : [{ label: `${q.tax_type} ${ratePct} %`, amount: Number(q.tax_amount) }];
+  // Frais annexes (manutention, livraison…) : ajoutés au TOTAL TTC et au
+  // montant en toutes lettres du document.
+  const charges = (q.extras ?? []).filter((x) => x.label.trim() !== "" && x.amount > 0);
+  const grandTotal = Number(q.total) + charges.reduce((t, x) => t + x.amount, 0);
 
   return (
     <div className="font-times mx-auto max-w-3xl bg-white px-4 py-2 text-[13px] leading-relaxed text-ge7-black shadow-soft print:max-w-none print:shadow-none">
@@ -117,16 +121,22 @@ export function Devis({ quote }: { quote: Quote }) {
                 <span className="font-bold">{money(t.amount)}</span>
               </div>
             ))}
+            {charges.map((x, i) => (
+              <div key={i} className="flex justify-between">
+                <span className="text-[#065baf]/70 font-bold">{x.label.toUpperCase()}</span>
+                <span className="font-bold">{money(x.amount)}</span>
+              </div>
+            ))}
             <div className="flex justify-between border-t border-ge7-black/20 pt-1 font-extrabold">
               <span>TOTAL TTC</span>
-              <span className="font-bold">{money(q.total)}</span>
+              <span className="font-bold">{money(grandTotal)}</span>
             </div>
           </div>
         </div>
 
         <p className="mt-2">
           <span className="font-bold italic underline">Arrêtée la présente proforma au montant de :</span>{" "}
-          <strong>{moneyInWords(q.total)}</strong>
+          <strong>{moneyInWords(grandTotal)}</strong>
         </p>
 
         <div className="mt-6 text-center">

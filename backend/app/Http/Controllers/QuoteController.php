@@ -90,7 +90,7 @@ class QuoteController extends Controller
     {
         $this->authorizeUser($request, self::VIEW_ROLES);
 
-        $quote->load(['creator', 'zone', 'items.product.unit']);
+        $quote->load(['creator', 'zone', 'items.product.unit', 'extras']);
 
         return response()->json(['data' => $quote]);
     }
@@ -118,11 +118,12 @@ class QuoteController extends Controller
             $this->fillTotals($quote, $validated['items'], $validated['tax_ids'] ?? [], (int) $validated['zone_id']);
             $quote->number = 'DEV-'.now()->format('Y').'-'.str_pad((string) $quote->id, 5, '0', STR_PAD_LEFT);
             $quote->save();
+            $this->syncExtras($quote, $validated['extras'] ?? []);
 
             return $quote;
         });
 
-        $quote->load(['creator', 'zone', 'items.product.unit']);
+        $quote->load(['creator', 'zone', 'items.product.unit', 'extras']);
 
         return response()->json(['data' => $quote], 201);
     }
@@ -149,9 +150,31 @@ class QuoteController extends Controller
             $quote->items()->delete();
             $this->fillTotals($quote, $validated['items'], $validated['tax_ids'] ?? [], (int) $validated['zone_id']);
             $quote->save();
+            $this->syncExtras($quote, $validated['extras'] ?? []);
         });
 
-        $quote->load(['creator', 'zone', 'items.product.unit']);
+        $quote->load(['creator', 'zone', 'items.product.unit', 'extras']);
+
+        return response()->json(['data' => $quote]);
+    }
+
+    /**
+     * Frais annexes (manutention, livraison…) affichés sur la proforma :
+     * libellé + montant, ajoutés au TOTAL TTC du document.
+     */
+    public function saveExtras(Request $request, Quote $quote): JsonResponse
+    {
+        $this->authorizeUser($request, self::MANAGE_ROLES);
+
+        $validated = $request->validate([
+            'extras' => 'present|array|max:20',
+            'extras.*.label' => 'required|string|max:80',
+            'extras.*.amount' => 'required|numeric|min:0|max:999999999',
+        ]);
+
+        $this->syncExtras($quote, $validated['extras']);
+
+        $quote->load(['creator', 'zone', 'items.product.unit', 'extras']);
 
         return response()->json(['data' => $quote]);
     }
@@ -180,7 +203,7 @@ class QuoteController extends Controller
         $quote->status = $validated['status'];
         $quote->save();
 
-        $quote->load(['creator', 'zone', 'items.product.unit']);
+        $quote->load(['creator', 'zone', 'items.product.unit', 'extras']);
 
         return response()->json(['data' => $quote]);
     }
@@ -202,7 +225,23 @@ class QuoteController extends Controller
             'discount_rate' => 'nullable|numeric|min:0|max:100',
             'valid_until' => 'nullable|date',
             'notes' => 'nullable|string|max:2000',
+            'extras' => 'nullable|array|max:20',
+            'extras.*.label' => 'required|string|max:80',
+            'extras.*.amount' => 'required|numeric|min:0|max:999999999',
         ];
+    }
+
+    /** @param  list<array{label: string, amount: float}>  $rows */
+    private function syncExtras(Quote $quote, array $rows): void
+    {
+        $quote->extras()->delete();
+        $quote->extras()->createMany(
+            collect($rows)
+                ->map(fn (array $x) => ['label' => trim($x['label']), 'amount' => (float) $x['amount']])
+                ->filter(fn (array $x) => $x['label'] !== '' && $x['amount'] > 0)
+                ->values()
+                ->all()
+        );
     }
 
     /**

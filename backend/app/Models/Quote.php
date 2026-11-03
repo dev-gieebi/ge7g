@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 #[Fillable(['number', 'user_id', 'zone_id', 'customer_name', 'customer_phone', 'customer_address', 'subtotal', 'discount_rate', 'tax_type', 'tax_rate', 'tax_amount', 'tax_details', 'total', 'status', 'valid_until', 'notes'])]
 class Quote extends Model
@@ -41,5 +42,11 @@ class Quote extends Model
     public function items(): HasMany
     {
         return $this->hasMany(QuoteItem::class);
+    }
+
+    /** Frais annexes (manutention, livraison…) imprimés sur la proforma. */
+    public function extras(): MorphMany
+    {
+        return $this->morphMany(Extra::class, 'extraable');
     }
 }

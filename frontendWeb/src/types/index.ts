@@ -485,6 +485,8 @@ export interface Quote {
   tax_amount: number;
   tax_details?: { type: string; name: string; rate: number; amount: number }[] | null;
   total: number;
+  /** Frais annexes (manutention, livraison…) ajoutés au document imprimé. */
+  extras?: { label: string; amount: number }[] | null;
   status: QuoteStatus;
   valid_until: string | null;
   notes: string | null;

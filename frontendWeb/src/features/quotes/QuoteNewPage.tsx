@@ -22,6 +22,7 @@ interface Payload {
   discount_rate: number | null;
   valid_until: string | null;
   notes: string | null;
+  extras: { label: string; amount: number }[];
 }
 
 export function QuoteNewPage() {
@@ -37,6 +38,7 @@ export function QuoteNewPage() {
   const [remise, setRemise] = useState<number | "">("");
   const [validUntil, setValidUntil] = useState("");
   const [notes, setNotes] = useState("");
+  const [extras, setExtras] = useState<{ label: string; amount: number }[]>([]);
 
   const { data: taxes } = useTaxes();
   const { data: zones } = useZones();
@@ -77,7 +79,9 @@ export function QuoteNewPage() {
   const netSubtotal = subtotal - discount;
   const rate = selectedTaxes.reduce((s, t) => s + (t.type === "AUCUNE" ? 0 : (t.type === "TPS" ? -Number(t.rate) : Number(t.rate))), 0) / 100;
   const taxAmount = Math.round(netSubtotal * rate);
-  const total = netSubtotal + taxAmount;
+  const charges = extras.filter((x) => x.label.trim() !== "" && x.amount > 0);
+  const extrasTotal = charges.reduce((s, x) => s + x.amount, 0);
+  const total = netSubtotal + taxAmount + extrasTotal;
 
   const add = (p: PosProduct) => {
     setCart((c) => {
@@ -105,6 +109,7 @@ export function QuoteNewPage() {
         discount_rate: remise === "" ? null : Number(remise),
         valid_until: validUntil || null,
         notes: notes || null,
+        extras: charges,
       })
       .then((q) => navigate(`/admin/devis/${q.id}`))
       .catch(() => {});
@@ -223,6 +228,35 @@ export function QuoteNewPage() {
                 ))}
               </div>
             </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-ge7-black/70">Frais annexes (manutention, livraison…)</label>
+              {extras.map((x, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Libellé (ex. Manutention)"
+                    value={x.label}
+                    onChange={(e) => setExtras((xs) => xs.map((it, j) => (j === i ? { ...it, label: e.target.value } : it)))}
+                    className="min-w-0 flex-1 rounded-lg border border-ge7-black/10 px-2 py-1.5 text-sm"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    placeholder="Montant"
+                    value={x.amount || ""}
+                    onChange={(e) => setExtras((xs) => xs.map((it, j) => (j === i ? { ...it, amount: Number(e.target.value) } : it)))}
+                    className="w-28 rounded-lg border border-ge7-black/10 px-2 py-1.5 text-right text-sm"
+                  />
+                  <button onClick={() => setExtras((xs) => xs.filter((_, j) => j !== i))} className="rounded-lg p-1 text-rose-600 hover:bg-red-50" title="Retirer">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+              <Button size="sm" variant="secondary" onClick={() => setExtras((xs) => [...xs, { label: "", amount: 0 }])}>
+                <Plus size={14} /> Ajouter un frais
+              </Button>
+            </div>
             <Textarea placeholder="Notes / conditions (optionnel)" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-ge7-black/60"><span>Total HT</span><span>{money(subtotal)}</span></div>
@@ -233,6 +267,9 @@ export function QuoteNewPage() {
                 </>
               )}
               <div className="flex justify-between text-ge7-black/60"><span>{selectedTaxes.length === 0 ? "Taxe" : `${selectedTaxes.map((t) => t.name).join(" + ")} ${(rate * 100).toFixed(2).replace(/\.?0+$/, "")} %`}</span><span>{money(taxAmount)}</span></div>
+              {charges.map((x, i) => (
+                <div key={i} className="flex justify-between text-ge7-black/60"><span>{x.label}</span><span>{money(x.amount)}</span></div>
+              ))}
               <div className="flex justify-between text-xl font-extrabold"><span>TOTAL</span><span className="text-ge7-bronze">{money(total)}</span></div>
             </div>
             <Button size="lg" className="w-full" disabled={!cart.length || !customer.trim() || zoneId === ""} loading={create.isPending} onClick={submit}>Enregistrer la proforma {money(total)}</Button>

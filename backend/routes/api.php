@@ -74,6 +74,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('pos/sales/{sale}/deliver', [PosController::class, 'deliver']);
 
     Route::post('quotes/{quote}/status', [QuoteController::class, 'updateStatus']);
+    Route::post('quotes/{quote}/extras', [QuoteController::class, 'saveExtras']);
     Route::apiResource('quotes', QuoteController::class);
 
     Route::get('reports/sales/export', [ReportController::class, 'exportSales']);
