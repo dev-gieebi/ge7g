@@ -229,7 +229,7 @@ export function OrderDetailPage() {
             </div>
           </Card>
         )}
-        <Facture sale={sale} originLabel={`Commande en ligne : ${c.numero}`} docTitle={estBl ? "BON DE LIVRAISON" : "FACTURE"} solde={solde} extras={solde ? [] : extras} />
+        <Facture sale={sale} originLabel={`Commande en ligne : ${c.numero}`} docTitle={estBl ? "BON DE LIVRAISON" : "FACTURE"} solde={solde} extras={extras} />
       </>
     );
   }

@@ -216,7 +216,7 @@ export function PosSaleDetailPage() {
       {isCashier ? (
         <PrintableDocument compact doc={doc} />
       ) : (
-        <Facture sale={s} docTitle={bonCommande ? "BON DE COMMANDE" : "FACTURE"} solde={solde} extras={solde ? [] : extras} />
+        <Facture sale={s} docTitle={bonCommande ? "BON DE COMMANDE" : "FACTURE"} solde={solde} extras={extras} />
       )}
       <div className="no-print mt-6 text-center"><Link to="/admin/caisse"><Button variant="purple">Nouvelle vente</Button></Link></div>
     </>
