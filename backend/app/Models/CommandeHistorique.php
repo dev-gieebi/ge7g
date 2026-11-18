@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['commande_id', 'ancien_statut', 'nouveau_statut', 'user_id', 'commentaire'])]
+#[Fillable(['commande_id', 'ancien_statut', 'nouveau_statut', 'user_id', 'commentaire', 'created_at'])]
 class CommandeHistorique extends Model
 {
     public $timestamps = false;

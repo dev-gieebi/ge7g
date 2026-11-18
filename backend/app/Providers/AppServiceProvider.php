@@ -29,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Notifications boutique : journalisation par défaut — un fournisseur
+        // Notifications boutique : journalisation par défaut, un fournisseur
         // SMS/WhatsApp se branche ici en remplaçant l'implémentation.
         $this->app->bind(NotificationService::class, LogNotificationService::class);
     }

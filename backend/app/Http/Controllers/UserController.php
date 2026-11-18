@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
 use App\Models\User;
+use App\Services\CommandeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -27,7 +29,7 @@ class UserController extends Controller
     {
         $this->authorizeUser($request);
 
-        $query = User::query();
+        $query = User::query()->with('zone:id,name');
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -71,7 +73,8 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             // CHAUFFEUR exclu : les chauffeurs se créent dans Logistique →
             // Chauffeurs, qui génère la fiche métier + le compte lié.
-            'role' => 'required|string|in:LG_ADMIN,CAISSIER,DG_ADMIN,SUPERADMIN,CDG_ADMIN',
+            'role' => 'required|string|in:LG_ADMIN,CAISSIER,DG_ADMIN,SUPERADMIN,CDG_ADMIN,CLIENT',
+            ...$this->clientRules($request),
         ]);
 
         $code = $this->generateUniqueCode();
@@ -85,7 +88,11 @@ class UserController extends Controller
             'is_admin' => in_array($validated['role'], ['LG_ADMIN', 'DG_ADMIN', 'CDG_ADMIN', 'SUPERADMIN'], true),
         ]);
 
-        return response()->json(['data' => $user], 201);
+        if ($validated['role'] === 'CLIENT') {
+            $this->lierClient($user, $validated);
+        }
+
+        return response()->json(['data' => $user->load('zone:id,name')], 201);
     }
 
     public function show(Request $request, User $user): JsonResponse
@@ -101,8 +108,9 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'role' => 'required|string|in:LG_ADMIN,CAISSIER,DG_ADMIN,SUPERADMIN,CDG_ADMIN,CHAUFFEUR',
+            'role' => 'required|string|in:LG_ADMIN,CAISSIER,DG_ADMIN,SUPERADMIN,CDG_ADMIN,CHAUFFEUR,CLIENT',
             'permissions' => 'sometimes|array',
+            ...$this->clientRules($request),
         ]);
 
         // Le rôle CHAUFFEUR ne peut pas être attribué ici (compte lié à une
@@ -118,7 +126,52 @@ class UserController extends Controller
             'is_admin' => in_array($validated['role'], ['LG_ADMIN', 'DG_ADMIN', 'CDG_ADMIN', 'SUPERADMIN'], true),
         ]);
 
-        return response()->json(['data' => $user]);
+        if ($validated['role'] === 'CLIENT') {
+            $this->lierClient($user, $validated);
+        } elseif ($user->zone_id) {
+            $user->update(['zone_id' => null]);
+        }
+
+        return response()->json(['data' => $user->load('zone:id,name')]);
+    }
+
+    /**
+     * Compte CLIENT : téléphone obligatoire (livraison + fiche client) et
+     * ville d'accès, `zone_id` vide = accès à toutes les villes.
+     *
+     * @return array<string, mixed>
+     */
+    private function clientRules(Request $request): array
+    {
+        return $request->input('role') === 'CLIENT'
+            ? [
+                // Même format que les commandes (+241 suivi de 8 ou 9 chiffres),
+                // sinon le client ne pourrait pas commander depuis son compte.
+                'phone' => ['required', 'string', 'max:30', function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! preg_match('/^\+241[0-9]{8,9}$/', CommandeService::normaliserTelephone((string) $value))) {
+                        $fail('Numéro de téléphone invalide : 8 ou 9 chiffres après l\'indicatif +241.');
+                    }
+                }],
+                'zone_id' => 'nullable|integer|exists:zones,id',
+            ]
+            : [];
+    }
+
+    /** Rattache le compte CLIENT à sa fiche client (reconnue par téléphone normalisé). */
+    private function lierClient(User $user, array $validated): void
+    {
+        $telephone = CommandeService::normaliserTelephone($validated['phone']);
+
+        $client = Client::firstOrNew(['telephone' => $telephone]);
+        $client->nom = $validated['name'];
+        $client->source = $client->source ?? 'espace_client';
+        $client->save();
+
+        $user->update([
+            'phone' => $telephone,
+            'zone_id' => $validated['zone_id'] ?? null,
+            'client_id' => $client->id,
+        ]);
     }
 
     public function updatePassword(Request $request, User $user): JsonResponse

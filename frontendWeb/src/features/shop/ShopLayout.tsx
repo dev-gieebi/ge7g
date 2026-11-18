@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { KeyRound, Menu, PackageSearch, Search, ShoppingCart, Store, X } from "lucide-react";
+import { KeyRound, LogOut, Menu, PackageSearch, Search, ShoppingCart, Store, X } from "lucide-react";
 import { Logo } from "@/components/ui";
+import { useAuth } from "@/lib/auth";
 import { GE7_COMPANY } from "@/features/shared/companyInfo";
 import { useCart } from "./cart";
+import { useEstClient, useProfilClient } from "./espaceClient";
 
 /**
- * Layout de la boutique publique — visible par tous, sans compte.
+ * Layout de la boutique publique, visible par tous, sans compte.
  * L'espace personnel reste derrière le bouton « Connexion ».
  */
 export function ShopLayout() {
@@ -14,6 +16,9 @@ export function ShopLayout() {
   const cart = useCart();
   const [search, setSearch] = useState("");
   const [menu, setMenu] = useState(false);
+  const { user, logout } = useAuth();
+  const estClient = useEstClient();
+  const nonLues = useProfilClient().data?.non_lues ?? 0;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -21,15 +26,35 @@ export function ShopLayout() {
     setMenu(false);
   };
 
+  // Compte client connecté : ses commandes (avec nouveautés) remplacent le suivi par numéro.
   const links = [
     { to: "/", label: "Accueil", end: true },
     { to: "/produits", label: "Catalogue", end: false },
-    { to: "/suivi", label: "Suivi de commande", end: false },
+    estClient
+      ? { to: "/mon-compte/commandes", label: `Mes commandes${nonLues ? ` (${nonLues})` : ""}`, end: false }
+      : { to: "/suivi", label: "Suivi de commande", end: false },
   ];
 
+  const compte = estClient ? (
+    <button
+      onClick={() => void logout().then(() => navigate("/"))}
+      title={`Connecté : ${user?.name}`}
+      className="hidden items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold text-white/85 transition hover:border-ge7-gold hover:text-white md:inline-flex"
+    >
+      <LogOut size={15} /> Déconnexion
+    </button>
+  ) : (
+    <Link
+      to="/login"
+      className="hidden items-center gap-2 rounded-full bg-ge7-gold px-4 py-2 text-sm font-bold text-ge7-black transition hover:brightness-110 md:inline-flex"
+    >
+      <KeyRound size={15} /> Connexion
+    </Link>
+  );
+
   return (
-    <div className="flex min-h-screen flex-col bg-ge7-cream">
-      <header className="sticky top-0 z-40 bg-[#151515] text-white shadow-lg">
+    <div className="flex min-h-screen flex-col bg-ge7-cream print:bg-white">
+      <header className="no-print sticky top-0 z-40 bg-[#151515] text-white shadow-lg">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           <Link to="/" className="shrink-0">
             <Logo light size={40} />
@@ -69,12 +94,7 @@ export function ShopLayout() {
             )}
           </Link>
 
-          <Link
-            to="/login"
-            className="hidden items-center gap-2 rounded-full bg-ge7-gold px-4 py-2 text-sm font-bold text-ge7-black transition hover:brightness-110 md:inline-flex"
-          >
-            <KeyRound size={15} /> Connexion
-          </Link>
+          {compte}
 
           <button onClick={() => setMenu((m) => !m)} className="rounded-full p-2.5 text-white/80 hover:bg-white/10 md:hidden">
             {menu ? <X size={21} /> : <Menu size={21} />}
@@ -107,9 +127,15 @@ export function ShopLayout() {
                   {l.label}
                 </NavLink>
               ))}
-              <Link to="/login" onClick={() => setMenu(false)} className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-ge7-gold px-4 py-2.5 text-sm font-bold text-ge7-black">
-                <KeyRound size={15} /> Connexion
-              </Link>
+              {estClient ? (
+                <button onClick={() => { setMenu(false); void logout().then(() => navigate("/")); }} className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 px-4 py-2.5 text-sm font-bold text-white/85">
+                  <LogOut size={15} /> Déconnexion ({user?.name})
+                </button>
+              ) : (
+                <Link to="/login" onClick={() => setMenu(false)} className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-ge7-gold px-4 py-2.5 text-sm font-bold text-ge7-black">
+                  <KeyRound size={15} /> Connexion
+                </Link>
+              )}
             </nav>
           </div>
         )}
@@ -119,7 +145,7 @@ export function ShopLayout() {
         <Outlet />
       </main>
 
-      <footer className="bg-[#151515] text-white/60">
+      <footer className="no-print bg-[#151515] text-white/60">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 text-sm sm:grid-cols-3">
           <div>
             <div className="mb-3 flex items-center gap-2 text-white"><Store size={18} className="text-ge7-gold" /><span className="font-bold">G-ENERGIE 7 GROUPE</span></div>
@@ -134,7 +160,7 @@ export function ShopLayout() {
           <div>
             <p className="mb-2 font-bold text-white">Boutique</p>
             <Link to="/produits" className="block hover:text-white">Catalogue</Link>
-            <Link to="/suivi" className="mt-1 flex items-center gap-1.5 hover:text-white"><PackageSearch size={14} /> Suivre ma commande</Link>
+            <Link to={estClient ? "/mon-compte/commandes" : "/suivi"} className="mt-1 flex items-center gap-1.5 hover:text-white"><PackageSearch size={14} /> {estClient ? "Mes commandes" : "Suivre ma commande"}</Link>
             <p className="mt-3 text-xs">{GE7_COMPANY.website}</p>
           </div>
         </div>

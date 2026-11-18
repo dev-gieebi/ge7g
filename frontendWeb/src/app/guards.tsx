@@ -9,9 +9,30 @@ export function RequireAuth() {
   const location = useLocation();
   if (loading) return <Loading label="Vérification de la session…" />;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
-  // L'application Web est réservée aux rôles internes et aux chauffeurs
-  // (espace livraisons). CLIENT n'y a pas accès.
+  // Le back-office est réservé aux rôles internes et aux chauffeurs
+  // (espace livraisons). CLIENT est renvoyé vers son espace boutique.
+  if (user.role === "CLIENT") return <Navigate to={homeFor(user.role)} replace />;
   if (!isWebRole(user.role)) return <Navigate to="/403" replace />;
+  return <Outlet />;
+}
+
+/**
+ * Suivi par numéro + téléphone : réservé aux commandes sans compte. Un
+ * client connecté suit toutes ses commandes depuis sa liste.
+ */
+export function SansCompteClient() {
+  const { user } = useAuth();
+  if (user?.role === "CLIENT") return <Navigate to="/mon-compte/commandes" replace />;
+  return <Outlet />;
+}
+
+/** Espace client (/mon-compte/*) : réservé aux comptes CLIENT connectés. */
+export function RequireClient() {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  if (loading) return <Loading label="Vérification de la session…" />;
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (user.role !== "CLIENT") return <Navigate to={homeFor(user.role)} replace />;
   return <Outlet />;
 }
 

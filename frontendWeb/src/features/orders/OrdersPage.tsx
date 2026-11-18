@@ -31,7 +31,18 @@ export function OrdersPage() {
   const columns: Column<CommandeListItem>[] = [
     { key: "numero", header: "N°", render: (c) => <span className="font-semibold">{c.numero}</span> },
     { key: "cree_le", header: "Date", render: (c) => date(c.cree_le) },
-    { key: "client", header: "Client", render: (c) => <span className="font-medium">{c.client}</span> },
+    {
+      key: "client",
+      header: "Client",
+      render: (c) => (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="font-medium">{c.client}</span>
+          {c.espace_client && <Badge tone="purple">compte</Badge>}
+          {c.remise_statut === "demandee" && <Badge tone="amber">remise</Badge>}
+          {!!c.annotations && <Badge tone="gold">{c.annotations} annot.</Badge>}
+        </span>
+      ),
+    },
     { key: "telephone", header: "Téléphone", render: (c) => c.telephone },
     { key: "quartier", header: "Quartier", render: (c) => `${c.quartier} · ${c.ville}` },
     { key: "total", header: "Montant", align: "right", render: (c) => <span className="font-bold">{money(c.total)}</span> },
@@ -43,7 +54,7 @@ export function OrdersPage() {
     <>
       <PageHeader
         title="Commandes en ligne"
-        subtitle="Commandes passées sur la boutique publique — validation, préparation, livraison."
+        subtitle="Commandes passées sur la boutique publique : validation, préparation, livraison."
         breadcrumb="Commercial"
         action={
           enAttente > 0 ? (

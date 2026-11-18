@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\StatutCommande;
 use App\Models\Client;
 use App\Models\Commande;
+use App\Models\CommandeAnnotation;
 use App\Models\Driver;
 use App\Models\Livraison;
 use App\Models\Paiement;
@@ -48,15 +49,20 @@ class CommandeService
      * partir du barème (jamais ceux envoyés par le navigateur) et figés dans
      * les lignes. Aucune facture, vente ni mouvement de stock à ce stade.
      *
-     * @param  array{nom: string, telephone: string, ville: string, quartier: string, point_repere: string, note?: ?string, zone_id?: ?int, lignes: list<array{produit_id: int, quantite: mixed}>}  $data
+     * `$compte` : compte CLIENT connecté (espace client), la commande lui est
+     * rattachée, l'annotation et la demande de remise éventuelles sont
+     * enregistrées, et la limite anti-abus des commandes publiques ne
+     * s'applique pas.
+     *
+     * @param  array{nom: string, telephone: string, ville: string, quartier: string, point_repere: string, note?: ?string, zone_id?: ?int, lignes: list<array{produit_id: int, quantite: mixed}>, annotation?: ?string, remise_taux?: mixed, remise_motif?: ?string}  $data
      */
-    public function creer(array $data): Commande
+    public function creer(array $data, ?User $compte = null): Commande
     {
         $telephone = self::normaliserTelephone($data['telephone']);
 
         // Anti-abus : 3 commandes en attente maximum par téléphone.
         $enAttente = Commande::where('telephone_livraison', $telephone)->where('statut', StatutCommande::EnAttente)->count();
-        if ($enAttente >= 3) {
+        if (! $compte && $enAttente >= 3) {
             throw ValidationException::withMessages([
                 'telephone' => 'Trop de commandes en attente sur ce numéro. Contactez-nous directement.',
             ]);
@@ -64,16 +70,18 @@ class CommandeService
 
         $zone = isset($data['zone_id']) ? Zone::find($data['zone_id']) : null;
 
-        return DB::transaction(function () use ($data, $telephone, $zone) {
-            // Reconnaissance du client par téléphone normalisé.
-            $client = Client::firstOrNew(['telephone' => $telephone]);
+        return DB::transaction(function () use ($data, $telephone, $zone, $compte) {
+            // Compte client : sa fiche liée ; sinon reconnaissance par téléphone normalisé.
+            $client = ($compte?->client_id ? Client::find($compte->client_id) : null) ?? Client::firstOrNew(['telephone' => $telephone]);
             $client->nom = $data['nom'];
-            $client->adresse = trim($data['ville'].' — '.$data['quartier'].', '.$data['point_repere']);
+            $client->adresse = trim($data['ville'].', '.$data['quartier'].', '.$data['point_repere']);
             $client->source = $client->source ?? 'boutique_en_ligne';
             $client->save();
 
             $commande = new Commande([
                 'client_id' => $client->id,
+                'user_id' => $compte?->id,
+                'client_vu_le' => $compte ? now() : null,
                 'zone_id' => $zone?->id,
                 'nom_livraison' => $data['nom'],
                 'telephone_livraison' => $telephone,
@@ -120,14 +128,110 @@ class CommandeService
             $commande->total = $total;
             $commande->save();
 
-            $this->historiser($commande, null, StatutCommande::EnAttente, null, 'Commande reçue');
+            $this->historiser($commande, null, StatutCommande::EnAttente, $compte, 'Commande reçue');
+
+            if ($compte && ! empty($data['annotation'])) {
+                $this->annoter($commande, $compte, $data['annotation']);
+            }
+
+            if ($compte && ! empty($data['remise_taux'])) {
+                $this->demanderRemise($commande, (float) $data['remise_taux'], $data['remise_motif'] ?? null, $compte);
+            }
 
             return $commande->load('lignes');
         });
     }
 
     /**
-     * Validation admin : dans UNE transaction — vérification du statut,
+     * Annotation libre sur la commande (signalement, précision, réponse).
+     * L'auteur est « client » pour un compte CLIENT, « equipe » sinon.
+     */
+    public function annoter(Commande $commande, User $user, string $contenu): CommandeAnnotation
+    {
+        return $commande->annotations()->create([
+            'user_id' => $user->id,
+            'auteur' => $user->role === 'CLIENT' ? 'client' : 'equipe',
+            'contenu' => trim($contenu),
+        ]);
+    }
+
+    /**
+     * Demande de remise du client, possible tant que la commande n'est pas
+     * validée (la facture reprend ensuite le montant net).
+     */
+    public function demanderRemise(Commande $commande, float $taux, ?string $motif, User $user): Commande
+    {
+        if ($commande->statut !== StatutCommande::EnAttente) {
+            throw ValidationException::withMessages(['remise_taux' => 'Une remise ne peut être demandée que sur une commande en attente de validation.']);
+        }
+
+        if ($commande->remise_statut === 'accordee') {
+            throw ValidationException::withMessages(['remise_taux' => 'Une remise a déjà été accordée sur cette commande.']);
+        }
+
+        $commande->remise_taux_demande = $taux;
+        $commande->remise_motif = $motif !== null ? trim($motif) : null;
+        $commande->remise_statut = 'demandee';
+        $commande->save();
+
+        $this->historiser($commande, null, $commande->statut, $user, 'Remise demandée : '.$this->pourcentage($taux).($commande->remise_motif ? ' ('.$commande->remise_motif.')' : ''));
+
+        return $commande;
+    }
+
+    /**
+     * Décision de l'équipe sur la remise, avant validation : accordée (taux
+     * demandé ou ajusté, appliqué au total) ou refusée.
+     */
+    public function deciderRemise(Commande $commande, bool $accorder, ?float $taux, User $admin): Commande
+    {
+        return DB::transaction(function () use ($commande, $accorder, $taux, $admin) {
+            $commande = Commande::lockForUpdate()->findOrFail($commande->id);
+
+            if ($commande->statut !== StatutCommande::EnAttente) {
+                throw ValidationException::withMessages(['remise' => 'La remise se décide avant la validation de la commande.']);
+            }
+
+            // Une décision par demande : après refus, le client peut redemander.
+            if ($commande->remise_statut !== 'demandee') {
+                throw ValidationException::withMessages(['remise' => 'Aucune demande de remise en attente de décision.']);
+            }
+
+            $sousTotal = $commande->sousTotal();
+
+            if ($accorder) {
+                $taux ??= $commande->remise_taux_demande;
+                if (! $taux || $taux <= 0 || $taux > 100) {
+                    throw ValidationException::withMessages(['taux' => 'Taux de remise invalide.']);
+                }
+
+                $commande->remise_taux = $taux;
+                $commande->remise_montant = (int) round($sousTotal * $taux / 100);
+                $commande->remise_statut = 'accordee';
+                $commentaire = 'Remise accordée : '.$this->pourcentage($taux);
+            } else {
+                $commande->remise_taux = 0;
+                $commande->remise_montant = 0;
+                $commande->remise_statut = 'refusee';
+                $commentaire = 'Remise refusée';
+            }
+
+            $commande->total = $sousTotal - $commande->remise_montant;
+            $commande->save();
+
+            $this->historiser($commande, null, $commande->statut, $admin, $commentaire);
+
+            return $commande;
+        });
+    }
+
+    private function pourcentage(float $taux): string
+    {
+        return rtrim(rtrim(number_format($taux, 2, ',', ''), '0'), ',').' %';
+    }
+
+    /**
+     * Validation admin : dans UNE transaction, vérification du statut,
      * déduction du stock avec verrous, création de la facture et de la vente
      * (source boutique_en_ligne), passage en `validee`. Tout ou rien.
      */
@@ -135,6 +239,12 @@ class CommandeService
     {
         return DB::transaction(function () use ($commande, $admin) {
             $commande = Commande::lockForUpdate()->with('lignes')->findOrFail($commande->id);
+
+            // La remise demandée doit d'abord être tranchée par le DG.
+            if ($commande->remise_statut === 'demandee') {
+                throw ValidationException::withMessages(['remise' => 'Une remise est en attente de décision du DG : la commande ne peut pas encore être validée.']);
+            }
+
             $this->transition($commande, StatutCommande::Validee, $admin, null, false);
 
             foreach ($commande->lignes as $ligne) {
@@ -143,7 +253,7 @@ class CommandeService
 
             $facture = $this->factures->creerDepuisCommande($commande, $admin);
 
-            // Vente rattachée à la facture, source boutique — non payée,
+            // Vente rattachée à la facture, source boutique, non payée,
             // encaissée à la livraison. Le stock est déjà sorti : les lignes
             // sont marquées livrées pour ne pas fausser le suivi des reliquats.
             $vente = PosSale::create([
@@ -152,9 +262,9 @@ class CommandeService
                 'zone_id' => $commande->zone_id,
                 'customer_name' => $commande->nom_livraison,
                 'customer_phone' => $commande->telephone_livraison,
-                'customer_address' => trim($commande->ville.' — '.$commande->quartier.', '.$commande->point_repere),
-                'subtotal' => $commande->total,
-                'discount_rate' => 0,
+                'customer_address' => trim($commande->ville.', '.$commande->quartier.', '.$commande->point_repere),
+                'subtotal' => $commande->sousTotal(),
+                'discount_rate' => $commande->remise_taux,
                 'tax_type' => 'AUCUNE',
                 'tax_rate' => 0,
                 'tax_amount' => 0,
@@ -353,6 +463,9 @@ class CommandeService
                 }
             }
 
+            // Bon de livraison généré automatiquement, numéroté comme les factures.
+            $this->factures->creerBonLivraison($commande, $livraison, $user);
+
             $this->marquerStatutChauffeur($livraison->chauffeur_id, 'DISPONIBLE');
             $this->notifications->statutCommande($commande);
 
@@ -360,7 +473,7 @@ class CommandeService
         });
     }
 
-    /** Échec de livraison (motif obligatoire) — replanifiable ou annulable. */
+    /** Échec de livraison (motif obligatoire), replanifiable ou annulable. */
     public function echec(Commande $commande, string $motif, User $user): Commande
     {
         $commande = $this->changer($commande, StatutCommande::EchecLivraison, $user, $motif);
@@ -454,6 +567,9 @@ class CommandeService
             'nouveau_statut' => $nouveau->value,
             'user_id' => $user?->id,
             'commentaire' => $commentaire,
+            // Horloge de l'application (et non celle du serveur SQL) : comparée
+            // à `client_vu_le` pour signaler les nouveautés au client.
+            'created_at' => now(),
         ]);
     }
 

@@ -55,12 +55,12 @@ export function ShopTrackingResultPage() {
                 latitude={suivi.position.latitude}
                 longitude={suivi.position.longitude}
                 majLe={suivi.position.maj_le}
-                label={`${suivi.chauffeur ?? "Le chauffeur"} — commande ${suivi.numero}`}
+                label={`${suivi.chauffeur ?? "Le chauffeur"} · commande ${suivi.numero}`}
                 height="h-80"
               />
               <p className="mt-2 flex items-center gap-1.5 text-xs text-ge7-black/50">
                 <MapPin size={13} className="text-ge7-purple" />
-                Position du chauffeur actualisée {relative(suivi.position.maj_le)} — la page se met à jour automatiquement.
+                Position du chauffeur actualisée {relative(suivi.position.maj_le)}. La page se met à jour automatiquement.
               </p>
             </>
           ) : (

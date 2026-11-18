@@ -28,7 +28,7 @@ export function DriverHomePage() {
     <>
       <PageHeader
         title="Mes livraisons"
-        subtitle="Commandes qui vous sont affectées — ouvrez une commande pour démarrer la mission et suivre la carte."
+        subtitle="Commandes qui vous sont affectées. Ouvrez une commande pour démarrer la mission et suivre la carte."
         breadcrumb="Livraisons"
       />
       <div className="mb-4 flex items-center gap-2 rounded-2xl border border-ge7-gold/30 bg-ge7-gold-soft/40 px-4 py-3 text-sm font-medium text-ge7-black/80">

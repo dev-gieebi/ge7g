@@ -3,6 +3,8 @@ import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   BadgeCheck,
+  BadgePercent,
+  MessageSquareText,
   Ban,
   Check,
   Plus,
@@ -27,6 +29,7 @@ import { Badge, Button, Card, CardHeader, ErrorState, FormGrid, Input, Loading, 
 import { SignaturePad, type SignaturePadRef } from "./SignaturePad";
 import { Facture } from "@/features/pos/Facture";
 import { CommandeMap } from "./CommandeMap";
+import { AnnotationsFil } from "./AnnotationsFil";
 import { FRISE } from "./statuts";
 
 const KEYS = ["commande", "commandes", "commande-stats"];
@@ -35,7 +38,7 @@ type MotifAction = "refuser" | "annuler" | "echec";
 
 /**
  * Document A4 (facture ou bon de livraison) de la commande, au même modèle
- * que l'achat en caisse — `PosSale` minimal reconstruit depuis la commande.
+ * que l'achat en caisse, `PosSale` minimal reconstruit depuis la commande.
  */
 function saleDepuisCommande(c: CommandeDetail, numero: string): PosSale {
   const montant = c.facture?.montant_total ?? c.total;
@@ -55,8 +58,9 @@ function saleDepuisCommande(c: CommandeDetail, numero: string): PosSale {
       unit_price: l.prix_unitaire,
       total: l.total_ligne,
     })) as PosSale["items"],
-    subtotal: montant,
-    discount_rate: 0,
+    // Remise accordée au client : sous-total brut + taux, le document affiche la remise.
+    subtotal: c.remise.montant > 0 ? c.sous_total : montant,
+    discount_rate: c.remise.montant > 0 ? c.remise.taux : 0,
     tax_type: "AUCUNE",
     tax_rate: 0,
     tax_amount: 0,
@@ -72,6 +76,8 @@ export function OrderDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
   const peutGerer = hasRole(user, "LG_ADMIN", "DG_ADMIN");
+  // Seul le DG accorde ou refuse une remise demandée par le client.
+  const peutDeciderRemise = hasRole(user, "DG_ADMIN");
   const peutAffecter = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
   const estChauffeur = user?.role === "CHAUFFEUR";
   const peutLivrer = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CHAUFFEUR");
@@ -85,6 +91,9 @@ export function OrderDetailPage() {
   const [livrer, setLivrer] = useState<{ receptionnaire: string; montant: string; mode: string } | null>(null);
   const [impression, setImpression] = useState<"facture" | "bl" | null>(null);
   const [solde, setSolde] = useState(false);
+  // Fenêtre « Commentaires » : annotations, remise et données complètes de la commande.
+  const [commentaires, setCommentaires] = useState(false);
+  const [tauxRemise, setTauxRemise] = useState<string | null>(null);
   // Frais annexes (manutention, livraison…) : chargés depuis la commande, enregistrés en base.
   const [extras, setExtras] = useState<{ label: string; amount: number }[]>([]);
   // Position locale du chauffeur (même source que le partage GPS) : la carte
@@ -103,6 +112,11 @@ export function OrderDetailPage() {
   const doLivrer = useAction<{ receptionnaire: string; montant: string; mode: string; signature?: string | null }>(
     () => `/commandes/${id}/livrer`,
     { keys: KEYS, success: "Livraison enregistrée", body: (v) => v },
+  );
+  const annoter = useAction<{ contenu: string }>(() => `/commandes/${id}/annotations`, { keys: KEYS, success: "Annotation ajoutée", body: (v) => v });
+  const decision = useAction<{ decision: "accorder" | "refuser"; taux?: number }>(
+    () => `/commandes/${id}/remise`,
+    { keys: KEYS, success: "Décision de remise enregistrée", body: (v) => v },
   );
   const saveExtras = useAction<{ extras: { label: string; amount: number }[] }, CommandeDetail>(
     () => `/commandes/${id}/extras`,
@@ -172,7 +186,9 @@ export function OrderDetailPage() {
   // avec la mention « Commande en ligne » pour distinguer la provenance.
   if (impression) {
     const estBl = impression === "bl";
-    const sale = saleDepuisCommande(c, estBl ? c.numero : (c.facture?.numero ?? c.numero));
+    // Le BL généré à la livraison porte son propre numéro (BL-xxxxx-AAAA) ; avant, aperçu au n° de commande.
+    const sale = saleDepuisCommande(c, estBl ? (c.bon_livraison?.numero ?? c.numero) : (c.facture?.numero ?? c.numero));
+    if (estBl && c.bon_livraison?.livre_le) sale.created_at = c.bon_livraison.livre_le;
 
     return (
       <>
@@ -253,15 +269,20 @@ export function OrderDetailPage() {
         action={
           <>
             {imprimable && (
-              <Button variant="secondary" onClick={() => setImpression("bl")}><Printer size={16} /> Bon de livraison</Button>
+              <Button variant="secondary" onClick={() => setImpression("bl")}><Printer size={16} /> {c.bon_livraison ? `BL ${c.bon_livraison.numero}` : "Bon de livraison"}</Button>
             )}
+            <Button variant="secondary" onClick={() => setCommentaires(true)}>
+              <MessageSquareText size={16} /> Commentaires
+              {(c.annotations?.length ?? 0) > 0 && <Badge tone="gold">{c.annotations!.length}</Badge>}
+              {c.remise.statut === "demandee" && <Badge tone="amber">remise</Badge>}
+            </Button>
             {c.facture && (
               <Button variant="secondary" onClick={() => setImpression("facture")}><FileDown size={16} /> Facture PDF</Button>
             )}
             {peutGerer && c.statut === "en_attente" && (
               <>
                 <Button variant="danger" onClick={() => setMotif({ action: "refuser", valeur: "" })}><X size={16} /> Refuser</Button>
-                <Button onClick={() => valider.mutate()} loading={valider.isPending}><Check size={16} /> Valider</Button>
+                <Button onClick={() => valider.mutate()} loading={valider.isPending} disabled={c.remise.statut === "demandee"} title={c.remise.statut === "demandee" ? "Remise en attente de décision du DG" : undefined}><Check size={16} /> Valider</Button>
               </>
             )}
             {peutGerer && c.statut === "validee" && (
@@ -288,6 +309,13 @@ export function OrderDetailPage() {
           </>
         }
       />
+
+      {c.remise.statut === "demandee" && c.statut === "en_attente" && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-ge7-gold/50 bg-ge7-gold-soft/40 px-4 py-3 text-sm">
+          <span><strong>Remise demandée par le client : {c.remise.taux_demande} %</strong>{c.remise.motif ? ` (« ${c.remise.motif} »)` : ""}. {peutDeciderRemise ? "À décider avant la validation." : "En attente de la décision du DG : la validation est bloquée jusque-là."}</span>
+          <Button size="sm" variant="secondary" onClick={() => setCommentaires(true)}><BadgePercent size={14} /> {peutDeciderRemise ? "Traiter" : "Voir"}</Button>
+        </div>
+      )}
 
       {stockInsuffisant && (
         <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
@@ -323,6 +351,13 @@ export function OrderDetailPage() {
                 })}
               </tbody>
               <tfoot className="bg-ge7-cream text-sm">
+                {c.remise.montant > 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-5 pt-3 text-right text-ge7-black/60">Sous-total {money(c.sous_total)} · Remise {c.remise.taux} %</td>
+                    <td className="px-5 pt-3 text-right font-semibold text-emerald-700">− {money(c.remise.montant)}</td>
+                    <td />
+                  </tr>
+                )}
                 <tr><td colSpan={3} className="px-5 py-3 text-right font-bold">TOTAL</td><td className="px-5 py-3 text-right text-lg font-extrabold text-ge7-bronze">{money(c.total)}</td><td /></tr>
               </tfoot>
             </table>
@@ -435,6 +470,78 @@ export function OrderDetailPage() {
           </Card>
         </div>
       </div>
+
+      {commentaires && (
+        <Modal
+          title={`Commentaires  ${c.numero}`}
+          subtitle="Annotations du client et de l'équipe, remise et données complètes de la commande."
+          size="lg"
+          onClose={() => setCommentaires(false)}
+          footer={<Button variant="secondary" onClick={() => setCommentaires(false)}>Fermer</Button>}
+        >
+          <div className="space-y-5 text-sm">
+            <section className="grid gap-3 sm:grid-cols-3">
+              <div><p className="text-xs text-ge7-black/50">Client</p><p className="font-semibold">{c.client.nom}</p><p>{c.client.telephone}</p></div>
+              <div><p className="text-xs text-ge7-black/50">Livraison</p><p>{c.adresse.ville} {c.adresse.quartier}</p><p className="text-ge7-black/60">{c.adresse.point_repere}</p></div>
+              <div>
+                <p className="text-xs text-ge7-black/50">Provenance</p>
+                <p className="font-semibold">{c.compte_client ? "Espace client" : "Boutique publique"}</p>
+                {c.compte_client && <p className="text-ge7-black/60">{c.compte_client.nom} · code {c.compte_client.code}</p>}
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-ge7-black/10 p-3">
+              <div className="flex flex-wrap justify-between gap-2">
+                <span><StatusBadge status={c.statut} /> <span className="ml-1 text-ge7-black/60">reçue le {datetime(c.cree_le)}</span></span>
+                <span>{c.lignes.length} ligne(s) · <strong>{money(c.total)}</strong>{c.remise.montant > 0 && <span className="text-ge7-black/50"> (brut {money(c.sous_total)})</span>}</span>
+              </div>
+              <ul className="mt-2 space-y-0.5 text-xs text-ge7-black/70">
+                {c.lignes.map((l) => <li key={l.id}>{l.quantite} {l.unite ?? ""} × {l.designation} : {money(l.total_ligne)}</li>)}
+              </ul>
+              {(c.extras?.length ?? 0) > 0 && <p className="mt-2 text-xs text-ge7-black/60">Frais annexes : {c.extras!.map((x) => `${x.label} ${money(x.amount)}`).join(" · ")}</p>}
+              {c.note && <p className="mt-2 rounded-lg bg-ge7-cream px-2.5 py-1.5 text-xs"><strong>Note de livraison :</strong> {c.note}</p>}
+              {c.motif && <p className="mt-2 text-xs font-medium text-rose-700">Motif : {c.motif}</p>}
+            </section>
+
+            <section>
+              <h4 className="mb-2 flex items-center gap-2 font-bold"><BadgePercent size={15} className="text-ge7-bronze" /> Remise</h4>
+              {!c.remise.statut && <p className="text-ge7-black/50">Aucune remise demandée.</p>}
+              {c.remise.statut === "demandee" && (
+                <p>Demandée : <strong>{c.remise.taux_demande} %</strong> (≈ {money(Math.round((c.sous_total * (c.remise.taux_demande ?? 0)) / 100))}){c.remise.motif ? ` (« ${c.remise.motif} »)` : ""}</p>
+              )}
+              {c.remise.statut === "accordee" && <p className="text-emerald-700">Accordée : <strong>{c.remise.taux} %</strong> soit − {money(c.remise.montant)}{c.remise.taux_demande ? ` (demandé : ${c.remise.taux_demande} %)` : ""}</p>}
+              {c.remise.statut === "refusee" && <p className="text-rose-700">Refusée{c.remise.taux_demande ? ` (demandé : ${c.remise.taux_demande} %)` : ""}.</p>}
+              {peutDeciderRemise && c.statut === "en_attente" && c.remise.statut === "demandee" && (
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <Input label="Taux accordé (%)" type="number" min={0.5} max={100} step="0.5" value={tauxRemise ?? String(c.remise.taux_demande ?? c.remise.taux ?? "")} onChange={(e) => setTauxRemise(e.target.value)} className="w-40" />
+                  <Button size="sm" loading={decision.isPending} disabled={!(Number(tauxRemise ?? c.remise.taux_demande) > 0)} onClick={() => decision.mutate({ decision: "accorder", taux: Number(tauxRemise ?? c.remise.taux_demande) })}><Check size={14} /> Accorder</Button>
+                  <Button size="sm" variant="danger" loading={decision.isPending} onClick={() => decision.mutate({ decision: "refuser" })}><X size={14} /> Refuser</Button>
+                </div>
+              )}
+            </section>
+
+            <section>
+              <h4 className="mb-2 flex items-center gap-2 font-bold"><MessageSquareText size={15} className="text-ge7-bronze" /> Annotations</h4>
+              <AnnotationsFil
+                annotations={c.annotations ?? []}
+                moi="equipe"
+                onEnvoyer={(contenu) => annoter.mutateAsync({ contenu })}
+                envoi={annoter.isPending}
+                placeholder={c.compte_client ? "Répondre au client (visible dans son espace)…" : "Ajouter une annotation interne…"}
+              />
+            </section>
+
+            <section>
+              <h4 className="mb-2 font-bold">Historique</h4>
+              <ol className="space-y-1.5 text-xs">
+                {c.historique.map((h, i) => (
+                  <li key={i}><span className="font-semibold">{datetime(h.created_at)}</span> · {h.nouveau_statut_libelle} · {h.user}{h.commentaire ? ` · ${h.commentaire}` : ""}</li>
+                ))}
+              </ol>
+            </section>
+          </div>
+        </Modal>
+      )}
 
       {motif && (
         <Modal

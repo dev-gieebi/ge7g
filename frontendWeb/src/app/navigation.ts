@@ -26,7 +26,7 @@ const ADMINS: Role[] = [...ADMIN_DIR, "CDG_ADMIN"];
 const REPORTS: Role[] = ["DG_ADMIN", "CDG_ADMIN"];
 
 /**
- * Menu principal Web — plateforme interne G7 Energy, montée sous /admin.
+ * Menu principal Web, plateforme interne G7 Energy, montée sous /admin.
  * La boutique publique occupe la racine du site.
  */
 export const NAVIGATION: NavGroup[] = [

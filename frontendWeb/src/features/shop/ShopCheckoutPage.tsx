@@ -1,11 +1,12 @@
-import { useState, type FormEvent } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useState, type FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, MapPin, Wallet } from "lucide-react";
+import { ArrowLeft, BadgePercent, MapPin, UserRound, Wallet } from "lucide-react";
 import { fieldErrors } from "@/lib/hooks";
 import { money } from "@/lib/format";
-import { shopApi } from "./api";
+import { shopApi, type CommandePayload } from "./api";
 import { useCart } from "./cart";
+import { clientApi, useEstClient, useProfilClient, type CommandeClientPayload } from "./espaceClient";
 
 const field = "w-full rounded-xl border border-ge7-black/15 bg-white px-3.5 py-2.5 text-sm focus:border-ge7-gold focus:outline-none";
 const label = "mb-1 block text-xs font-bold uppercase tracking-wide text-ge7-black/60";
@@ -15,13 +16,46 @@ export function ShopCheckoutPage() {
   const cart = useCart();
   const { data: zones } = useQuery({ queryKey: ["shop", "zones"], queryFn: shopApi.zones, staleTime: 5 * 60_000 });
 
+  const estClient = useEstClient();
+  const profil = useProfilClient();
+  const qc = useQueryClient();
+
   const [form, setForm] = useState({ nom: "", telephone: "", ville: cart.zone?.id ? cart.zone.name : "", villeAutre: "", quartier: "", point_repere: "", note: "", site_web: "" });
+  // Espace client : annotation libre et demande de remise jointes à la commande.
+  const [annotation, setAnnotation] = useState("");
+  const [remise, setRemise] = useState<{ taux: string; motif: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
 
+  // Coordonnées du compte client pré-remplies (modifiables pour la livraison).
+  useEffect(() => {
+    if (profil.data) {
+      setForm((f) => ({ ...f, nom: f.nom || profil.data.nom, telephone: f.telephone || (profil.data.telephone ?? "") }));
+    }
+  }, [profil.data]);
+
+  // Ville imposée par le compte : toujours alignée sur la zone du compte.
+  useEffect(() => {
+    if (cart.zoneVerrouillee && cart.zone) setForm((f) => ({ ...f, ville: cart.zone!.name }));
+  }, [cart.zoneVerrouillee, cart.zone]);
+
   const commander = useMutation({
-    mutationFn: shopApi.commander,
+    mutationFn: (payload: CommandePayload) =>
+      estClient
+        ? clientApi.commander({
+            ...payload,
+            site_web: undefined,
+            annotation: annotation.trim() || undefined,
+            remise_taux: remise && Number(remise.taux) > 0 ? Number(remise.taux) : undefined,
+            remise_motif: remise?.motif.trim() || undefined,
+          } as CommandeClientPayload)
+        : shopApi.commander(payload),
     onSuccess: (data) => {
       cart.clear();
+      if (estClient && "id" in data) {
+        void qc.invalidateQueries({ queryKey: ["client"] });
+        navigate(`/mon-compte/commandes/${data.id}`, { state: { nouvelle: true } });
+        return;
+      }
       navigate(`/commande/confirmation/${data.numero}`, { state: { total: data.total } });
     },
     onError: (e) => setErrors(fieldErrors(e)),
@@ -64,24 +98,42 @@ export function ShopCheckoutPage() {
         <ArrowLeft size={15} /> Panier
       </Link>
       <h1 className="mt-2 font-display text-2xl font-extrabold">Finaliser la commande</h1>
-      <p className="mt-1 text-sm text-ge7-black/60">Aucun compte requis vos coordonnées servent uniquement à la livraison.</p>
+      <p className="mt-1 text-sm text-ge7-black/60">
+        {estClient
+          ? "Votre commande est enregistrée sur votre compte : vous suivrez sa validation et sa livraison dans « Mes commandes »."
+          : "Aucun compte requis vos coordonnées servent uniquement à la livraison."}
+      </p>
 
       <form onSubmit={submit} className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-4 rounded-2xl border border-ge7-black/10 bg-white p-5">
-          <div>
-            <label className={label}>Nom complet *</label>
-            <input required minLength={2} maxLength={100} className={field} value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} placeholder="Ex. Jean Mba" />
-            {err("nom") && <p className="mt-1 text-xs font-medium text-rose-600">{err("nom")}</p>}
-          </div>
-          <div>
-            <label className={label}>Téléphone *</label>
-            <input required className={field} value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} placeholder="+241 06 61 12 33" inputMode="tel" />
-            {err("telephone") ? <p className="mt-1 text-xs font-medium text-rose-600">{err("telephone")}</p> : <p className="mt-1 text-xs text-ge7-black/40">Il servira aussi pour le suivi de votre commande.</p>}
-          </div>
+          {estClient ? (
+            // Compte client : nom et téléphone viennent du compte, rien à ressaisir.
+            <div className="flex items-center gap-3 rounded-xl bg-ge7-cream/70 px-3.5 py-3">
+              <UserRound size={18} className="shrink-0 text-ge7-bronze" />
+              <div className="text-sm">
+                <p className="font-bold">{profil.data?.nom}</p>
+                <p className="text-ge7-black/60">{profil.data?.telephone ?? ""}</p>
+                {(err("telephone") || err("nom")) && <p className="mt-1 text-xs font-medium text-rose-600">{err("telephone") ?? err("nom")}</p>}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className={label}>Nom complet *</label>
+                <input required minLength={2} maxLength={100} className={field} value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} placeholder="Ex. Jean Mba" />
+                {err("nom") && <p className="mt-1 text-xs font-medium text-rose-600">{err("nom")}</p>}
+              </div>
+              <div>
+                <label className={label}>Téléphone *</label>
+                <input required className={field} value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} placeholder="+241 06 61 12 33" inputMode="tel" />
+                {err("telephone") ? <p className="mt-1 text-xs font-medium text-rose-600">{err("telephone")}</p> : <p className="mt-1 text-xs text-ge7-black/40">Il servira aussi pour le suivi de votre commande.</p>}
+              </div>
+            </>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className={label}>Ville *</label>
-              <select required className={field} value={form.ville} onChange={(e) => setForm({ ...form, ville: e.target.value })}>
+              <select required disabled={cart.zoneVerrouillee} className={`${field} disabled:bg-ge7-black/[0.04]`} value={form.ville} onChange={(e) => setForm({ ...form, ville: e.target.value })}>
                 <option value="">Choisir…</option>
                 {zones?.map((z) => <option key={z.id} value={z.name}>{z.name}</option>)}
                 <option value="__autre__">Autre ville…</option>
@@ -110,6 +162,36 @@ export function ShopCheckoutPage() {
             <label className={label}>Note de livraison (facultatif)</label>
             <textarea maxLength={500} rows={2} className={field} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Instructions particulières…" />
           </div>
+          {estClient && (
+            <>
+              <div>
+                <label className={label}>Annotation sur la commande (facultatif)</label>
+                <textarea maxLength={1000} rows={3} className={field} value={annotation} onChange={(e) => setAnnotation(e.target.value)} placeholder="Signalez une précision à l'équipe : produit équivalent accepté, urgence, conditionnement…" />
+                <p className="mt-1 text-xs text-ge7-black/40">Vous pourrez ajouter d'autres annotations pendant le suivi de la commande.</p>
+                {err("annotation") && <p className="mt-1 text-xs font-medium text-rose-600">{err("annotation")}</p>}
+              </div>
+              <div className="rounded-xl border border-ge7-black/10 bg-ge7-cream/60 p-3.5">
+                <label className="flex items-center gap-2 text-sm font-bold">
+                  <input type="checkbox" className="size-4 accent-ge7-gold" checked={!!remise} onChange={(e) => setRemise(e.target.checked ? { taux: "", motif: "" } : null)} />
+                  <BadgePercent size={16} className="text-ge7-bronze" /> Demander une remise
+                </label>
+                {remise && (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[8rem_1fr]">
+                    <div>
+                      <label className={label}>Remise (%) *</label>
+                      <input required type="number" min={0.5} max={100} step="0.5" className={field} value={remise.taux} onChange={(e) => setRemise({ ...remise, taux: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={label}>Motif</label>
+                      <input maxLength={500} className={field} value={remise.motif} onChange={(e) => setRemise({ ...remise, motif: e.target.value })} placeholder="Ex. commande en volume, client fidèle…" />
+                    </div>
+                    <p className="text-xs text-ge7-black/50 sm:col-span-2">La remise est étudiée par notre équipe avant la validation ; vous verrez la décision dans le suivi de la commande.</p>
+                    {err("remise_taux") && <p className="text-xs font-medium text-rose-600 sm:col-span-2">{err("remise_taux")}</p>}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
           {/* Honeypot invisible les robots le remplissent, pas les humains. */}
           <input type="text" name="site_web" value={form.site_web} onChange={(e) => setForm({ ...form, site_web: e.target.value })} tabIndex={-1} autoComplete="off" className="absolute -left-[9999px] h-0 w-0 opacity-0" aria-hidden="true" />
         </div>

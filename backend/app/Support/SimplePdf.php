@@ -7,7 +7,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Générateur PDF minimal (PDF 1.4, Times-Roman/Times-Bold, WinAnsiEncoding)
- * sans dépendance externe — suffisant pour les documents imprimables.
+ * sans dépendance externe, suffisant pour les documents imprimables.
  * Origine en bas à gauche ; coordonnées en points (A4 = 595 × 842 pt).
  */
 class SimplePdf

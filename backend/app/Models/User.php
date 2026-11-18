@@ -7,11 +7,12 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
-#[Fillable(['name', 'phone', 'code', 'role', 'permissions', 'password', 'is_admin', 'client_id', 'driver_id'])]
+#[Fillable(['name', 'phone', 'code', 'role', 'permissions', 'password', 'is_admin', 'client_id', 'driver_id', 'zone_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements JWTSubject
 {
@@ -41,6 +42,13 @@ class User extends Authenticatable implements JWTSubject
             'permissions' => 'array',
             'client_id' => 'integer',
             'driver_id' => 'integer',
+            'zone_id' => 'integer',
         ];
+    }
+
+    /** Ville d'accès d'un compte CLIENT, null = toutes les villes. */
+    public function zone(): BelongsTo
+    {
+        return $this->belongsTo(Zone::class);
     }
 }

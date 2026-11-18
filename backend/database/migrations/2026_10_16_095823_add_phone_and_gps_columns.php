@@ -8,12 +8,12 @@ return new class extends Migration
 {
     /**
      * Téléphone des utilisateurs (chauffeurs) et position GPS temps réel de
-     * la livraison en cours — saisie par le chauffeur, affichée sur la
+     * la livraison en cours, saisie par le chauffeur, affichée sur la
      * carte de suivi client.
      */
     public function up(): void
     {
-        // La colonne existe déjà sur certaines bases (ajout manuel) — garde-fou.
+        // La colonne existe déjà sur certaines bases (ajout manuel), garde-fou.
         if (! Schema::hasColumn('users', 'phone')) {
             Schema::table('users', function (Blueprint $table) {
                 $table->string('phone', 30)->nullable()->after('name');

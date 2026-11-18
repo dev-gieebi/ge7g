@@ -50,7 +50,7 @@ export function Sidebar({
           open ? "translate-x-0" : "-translate-x-full"
         } ${collapsed ? "w-60 lg:w-[76px]" : "w-68"}`}
       >
-        {/* Bouton de repli (desktop) — chevron sur le bord droit, comme la maquette. */}
+        {/* Bouton de repli (desktop), chevron sur le bord droit, comme la maquette. */}
         <button
           onClick={onToggleCollapse}
           title={collapsed ? "Déplier le menu" : "Replier le menu"}
@@ -128,7 +128,7 @@ export function Sidebar({
         )}
 
         <div className="border-t border-white/10 p-4">
-          {/* Version compacte (icône) — desktop replié uniquement. */}
+          {/* Version compacte (icône), desktop replié uniquement. */}
           <div className={collapsed ? "hidden flex-col items-center gap-2 lg:flex" : "hidden"}>
             <div
               className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-ge7-purple to-ge7-purple-light font-bold text-white"
@@ -140,7 +140,7 @@ export function Sidebar({
               <LogOut size={16} />
             </button>
           </div>
-          {/* Version complète — mobile et desktop déplié. */}
+          {/* Version complète, mobile et desktop déplié. */}
           <div className={`flex items-center gap-3 rounded-2xl bg-white/5 p-3 ${collapsed ? "lg:hidden" : ""}`}>
             <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-ge7-purple to-ge7-purple-light font-bold text-white">
               {user.name.slice(0, 1).toUpperCase()}

@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.post("/logout");
     } catch {
-      // ignore — nettoyage local quoi qu'il arrive
+      // ignore, nettoyage local quoi qu'il arrive
     } finally {
       tokenStore.clear();
       userStore.clear();

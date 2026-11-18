@@ -1,6 +1,6 @@
 import { createBrowserRouter, Link, Navigate, useLocation } from "react-router-dom";
 import { AppShell } from "./layout/AppShell";
-import { HomeRedirect, RequireAuth, RequireRole } from "./guards";
+import { HomeRedirect, RequireAuth, RequireClient, RequireRole, SansCompteClient } from "./guards";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { ForbiddenPage } from "@/features/shared/ForbiddenPage";
 import { CartProvider } from "@/features/shop/cart";
@@ -13,6 +13,8 @@ import { ShopCheckoutPage } from "@/features/shop/ShopCheckoutPage";
 import { ShopConfirmationPage } from "@/features/shop/ShopConfirmationPage";
 import { ShopTrackingPage } from "@/features/shop/ShopTrackingPage";
 import { ShopTrackingResultPage } from "@/features/shop/ShopTrackingResultPage";
+import { ClientOrdersPage } from "@/features/shop/ClientOrdersPage";
+import { ClientOrderDetailPage } from "@/features/shop/ClientOrderDetailPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ClientsPage } from "@/features/clients/ClientsPage";
 import { ClientDetailPage } from "@/features/clients/ClientDetailPage";
@@ -75,7 +77,7 @@ export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/403", element: <ForbiddenPage /> },
 
-  // ===== Boutique publique — visible par tous, sans compte. =====
+  // ===== Boutique publique, visible par tous, sans compte. =====
   {
     element: (
       <CartProvider>
@@ -88,13 +90,28 @@ export const router = createBrowserRouter([
       { path: "/produits/:id", element: <ShopProductPage /> },
       { path: "/panier", element: <ShopCartPage /> },
       { path: "/commande", element: <ShopCheckoutPage /> },
-      { path: "/commande/confirmation/:numero", element: <ShopConfirmationPage /> },
-      { path: "/suivi", element: <ShopTrackingPage /> },
-      { path: "/suivi/resultat", element: <ShopTrackingResultPage /> },
+      {
+        // Commande sans compte : confirmation et suivi par numéro + téléphone.
+        element: <SansCompteClient />,
+        children: [
+          { path: "/commande/confirmation/:numero", element: <ShopConfirmationPage /> },
+          { path: "/suivi", element: <ShopTrackingPage /> },
+          { path: "/suivi/resultat", element: <ShopTrackingResultPage /> },
+        ],
+      },
+      {
+        // Espace client connecté : ses commandes, leur suivi et le bon de livraison.
+        element: <RequireClient />,
+        children: [
+          { path: "/mon-compte", element: <Navigate to="/mon-compte/commandes" replace /> },
+          { path: "/mon-compte/commandes", element: <ClientOrdersPage /> },
+          { path: "/mon-compte/commandes/:id", element: <ClientOrderDetailPage /> },
+        ],
+      },
     ],
   },
 
-  // ===== Espace personnel — derrière le bouton « Connexion » (/admin/*). =====
+  // ===== Espace personnel, derrière le bouton « Connexion » (/admin/*). =====
   {
     element: <RequireAuth />,
     children: [
@@ -158,7 +175,7 @@ export const router = createBrowserRouter([
           },
           {
             // Espace chauffeur : ses livraisons uniquement (filtre serveur).
-            // strict : même le SUPERADMIN n'y a pas accès — c'est l'espace
+            // strict : même le SUPERADMIN n'y a pas accès, c'est l'espace
             // personnel du chauffeur connecté.
             element: <RequireRole roles={["CHAUFFEUR"]} strict />,
             children: [

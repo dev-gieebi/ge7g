@@ -246,7 +246,7 @@ class QuoteController extends Controller
 
     /**
      * Crée les lignes et fige les totaux (remise puis taxes sur le HT net),
-     * comme pour les ventes POS — sans toucher au stock.
+     * comme pour les ventes POS, sans toucher au stock.
      *
      * @param  list<array{product_id: int, quantity: float, unit_price?: float|null}>  $items
      * @param  list<int>  $taxIds

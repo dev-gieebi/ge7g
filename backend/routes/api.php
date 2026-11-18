@@ -6,6 +6,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ChauffeurController;
 use App\Http\Controllers\CommandeController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EspaceClientController;
 use App\Http\Controllers\FactureController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PriceController;
@@ -29,7 +30,7 @@ Route::post('pusher/trigger', [PusherTestController::class, 'trigger']);
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
 
-// Boutique publique — sans authentification, débit limité contre l'abus.
+// Boutique publique, sans authentification, débit limité contre l'abus.
 Route::prefix('public')->group(function () {
     Route::get('categories', [ShopController::class, 'categories']);
     Route::get('zones', [ShopController::class, 'zones']);
@@ -89,6 +90,8 @@ Route::middleware('auth:api')->group(function () {
     Route::get('commandes/{commande}', [CommandeController::class, 'show']);
     Route::post('commandes/{commande}/valider', [CommandeController::class, 'valider']);
     Route::post('commandes/{commande}/extras', [CommandeController::class, 'saveExtras']);
+    Route::post('commandes/{commande}/annotations', [CommandeController::class, 'annoter']);
+    Route::post('commandes/{commande}/remise', [CommandeController::class, 'remise']);
     Route::post('commandes/{commande}/refuser', [CommandeController::class, 'refuser']);
     Route::post('commandes/{commande}/preparer', [CommandeController::class, 'preparer']);
     Route::post('commandes/{commande}/affecter', [CommandeController::class, 'affecter']);
@@ -99,6 +102,16 @@ Route::middleware('auth:api')->group(function () {
     Route::post('commandes/{commande}/echec', [CommandeController::class, 'echec']);
     Route::post('commandes/{commande}/annuler', [CommandeController::class, 'annuler']);
     Route::get('factures/{facture}/pdf', [FactureController::class, 'pdf']);
+
+    // Espace client connecté (rôle CLIENT) : ses commandes uniquement.
+    Route::prefix('client')->group(function () {
+        Route::get('profil', [EspaceClientController::class, 'profil']);
+        Route::get('commandes', [EspaceClientController::class, 'index']);
+        Route::post('commandes', [EspaceClientController::class, 'store'])->middleware('throttle:30,60');
+        Route::get('commandes/{commande}', [EspaceClientController::class, 'show']);
+        Route::post('commandes/{commande}/annotations', [EspaceClientController::class, 'annoter']);
+        Route::post('commandes/{commande}/remise', [EspaceClientController::class, 'remise']);
+    });
 
     Route::get('dashboard', [DashboardController::class, 'index']);
     Route::get('dashboard/sales-series', [DashboardController::class, 'salesSeries']);

@@ -5,7 +5,7 @@ const ADMIN_DIR: Role[] = ["LG_ADMIN", "DG_ADMIN"];
 const ADMINS: Role[] = [...ADMIN_DIR, "CDG_ADMIN"];
 const SUPERADMIN_ONLY: Role[] = ["SUPERADMIN"];
 
-/** Onglets des hubs — chaque entrée de sidebar ouvre une page à onglets. */
+/** Onglets des hubs, chaque entrée de sidebar ouvre une page à onglets. */
 export const COMMERCIAL_TABS: ModuleTab[] = [
   { label: "Clients", to: "/admin/clients", roles: ADMINS },
   { label: "Commandes", to: "/admin/commandes", roles: ADMINS },

@@ -8,7 +8,7 @@ import { Logo } from "@/components/ui";
 
 export function AppShell() {
   const [open, setOpen] = useState(false);
-  // Sidebar repliable (desktop) — état persisté entre les sessions.
+  // Sidebar repliable (desktop), état persisté entre les sessions.
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("ge7.sidebar.collapsed") === "1");
   const { user, logout } = useAuth();
 

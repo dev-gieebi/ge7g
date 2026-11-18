@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-#[Fillable(['numero', 'client_id', 'zone_id', 'nom_livraison', 'telephone_livraison', 'ville', 'quartier', 'point_repere', 'note', 'total', 'statut', 'motif', 'validee_par', 'validee_le', 'chauffeur_id'])]
+#[Fillable(['numero', 'client_id', 'user_id', 'zone_id', 'nom_livraison', 'telephone_livraison', 'ville', 'quartier', 'point_repere', 'note', 'total', 'statut', 'motif', 'validee_par', 'validee_le', 'chauffeur_id', 'remise_taux_demande', 'remise_motif', 'remise_statut', 'remise_taux', 'remise_montant', 'client_vu_le'])]
 class Commande extends Model
 {
     /** @use HasFactory<CommandeFactory> */
@@ -23,12 +23,33 @@ class Commande extends Model
         return [
             'statut' => StatutCommande::class,
             'validee_le' => 'datetime',
+            'client_vu_le' => 'datetime',
+            'remise_taux_demande' => 'float',
+            'remise_taux' => 'float',
         ];
     }
 
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    /** Compte CLIENT ayant passé la commande depuis son espace (null = boutique publique). */
+    public function compte(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /** Annotations échangées entre le client et l'équipe, dans l'ordre d'écriture. */
+    public function annotations(): HasMany
+    {
+        return $this->hasMany(CommandeAnnotation::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    /** Montant des lignes avant remise. */
+    public function sousTotal(): int
+    {
+        return (int) $this->total + (int) $this->remise_montant;
     }
 
     public function zone(): BelongsTo
@@ -49,6 +70,12 @@ class Commande extends Model
     public function facture(): HasOne
     {
         return $this->hasOne(Facture::class);
+    }
+
+    /** Bon de livraison créé à la confirmation de la livraison. */
+    public function bonLivraison(): HasOne
+    {
+        return $this->hasOne(BonLivraison::class);
     }
 
     public function livraison(): HasOne

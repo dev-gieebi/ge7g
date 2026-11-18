@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { useProfilClient } from "./espaceClient";
 
 export interface CartItem {
   produit_id: number;
@@ -18,9 +19,11 @@ interface CartApi {
   items: CartItem[];
   count: number;
   total: number;
-  /** Ville de livraison choisie — détermine le barème affiché, comme à la caisse. */
+  /** Ville de livraison choisie, détermine le barème affiché, comme à la caisse. */
   zone: ShopZone | null;
   setZone: (zone: ShopZone | null) => void;
+  /** Compte client rattaché à une ville : la ville est imposée, non modifiable. */
+  zoneVerrouillee: boolean;
   add: (item: Omit<CartItem, "quantite">, quantite: number) => void;
   setQuantite: (produitId: number, quantite: number) => void;
   remove: (produitId: number) => void;
@@ -61,7 +64,10 @@ function loadZone(): ShopZone | null {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(load);
-  const [zone, setZoneState] = useState<ShopZone | null>(loadZone);
+  const [zoneChoisie, setZoneState] = useState<ShopZone | null>(loadZone);
+  const profil = useProfilClient();
+  const zoneImposee = profil.data?.zone ?? null;
+  const zone = zoneImposee ?? zoneChoisie;
 
   const api = useMemo<CartApi>(() => {
     const commit = (next: CartItem[]) => {
@@ -74,7 +80,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       count: items.reduce((s, i) => s + i.quantite, 0),
       total: items.reduce((s, i) => s + i.prix * i.quantite, 0),
       zone,
+      zoneVerrouillee: !!zoneImposee,
       setZone: (z) => {
+        if (zoneImposee) return;
         setZoneState(z);
         try {
           z ? localStorage.setItem(ZONE_KEY, JSON.stringify(z)) : localStorage.removeItem(ZONE_KEY);
@@ -95,7 +103,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       remove: (produitId) => commit(items.filter((i) => i.produit_id !== produitId)),
       clear: () => commit([]),
     };
-  }, [items, zone]);
+  }, [items, zone, zoneImposee]);
 
   return <CartContext.Provider value={api}>{children}</CartContext.Provider>;
 }

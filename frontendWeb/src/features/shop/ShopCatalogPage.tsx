@@ -38,11 +38,12 @@ export function ShopCatalogPage() {
       <h1 className="font-display text-2xl font-extrabold">Catalogue</h1>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        {/* Ville de livraison — les produits et prix affichés suivent le barème de la ville, comme à la caisse. */}
+        {/* Ville de livraison, les produits et prix affichés suivent le barème de la ville, comme à la caisse. */}
         <div className="relative sm:w-56">
           <MapPin size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ge7-bronze" />
           <select
             value={cart.zone ? String(cart.zone.id ?? "toutes") : ""}
+            disabled={cart.zoneVerrouillee}
             onChange={(e) => {
               const v = e.target.value;
               if (v === "") cart.setZone(null);

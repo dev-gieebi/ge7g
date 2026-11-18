@@ -73,7 +73,7 @@
             </div>
 
             <div class="mt-8 text-xs text-slate-400 dark:text-slate-500">
-                © {{ date('Y') }} G-E7G — Tous droits réservés.
+                © {{ date('Y') }} G-E7G. Tous droits réservés.
             </div>
         </div>
     </main>

@@ -66,7 +66,7 @@ class StockMovementController extends Controller
 
     /**
      * Export Excel (.xlsx) des mouvements filtrés : même mise en page que le
-     * fichier de suivi — BASE DE DONNÉES / ENTRÉES / SORTIES / N° BL /
+     * fichier de suivi, BASE DE DONNÉES / ENTRÉES / SORTIES / N° BL /
      * Entrées Mois / Sorties Mois, avec cellules fusionnées et bordures.
      */
     public function export(Request $request): BinaryFileResponse

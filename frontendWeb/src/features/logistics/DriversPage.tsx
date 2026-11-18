@@ -106,7 +106,7 @@ export function DriversPage() {
                 value={form.password ?? ""}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 error={errors.password}
-                hint={editId ? "Laisser vide pour conserver le mot de passe actuel" : "8 caractères minimum — le code de connexion sera affiché après création"}
+                hint={editId ? "Laisser vide pour conserver le mot de passe actuel" : "8 caractères minimum. Le code de connexion sera affiché après création"}
               />
             </FormGrid>
             {formError ? <p className="mt-3 text-sm font-medium text-rose-600">{toApiError(formError).message}</p> : null}
@@ -135,7 +135,7 @@ export function DriversPage() {
 
       {compte && (
         <Modal title="Compte chauffeur créé" size="sm" onClose={() => setCompte(null)} footer={<Button onClick={() => setCompte(null)}>OK</Button>}>
-          <p className="text-sm">Communiquez ces identifiants à <strong>{compte.name}</strong> — il se connecte via le bouton « Connexion » de la plateforme :</p>
+          <p className="text-sm">Communiquez ces identifiants à <strong>{compte.name}</strong>. Il se connecte via le bouton « Connexion » de la plateforme :</p>
           <dl className="mt-3 space-y-2 rounded-2xl bg-ge7-cream p-4 text-sm">
             <div className="flex justify-between"><dt className="text-ge7-black/60">Code de connexion</dt><dd className="font-mono text-lg font-extrabold tracking-widest">{compte.code}</dd></div>
             <div className="flex justify-between"><dt className="text-ge7-black/60">Mot de passe</dt><dd>celui que vous venez de saisir</dd></div>

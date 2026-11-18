@@ -37,6 +37,23 @@ class CommandeResource extends JsonResource
             ],
             'note' => $this->note,
             'total' => (int) $this->total,
+            'sous_total' => $this->sousTotal(),
+            'remise' => [
+                'statut' => $this->remise_statut,
+                'taux_demande' => $this->remise_taux_demande,
+                'motif' => $this->remise_motif,
+                'taux' => (float) $this->remise_taux,
+                'montant' => (int) $this->remise_montant,
+            ],
+            // Commande passée depuis un compte CLIENT (espace client).
+            'compte_client' => $this->whenLoaded('compte', fn () => $this->compte ? ['id' => $this->compte->id, 'nom' => $this->compte->name, 'code' => $this->compte->code] : null),
+            'annotations' => $this->whenLoaded('annotations', fn () => $this->annotations->map(fn ($a) => [
+                'id' => $a->id,
+                'auteur' => $a->auteur,
+                'nom' => $a->user?->name ?? ($a->auteur === 'client' ? 'Client' : 'Équipe'),
+                'contenu' => $a->contenu,
+                'created_at' => $a->created_at?->toIso8601String(),
+            ])),
             'extras' => $this->whenLoaded('extras', fn () => $this->extras->map(fn ($e) => ['label' => $e->label, 'amount' => (float) $e->amount])->values()),
             'lignes' => $this->lignes->map(fn ($l) => [
                 'id' => $l->id,
@@ -59,6 +76,11 @@ class CommandeResource extends JsonResource
                 'encaisse' => (int) $this->facture->paiements->sum('montant'),
                 'avoir' => $this->facture->avoir ? ['numero' => $this->facture->avoir->numero, 'montant' => (int) $this->facture->avoir->montant] : null,
             ] : null),
+            'bon_livraison' => $this->bonLivraison ? [
+                'id' => $this->bonLivraison->id,
+                'numero' => $this->bonLivraison->numero,
+                'livre_le' => $this->bonLivraison->livre_le?->toIso8601String(),
+            ] : null,
             'livraison' => $this->livraison ? [
                 'depart_le' => $this->livraison->depart_le?->toIso8601String(),
                 'livree_le' => $this->livraison->livree_le?->toIso8601String(),

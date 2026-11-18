@@ -8,11 +8,13 @@ import { shopApi } from "./api";
 import { useCart } from "./cart";
 import { ChoisirVille, zoneParam } from "./ChoisirVille";
 import { DISPONIBILITE } from "./ProduitCard";
+import { useEstClient } from "./espaceClient";
 
 export function ShopProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const cart = useCart();
+  const estClient = useEstClient();
   const [quantite, setQuantite] = useState(1);
   const [added, setAdded] = useState(false);
 
@@ -29,7 +31,8 @@ export function ShopProductPage() {
   if (isError || !p) return <ErrorState message="Produit introuvable ou sans prix pour cette ville." />;
 
   const dispo = DISPONIBILITE[p.disponibilite];
-  const rupture = p.disponibilite === "rupture";
+  // Le compte client ne voit pas le stock : il commande quoi qu'il arrive.
+  const rupture = !estClient && p.disponibilite === "rupture";
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -47,7 +50,7 @@ export function ShopProductPage() {
                 {p.designation.slice(0, 2).toUpperCase()}
               </span>
             )}
-            <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ${dispo.className}`}>{dispo.label}</span>
+            {!estClient && <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ${dispo.className}`}>{dispo.label}</span>}
           </div>
         </div>
 
@@ -94,7 +97,7 @@ export function ShopProductPage() {
           )}
 
           <p className="mt-6 rounded-2xl bg-ge7-black/[0.04] px-4 py-3 text-xs text-ge7-black/60">
-            Paiement à la livraison — espèces, Airtel Money ou Moov Money. Prix confirmé à la commande.
+            Paiement à la livraison : espèces, Airtel Money ou Moov Money. Prix confirmé à la commande.
           </p>
         </div>
       </div>

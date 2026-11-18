@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Gestion des chauffeurs : la fiche métier (permis, disponibilité) est
- * liée à un compte utilisateur au rôle CHAUFFEUR — créé automatiquement à
+ * liée à un compte utilisateur au rôle CHAUFFEUR, créé automatiquement à
  * l'enregistrement pour que le chauffeur se connecte sur la plateforme
  * et suive ses livraisons.
  */
@@ -78,7 +78,7 @@ class ChauffeurController extends Controller
 
     /**
      * Enregistre le chauffeur ET son compte plateforme (rôle CHAUFFEUR)
-     * dans une seule transaction — le code de connexion à 8 chiffres est
+     * dans une seule transaction, le code de connexion à 8 chiffres est
      * renvoyé dans `compte` pour être communiqué au chauffeur.
      */
     public function store(Request $request): JsonResponse
@@ -177,7 +177,7 @@ class ChauffeurController extends Controller
                 ->exists();
 
             if ($livraisonEnCours) {
-                abort(422, 'Ce chauffeur a une livraison en cours — terminez-la ou réaffectez-la avant de le supprimer.');
+                abort(422, 'Ce chauffeur a une livraison en cours : terminez-la ou réaffectez-la avant de le supprimer.');
             }
         }
 

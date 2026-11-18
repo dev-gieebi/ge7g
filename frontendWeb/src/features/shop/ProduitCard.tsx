@@ -2,6 +2,7 @@ import { useState } from "react";
 import { money } from "@/lib/format";
 import type { ShopProduit } from "./api";
 import { ProduitModal } from "./ProduitModal";
+import { useEstClient } from "./espaceClient";
 
 export const DISPONIBILITE: Record<ShopProduit["disponibilite"], { label: string; className: string }> = {
   disponible: { label: "Disponible", className: "bg-emerald-100 text-emerald-800" },
@@ -11,6 +12,7 @@ export const DISPONIBILITE: Record<ShopProduit["disponibilite"], { label: string
 
 export function ProduitCard({ p }: { p: ShopProduit }) {
   const [open, setOpen] = useState(false);
+  const estClient = useEstClient();
   const dispo = DISPONIBILITE[p.disponibilite];
 
   return (
@@ -28,7 +30,8 @@ export function ProduitCard({ p }: { p: ShopProduit }) {
               {p.designation.slice(0, 2).toUpperCase()}
             </span>
           )}
-          <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${dispo.className}`}>{dispo.label}</span>
+          {/* Le compte client ne voit pas le stock : il commande quoi qu'il arrive. */}
+          {!estClient && <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${dispo.className}`}>{dispo.label}</span>}
         </div>
         <div className="flex flex-1 flex-col p-3">
           <p className="text-[11px] font-medium uppercase tracking-wide text-ge7-black/40">{p.categorie ?? p.reference}</p>

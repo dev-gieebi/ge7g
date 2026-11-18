@@ -4,7 +4,7 @@ namespace App\Enums;
 
 /**
  * Cycle de vie d'une commande boutique. Les transitions autorisées sont
- * strictement celles du schéma de la procédure (voir `peutPasserA`) — toute
+ * strictement celles du schéma de la procédure (voir `peutPasserA`), toute
  * autre transition est rejetée par le backend (erreur 422).
  */
 enum StatutCommande: string

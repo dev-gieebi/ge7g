@@ -13,6 +13,8 @@ export interface Field<T> {
   hint?: string;
   hideOnEdit?: boolean;
   span?: 1 | 2;
+  /** Champ affiché seulement si la condition est vraie (ex. selon le rôle choisi). */
+  visible?: (form: Partial<T>) => boolean;
 }
 
 export function SimpleCrud<T extends { id: number }>({
@@ -87,13 +89,13 @@ export function SimpleCrud<T extends { id: number }>({
         <Modal title={editId ? `Modifier  ${title}` : `Ajouter  ${title}`} size="sm" onClose={() => setForm(null)} footer={<><Button variant="secondary" onClick={() => setForm(null)}>Annuler</Button><Button type="submit" form={`crud-${queryKey}`} loading={crud.create.isPending || crud.update.isPending}>Enregistrer</Button></>}>
           <form id={`crud-${queryKey}`} onSubmit={submit}>
             <FormGrid cols={2}>
-              {fields.filter((f) => !(editId && f.hideOnEdit)).map((f) => {
+              {fields.filter((f) => !(editId && f.hideOnEdit) && (f.visible?.(form) ?? true)).map((f) => {
                 const val = form[f.name] as unknown;
                 const cls = f.span === 2 ? "sm:col-span-2" : "";
                 if (f.type === "select")
                   return (
                     <Select key={f.name} label={f.label} required={f.required} value={String(val ?? "")} onChange={(e) => setForm({ ...form, [f.name]: e.target.value })} error={errors[f.name]} className={cls}>
-                      {!f.required && <option value=""></option>}
+                      {!f.required && !f.options?.some((o) => o.value === "") && <option value=""></option>}
                       {f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </Select>
                   );

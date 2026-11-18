@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { useToast } from "@/lib/toast";
 import { api, toApiError } from "@/lib/api";
 import { Badge, Button, Input, Modal, PageHeader } from "@/components/ui";
+import { useZones } from "@/features/shared/refData";
 import { SimpleCrud } from "./SimpleCrud";
 
 type Tab = "taxes" | "zones" | "users";
@@ -38,6 +39,7 @@ export function SettingsPage() {
   };
   const notify = useToast();
   const qc = useQueryClient();
+  const { data: zones } = useZones();
   const passwordMutation = useMutation<void, unknown, { id: number; password: string }>({
     mutationFn: ({ id, password }) => api.patch(`/users/${id}/password`, { password }),
     onSuccess: () => {
@@ -101,12 +103,24 @@ export function SettingsPage() {
               { key: "code", header: "Code", render: (u) => <span className="font-mono text-xs font-semibold">{u.code}</span> },
               { key: "name", header: "Nom", render: (u) => <span className="font-semibold">{u.name}</span> },
               { key: "role", header: "Rôle", render: (u) => <Badge tone={u.role === "SUPERADMIN" ? "dark" : u.role === "LG_ADMIN" ? "dark" : u.role === "CAISSIER" ? "gold" : "purple"}>{ROLE_LABELS[u.role]}</Badge> },
+              { key: "zone", header: "Accès villes", render: (u) => (u.role === "CLIENT" ? (u.zone?.name ?? "Toutes les villes") : "") },
             ]}
             fields={[
               { name: "name", label: "Nom", required: true, span: 2 },
               // Les chauffeurs se créent et se gèrent dans Logistique → Chauffeurs
-              // (fiche + compte lié) — le rôle CHAUFFEUR n'est pas proposé ici.
+              // (fiche + compte lié), le rôle CHAUFFEUR n'est pas proposé ici.
               { name: "role", label: "Rôle", type: "select", required: true, span: 2, options: (Object.keys(ROLE_LABELS) as Role[]).filter((r) => r !== "CHAUFFEUR").map((r) => ({ value: r, label: ROLE_LABELS[r] })) },
+              // Compte CLIENT : accès à la boutique uniquement, pour une ville ou toutes.
+              { name: "phone", label: "Téléphone", required: true, span: 2, hint: "Téléphone de livraison du client (+241…).", visible: (f) => f.role === "CLIENT" },
+              {
+                name: "zone_id",
+                label: "Accès villes",
+                type: "select",
+                span: 2,
+                hint: "Vide = le client peut commander pour toutes les villes.",
+                options: [{ value: "", label: "Toutes les villes" }, ...(zones ?? []).map((z) => ({ value: z.id, label: `${z.name} uniquement` }))],
+                visible: (f) => f.role === "CLIENT",
+              },
             ]}
             empty={{ name: "", role: "CAISSIER" }}
             allowEdit={(u) => u.role !== "CHAUFFEUR"}

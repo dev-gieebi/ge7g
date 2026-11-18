@@ -23,11 +23,17 @@ class CommandeController extends Controller
     /** Validation, refus, préparation, expédition et annulation. */
     private const MANAGE_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN'];
 
+    /** Décision sur une remise demandée par le client : la direction générale. */
+    private const REMISE_ROLES = ['DG_ADMIN', 'SUPERADMIN'];
+
     /** Affectation d'un chauffeur : gestionnaires + contrôle de gestion. */
     private const ASSIGN_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'CDG_ADMIN', 'SUPERADMIN'];
 
     /** Livraison et échec : chauffeur affecté ou gestionnaires. */
     private const DELIVER_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CHAUFFEUR'];
+
+    /** Relations de la fiche commande complète (détail, frais, annotations). */
+    private const DETAIL = ['lignes.produit.unit', 'historique.user', 'chauffeur', 'valideur', 'facture.paiements', 'facture.avoir', 'livraison', 'extras', 'annotations.user', 'compte', 'bonLivraison'];
 
     public function __construct(private readonly CommandeService $service) {}
 
@@ -47,7 +53,7 @@ class CommandeController extends Controller
     {
         $user = $this->authorizeUser($request, self::VIEW_ROLES);
 
-        $query = Commande::query()->with(['chauffeur', 'lignes']);
+        $query = Commande::query()->with(['chauffeur', 'lignes'])->withCount('annotations');
 
         // Le chauffeur ne voit que les commandes qui lui sont affectées.
         if ($user->role === 'CHAUFFEUR') {
@@ -87,6 +93,9 @@ class CommandeController extends Controller
                 'ville' => $c->ville,
                 'total' => (int) $c->total,
                 'chauffeur' => $c->chauffeur?->name,
+                'espace_client' => $c->user_id !== null,
+                'remise_statut' => $c->remise_statut,
+                'annotations' => (int) $c->annotations_count,
                 'cree_le' => $c->created_at?->toIso8601String(),
             ]),
             'meta' => [
@@ -106,7 +115,7 @@ class CommandeController extends Controller
         $user = $this->authorizeUser($request, self::VIEW_ROLES);
         $this->authorizeChauffeur($user, $commande);
 
-        $commande->load(['lignes.produit.unit', 'historique.user', 'chauffeur', 'valideur', 'facture.paiements', 'facture.avoir', 'livraison', 'extras']);
+        $commande->load(self::DETAIL);
 
         return new CommandeResource($commande);
     }
@@ -143,9 +152,41 @@ class CommandeController extends Controller
         $commande->extras()->delete();
         $commande->extras()->createMany($rows);
 
-        $commande->load(['lignes.produit.unit', 'historique.user', 'chauffeur', 'valideur', 'facture.paiements', 'facture.avoir', 'livraison', 'extras']);
+        $commande->load(self::DETAIL);
 
         return new CommandeResource($commande);
+    }
+
+    /** Annotation de l'équipe (réponse au client, consigne interne…). */
+    public function annoter(Request $request, Commande $commande): CommandeResource
+    {
+        $user = $this->authorizeUser($request, self::VIEW_ROLES);
+        $this->authorizeChauffeur($user, $commande);
+
+        $validated = $request->validate(['contenu' => 'required|string|max:1000']);
+        $this->service->annoter($commande, $user, $validated['contenu']);
+
+        return new CommandeResource($commande->load(self::DETAIL));
+    }
+
+    /** Décision sur la remise demandée par le client, avant validation. */
+    public function remise(Request $request, Commande $commande): CommandeResource
+    {
+        $this->authorizeUser($request, self::REMISE_ROLES);
+
+        $validated = $request->validate([
+            'decision' => 'required|in:accorder,refuser',
+            'taux' => 'nullable|numeric|min:0.5|max:100',
+        ]);
+
+        $commande = $this->service->deciderRemise(
+            $commande,
+            $validated['decision'] === 'accorder',
+            isset($validated['taux']) ? (float) $validated['taux'] : null,
+            $request->user(),
+        );
+
+        return new CommandeResource($commande->load(self::DETAIL));
     }
 
     public function refuser(Request $request, Commande $commande): CommandeResource
@@ -164,7 +205,7 @@ class CommandeController extends Controller
         return new CommandeResource($this->service->preparer($commande, $request->user())->load('historique.user'));
     }
 
-    /** Affectation d'un chauffeur — uniquement après validation de la commande. */
+    /** Affectation d'un chauffeur, uniquement après validation de la commande. */
     public function affecter(Request $request, Commande $commande): CommandeResource
     {
         $this->authorizeUser($request, self::ASSIGN_ROLES);

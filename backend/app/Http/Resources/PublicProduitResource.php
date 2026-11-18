@@ -8,7 +8,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Vue publique d'un produit boutique. Jamais exposés : prix d'achat, marges,
- * stock exact — seulement la disponibilité en trois états.
+ * stock exact, seulement la disponibilité en trois états.
  *
  * @mixin Product
  */

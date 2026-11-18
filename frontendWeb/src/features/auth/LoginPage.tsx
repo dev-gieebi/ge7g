@@ -25,7 +25,9 @@ export function LoginPage() {
     try {
       const u = await login(code, password);
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
-      navigate(from ?? homeFor(u.role), { replace: true });
+      // Un client ne revient que vers son espace, jamais vers le back-office.
+      const retour = u.role === "CLIENT" && from && !from.startsWith("/mon-compte") ? undefined : from;
+      navigate(retour ?? homeFor(u.role), { replace: true });
     } catch (err) {
       setError(toApiError(err).message);
     } finally {

@@ -34,7 +34,7 @@ class ReportController extends Controller
     }
 
     /**
-     * Synthèse des ventes facturées sur une période (from/to optionnels —
+     * Synthèse des ventes facturées sur une période (from/to optionnels,
      * sans borne : cumul depuis le démarrage de l'activité).
      */
     public function sales(Request $request): JsonResponse
@@ -67,7 +67,7 @@ class ReportController extends Controller
             $merges[] = "A{$i}:G{$i}";
         };
 
-        $wide($r['from'] && $r['to'] ? "RAPPORT COMMERCIAL — du {$r['from']} au {$r['to']}" : 'RAPPORT COMMERCIAL — cumul depuis le démarrage', 1);
+        $wide($r['from'] && $r['to'] ? "RAPPORT COMMERCIAL du {$r['from']} au {$r['to']}" : 'RAPPORT COMMERCIAL : cumul depuis le démarrage', 1);
         $rows[] = $blank;
         $wide('INDICATEURS DE PERFORMANCE', 2);
         $rows[] = $pad(7, [['Factures émises', 3], [(int) $k['sales_count'], 4], ['Chiffre d\'affaires', 3], [$k['total'], 4]]);
@@ -155,7 +155,7 @@ class ReportController extends Controller
             $merges[] = 'A'.count($rows).':O'.count($rows);
         };
 
-        $wide('ETAT DU STOCK — '.now()->format('d/m/Y'), 1);
+        $wide('ETAT DU STOCK AU '.now()->format('d/m/Y'), 1);
         $wide("CA facturé : {$i['ca_facture']} FCFA · Valeur stock : {$i['valeur_stock']} FCFA · Achats : {$i['achats']} FCFA · Marge livrée : {$i['marge_livree']} FCFA", 2);
         $rows[] = array_fill(0, 15, [null, 0]);
         $rows[] = array_map(fn ($h) => [$h, 2], [
@@ -310,7 +310,7 @@ class ReportController extends Controller
     }
 
     /**
-     * Synthèse des ventes facturées sur une période (from/to optionnels —
+     * Synthèse des ventes facturées sur une période (from/to optionnels,
      * sans borne : cumul depuis le démarrage de l'activité).
      *
      * @return array<string, mixed>
@@ -393,7 +393,7 @@ class ReportController extends Controller
             ->sortByDesc('total')
             ->values();
 
-        // Proformas émises sur la même période (et validées) — taux de conversion commercial.
+        // Proformas émises sur la même période (et validées), taux de conversion commercial.
         $quotes = Quote::query();
         if ($from) {
             $quotes->whereDate('created_at', '>=', $from);

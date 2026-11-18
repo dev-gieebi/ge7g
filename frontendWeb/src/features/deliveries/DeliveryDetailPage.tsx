@@ -13,7 +13,7 @@ export function DeliveryDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
   const delivery = useOne<Delivery>("delivery", id ? `/deliveries/${id}` : null);
-  const confirm = useAction(() => `/deliveries/${id}/confirm-reception`, { keys: ["delivery", "deliveries", "orders", "order", "site-stock", "logistics", "dashboard"], success: "Réception confirmée — stock chantier mis à jour" });
+  const confirm = useAction(() => `/deliveries/${id}/confirm-reception`, { keys: ["delivery", "deliveries", "orders", "order", "site-stock", "logistics", "dashboard"], success: "Réception confirmée, stock chantier mis à jour" });
 
   if (delivery.isLoading) return <Loading />;
   if (!delivery.data) return <ErrorState message="Livraison introuvable" />;

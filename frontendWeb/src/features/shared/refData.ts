@@ -26,7 +26,7 @@ export const useDriversRef = () => useQuery({ queryKey: ["ref", "drivers"], quer
 export const useVehiclesRef = () => useQuery({ queryKey: ["ref", "vehicles"], queryFn: () => all<Vehicle>("/vehicles"), ...opts });
 /**
  * Chauffeurs affectables aux commandes boutique : fiches liées à un compte
- * CHAUFFEUR actif — l'affectation envoie l'identifiant utilisateur.
+ * CHAUFFEUR actif, l'affectation envoie l'identifiant utilisateur.
  */
 export const useChauffeurs = (enabled = true) =>
   useQuery({

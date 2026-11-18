@@ -88,6 +88,6 @@ export const amountInWords = (v: number | string | null | undefined): string => 
   return parts.join(" ");
 };
 
-/** « Un million quatre cent soixante-dix mille francs CFA » — formule légale des factures. */
+/** « Un million quatre cent soixante-dix mille francs CFA », formule légale des factures. */
 export const moneyInWords = (v: number | string | null | undefined): string =>
   `${amountInWords(v).replace(/^\w/, (c) => c.toUpperCase())} francs CFA`;

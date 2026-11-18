@@ -8,10 +8,12 @@ import { shopApi } from "./api";
 import { useCart } from "./cart";
 import { zoneParam } from "./ChoisirVille";
 import { DISPONIBILITE } from "./ProduitCard";
+import { useEstClient } from "./espaceClient";
 
-/** Modal de détail produit — mêmes informations que la fiche /produits/:id. */
+/** Modal de détail produit, mêmes informations que la fiche /produits/:id. */
 export function ProduitModal({ produitId, onClose }: { produitId: number; onClose: () => void }) {
   const cart = useCart();
+  const estClient = useEstClient();
   const [quantite, setQuantite] = useState(1);
   const [added, setAdded] = useState(false);
 
@@ -61,7 +63,7 @@ export function ProduitModal({ produitId, onClose }: { produitId: number; onClos
                     {p.designation.slice(0, 2).toUpperCase()}
                   </span>
                 )}
-                <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ${dispo!.className}`}>{dispo!.label}</span>
+                {!estClient && <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ${dispo!.className}`}>{dispo!.label}</span>}
               </div>
             </div>
 

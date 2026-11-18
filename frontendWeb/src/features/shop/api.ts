@@ -1,6 +1,6 @@
 import { api } from "@/lib/api";
 
-/** Réponses de l'API publique `/api/public` — jamais de prix d'achat ni de stock exact. */
+/** Réponses de l'API publique `/api/public`, jamais de prix d'achat ni de stock exact. */
 
 export interface ShopProduit {
   id: number;
@@ -48,7 +48,7 @@ export interface SuiviCommande {
   ville: string;
   quartier: string;
   chauffeur: string | null;
-  /** Position du chauffeur — uniquement pendant la livraison. */
+  /** Position du chauffeur, uniquement pendant la livraison. */
   position: { latitude: number; longitude: number; maj_le: string | null } | null;
 }
 
@@ -61,7 +61,7 @@ export interface CommandePayload {
   note?: string;
   zone_id?: number;
   lignes: { produit_id: number; quantite: number }[];
-  /** Honeypot anti-robots — doit rester vide. */
+  /** Honeypot anti-robots, doit rester vide. */
   site_web?: string;
 }
 

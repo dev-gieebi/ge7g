@@ -6,7 +6,7 @@ import { GE7_COMPANY, cfaNumber } from "@/features/shared/companyInfo";
 /**
  * Document A4 du modèle papier (achat caisse et commande en ligne) :
  * facture ou bon de livraison selon `docTitle`. `originLabel` distingue la
- * provenance — ex. « Commande en ligne : CMD-… ».
+ * provenance, ex. « Commande en ligne : CMD-… ».
  */
 export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false, extras = [] }: { sale: PosSale; originLabel?: string; docTitle?: string; solde?: boolean; extras?: { label: string; amount: number }[] }) {
   const s = sale;

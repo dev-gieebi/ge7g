@@ -1,4 +1,4 @@
-export type Role = "LG_ADMIN" | "CAISSIER" | "DG_ADMIN" | "SUPERADMIN" | "CDG_ADMIN" | "CHAUFFEUR";
+export type Role = "LG_ADMIN" | "CAISSIER" | "DG_ADMIN" | "SUPERADMIN" | "CDG_ADMIN" | "CHAUFFEUR" | "CLIENT";
 
 export interface User {
   id: number;
@@ -8,6 +8,10 @@ export interface User {
   role: Role;
   permissions: string[];
   is_admin?: boolean;
+  phone?: string | null;
+  /** Compte CLIENT : ville d'accès, `null` = toutes les villes. */
+  zone_id?: number | null;
+  zone?: { id: number; name: string } | null;
 }
 
 export interface Paginated<T> {
@@ -640,6 +644,10 @@ export interface CommandeListItem {
   ville: string;
   total: number;
   chauffeur: string | null;
+  /** Commande passée depuis un compte CLIENT. */
+  espace_client?: boolean;
+  remise_statut?: "demandee" | "accordee" | "refusee" | null;
+  annotations?: number;
   cree_le: string;
 }
 
@@ -674,6 +682,20 @@ export interface CommandeDetail {
   adresse: { ville: string; quartier: string; point_repere: string };
   note: string | null;
   total: number;
+  /** Montant des lignes avant remise. */
+  sous_total: number;
+  remise: {
+    statut: "demandee" | "accordee" | "refusee" | null;
+    taux_demande: number | null;
+    motif: string | null;
+    taux: number;
+    montant: number;
+  };
+  /** Bon de livraison généré automatiquement à la confirmation de la livraison. */
+  bon_livraison?: { id: number; numero: string; livre_le: string | null } | null;
+  /** Compte CLIENT ayant passé la commande (espace client). */
+  compte_client?: { id: number; nom: string; code: string } | null;
+  annotations?: { id: number; auteur: "client" | "equipe"; nom: string; contenu: string; created_at: string }[];
   /** Frais annexes (manutention, livraison…) ajoutés au document imprimé. */
   extras?: { label: string; amount: number }[];
   lignes: CommandeLigne[];

@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * API publique de la boutique — aucune authentification. Ne renvoie jamais
+ * API publique de la boutique, aucune authentification. Ne renvoie jamais
  * les prix d'achat, les marges, le stock exact ni les données d'autres
  * clients (voir les ressources dédiées).
  */
@@ -114,7 +114,7 @@ class ShopController extends Controller
     }
 
     /**
-     * Suivi : numéro ET téléphone doivent correspondre — message générique
+     * Suivi : numéro ET téléphone doivent correspondre, message générique
      * sinon (anti-énumération).
      */
     public function suivi(Request $request): SuiviCommandeResource|JsonResponse

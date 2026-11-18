@@ -5,10 +5,12 @@ import { shopApi } from "./api";
 import { useCart } from "./cart";
 import { ChoisirVille, zoneParam } from "./ChoisirVille";
 import { ProduitCard } from "./ProduitCard";
+import { useEstClient } from "./espaceClient";
 import { GE7_COMPANY } from "@/features/shared/companyInfo";
 
 export function ShopHomePage() {
   const cart = useCart();
+  const estClient = useEstClient();
   const zone = zoneParam(cart.zone);
   const { data: categories } = useQuery({ queryKey: ["shop", "categories"], queryFn: shopApi.categories, staleTime: 5 * 60_000 });
   const { data: zones } = useQuery({ queryKey: ["shop", "zones"], queryFn: shopApi.zones, staleTime: 30 * 60_000 });
@@ -23,14 +25,14 @@ export function ShopHomePage() {
           Équipements et fournitures industrielles, livrés partout au Gabon.
         </h1>
         <p className="mt-3 max-w-xl text-sm text-white/70">
-          Commandez en ligne sans compte, payez à la livraison. Une question ? {GE7_COMPANY.phones}
+          {estClient ? "Commandez depuis votre compte, payez à la livraison." : "Commandez en ligne sans compte, payez à la livraison."} Une question ? {GE7_COMPANY.phones}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link to="/produits" className="inline-flex items-center gap-2 rounded-full bg-ge7-gold px-5 py-2.5 text-sm font-bold text-ge7-black transition hover:brightness-110">
             Voir le catalogue <ArrowRight size={16} />
           </Link>
-          <Link to="/suivi" className="inline-flex items-center gap-2 rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-white/80 transition hover:bg-white/10">
-            Suivre ma commande
+          <Link to={estClient ? "/mon-compte/commandes" : "/suivi"} className="inline-flex items-center gap-2 rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-white/80 transition hover:bg-white/10">
+            {estClient ? "Mes commandes" : "Suivre ma commande"}
           </Link>
         </div>
         <div className="mt-8 grid gap-3 text-sm sm:grid-cols-3">
@@ -87,6 +89,7 @@ export function ShopHomePage() {
                   <MapPin size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ge7-bronze" />
                   <select
                     value={String(cart.zone.id ?? "toutes")}
+                    disabled={cart.zoneVerrouillee}
                     onChange={(e) => {
                       const v = e.target.value;
                       if (v === "toutes") cart.setZone({ id: null, name: "Toutes les villes" });
