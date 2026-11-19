@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { PackagePlus, PackageSearch, Plus, Search, Trash2, X } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { Loading } from "@/components/ui";
 import { shopApi } from "./api";
 import { clientApi, type LigneDemandee, type ProduitClient } from "./espaceClient";
@@ -85,44 +85,50 @@ function CarteProduit({ p, onAjouter }: { p: ProduitClient; onAjouter: (l: Ligne
   );
 }
 
-/** Formulaire « produit introuvable » : désignation libre, précision et quantité. */
-export function ProduitInconnuForm({ onAjouter, onFermer }: { onAjouter: (l: LigneLocale) => void; onFermer: () => void }) {
-  const [form, setForm] = useState({ designation: "", precision: "", quantite: "1" });
-  const quantite = Number(form.quantite.replace(",", "."));
-  const valide = form.designation.trim().length >= 2 && quantite > 0;
+/** Produit absent du catalogue : une ligne nom + quantité, ajoutée d'un clic sur « + ». */
+function AjoutProduitLibre({ onAjouter }: { onAjouter: (l: LigneLocale) => void }) {
+  const [designation, setDesignation] = useState("");
+  const [quantite, setQuantite] = useState("1");
+  const valeur = Number(quantite.replace(",", "."));
+  const valide = designation.trim().length >= 2 && valeur > 0;
+
+  const ajouter = () => {
+    if (!valide) return;
+    onAjouter({ cle: `i${Date.now()}`, designation: designation.trim(), quantite: valeur });
+    setDesignation("");
+    setQuantite("1");
+  };
 
   return (
-    <div className="rounded-2xl border border-ge7-gold/50 bg-ge7-gold-soft/30 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <p className="flex items-center gap-2 text-sm font-bold"><PackageSearch size={16} className="text-ge7-bronze" /> Demander un produit hors catalogue</p>
-        <button type="button" onClick={onFermer} className="text-ge7-black/40 hover:text-ge7-black" aria-label="Fermer"><X size={16} /></button>
-      </div>
-      <p className="mt-1 text-xs text-ge7-black/60">Décrivez le produit recherché : notre équipe le trouve et l'ajoute au catalogue avant de valider la commande.</p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_7rem]">
-        <div>
-          <label className={etiquette}>Produit *</label>
-          <input maxLength={150} className={champ} value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} placeholder="Ex. Disjoncteur 63 A tétrapolaire" />
-        </div>
-        <div>
-          <label className={etiquette}>Quantité *</label>
-          <input type="number" min={0.01} step="any" inputMode="decimal" className={champ} value={form.quantite} onChange={(e) => setForm({ ...form, quantite: e.target.value })} />
-        </div>
-        <div className="sm:col-span-2">
-          <label className={etiquette}>Précisions (facultatif)</label>
-          <input maxLength={300} className={champ} value={form.precision} onChange={(e) => setForm({ ...form, precision: e.target.value })} placeholder="Marque, dimensions, référence fabricant…" />
-        </div>
-      </div>
+    <div className="flex items-center gap-2 rounded-2xl border border-dashed border-ge7-bronze/50 bg-white p-3">
+      <input
+        maxLength={150}
+        className={`${champ} min-w-0 flex-1`}
+        value={designation}
+        onChange={(e) => setDesignation(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); ajouter(); } }}
+        placeholder="Produit absent du catalogue : nom du produit"
+        aria-label="Nom du produit"
+      />
+      <input
+        type="number"
+        min={0.01}
+        step="any"
+        inputMode="decimal"
+        aria-label="Quantité"
+        className="w-20 shrink-0 rounded-xl border border-ge7-black/15 px-2.5 py-2.5 text-right text-sm focus:border-ge7-gold focus:outline-none"
+        value={quantite}
+        onChange={(e) => setQuantite(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); ajouter(); } }}
+      />
       <button
         type="button"
         disabled={!valide}
-        onClick={() => {
-          onAjouter({ cle: `i${Date.now()}`, designation: form.designation.trim(), precision: form.precision.trim() || undefined, quantite });
-          setForm({ designation: "", precision: "", quantite: "1" });
-          onFermer();
-        }}
-        className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-ge7-black px-4 py-2 text-sm font-bold text-ge7-gold-light disabled:opacity-40"
+        onClick={ajouter}
+        className="grid size-9 shrink-0 place-items-center rounded-full bg-ge7-gold text-ge7-black transition hover:brightness-110 disabled:opacity-40"
+        title="Ajouter ce produit"
       >
-        <PackagePlus size={15} /> Ajouter à ma demande
+        <Plus size={17} />
       </button>
     </div>
   );
@@ -134,7 +140,6 @@ export function CatalogueClient({ onAjouter }: { onAjouter: (l: LigneLocale) => 
   const [search, setSearch] = useState("");
   const [categorie, setCategorie] = useState<number | undefined>();
   const [page, setPage] = useState(1);
-  const [inconnu, setInconnu] = useState(false);
 
   // Recherche lancée après une courte pause de frappe.
   useEffect(() => {
@@ -163,20 +168,14 @@ export function CatalogueClient({ onAjouter }: { onAjouter: (l: LigneLocale) => 
       </div>
 
       <div className="mt-3">
-        {inconnu ? (
-          <ProduitInconnuForm onAjouter={onAjouter} onFermer={() => setInconnu(false)} />
-        ) : (
-          <button type="button" onClick={() => setInconnu(true)} className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-ge7-bronze/60 px-4 py-2 text-sm font-semibold text-ge7-bronze hover:bg-ge7-gold-soft/40">
-            <PackageSearch size={15} /> Produit introuvable ? Demander un produit
-          </button>
-        )}
+        <AjoutProduitLibre onAjouter={onAjouter} />
       </div>
 
       {isLoading ? (
         <Loading />
       ) : !data || data.data.length === 0 ? (
         <p className="mt-4 rounded-2xl border border-dashed border-ge7-black/15 bg-white/60 px-6 py-10 text-center text-sm text-ge7-black/50">
-          Aucun produit trouvé. Utilisez « Demander un produit » pour nous signaler ce que vous cherchez.
+          Aucun produit trouvé. Ajoutez-le avec son nom et sa quantité dans la ligne ci-dessus.
         </p>
       ) : (
         <>

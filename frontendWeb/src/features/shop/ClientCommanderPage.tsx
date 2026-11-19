@@ -38,7 +38,7 @@ export function ClientCommanderPage() {
   const { data: zones } = useQuery({ queryKey: ["shop", "zones"], queryFn: shopApi.zones, staleTime: 5 * 60_000 });
 
   const [lignes, setLignes] = useState<LigneLocale[]>(charger);
-  const [form, setForm] = useState({ ville: "", villeAutre: "", quartier: "", point_repere: "", note: "" });
+  const [form, setForm] = useState({ ville: "", villeAutre: "", quartier: "", point_repere: "" });
   const [annotation, setAnnotation] = useState("");
   const [errors, setErrors] = useState<Record<string, string[]>>({});
 
@@ -73,7 +73,6 @@ export function ClientCommanderPage() {
       ville: villeFinale,
       quartier: form.quartier.trim(),
       point_repere: form.point_repere.trim(),
-      note: form.note.trim() || undefined,
       zone_id: zones?.find((z) => z.name === form.ville)?.id,
       lignes: versPayload(lignes),
       annotation: annotation.trim() || undefined,
@@ -87,7 +86,7 @@ export function ClientCommanderPage() {
     <div>
       <h1 className="font-display text-2xl font-extrabold">Passer une commande</h1>
       <p className="mt-1 text-sm text-ge7-black/60">
-        Choisissez vos produits et saisissez les quantités. Un produit manque ? Demandez-le : notre équipe le recherche pour vous.
+        Choisissez vos produits et saisissez les quantités. Un produit manque ? Saisissez son nom et sa quantité, puis appuyez sur « + ».
         Les prix vous sont communiqués sur la facture, après validation.
       </p>
 
@@ -147,10 +146,6 @@ export function ClientCommanderPage() {
                 <input required maxLength={150} className={`${champ} pl-9`} value={form.point_repere} onChange={(e) => setForm({ ...form, point_repere: e.target.value })} placeholder="Ex. Face à la pharmacie du rond-point" />
               </div>
               {err("point_repere") && <p className="mt-1 text-xs font-medium text-rose-600">{err("point_repere")}</p>}
-            </div>
-            <div>
-              <label className={etiquette}>Note de livraison (facultatif)</label>
-              <textarea maxLength={500} rows={2} className={champ} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Instructions particulières…" />
             </div>
             <div>
               <label className={etiquette}>Annotation sur la commande (facultatif)</label>
