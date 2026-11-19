@@ -457,6 +457,8 @@ export interface PosSale {
   /** Origine de la vente : caisse ou commande de la boutique en ligne. */
   source?: "caisse" | "boutique_en_ligne";
   annulee?: boolean;
+  /** Vente soldée (enregistrée) : le tampon « Soldé » reste sur la facture. */
+  soldee_le?: string | null;
   delivery_status?: "LIVREE" | "PARTIELLEMENT_LIVREE" | "A_LIVRER";
   invoice?: Invoice | null;
   items?: { id: number; product?: PosProduct; quantity: number; delivered_quantity: number; remaining_quantity: number; unit_price: number; total: number }[];
@@ -601,7 +603,7 @@ export interface DashboardStats {
   products_count: number;
   products_sold_today: number;
   online_sales: number;
-  pos_sales: number;
+  pos_sales: number | null;
   purchases: number;
   expenses: number;
   alerts: { level: "warning" | "danger" | "info"; message: string; link?: string }[];
@@ -731,8 +733,8 @@ export interface CommandeDetail {
 export interface CommandeStats {
   en_attente: number;
   commandes_jour: number;
-  ca_boutique_jour: number;
-  ca_boutique_mois: number;
+  ca_boutique_jour: number | null;
+  ca_boutique_mois: number | null;
   taux_livrees: number;
   /** Pilotage logistique. */
   a_affecter: number;

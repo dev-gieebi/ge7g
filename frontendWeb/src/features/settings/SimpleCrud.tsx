@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { fieldErrors, useCrud, useListState, usePaginated } from "@/lib/hooks";
-import { Button, DataTable, FormGrid, Input, Modal, SearchInput, Select, type Column } from "@/components/ui";
+import { Button, CardGrid, DataTable, FormGrid, Input, Modal, SearchInput, Select, type CarteContenu, type Column } from "@/components/ui";
 
 export interface Field<T> {
   name: keyof T & string;
@@ -28,6 +28,7 @@ export function SimpleCrud<T extends { id: number }>({
   allowEdit,
   searchable = true,
   extraActions,
+  carte,
 }: {
   queryKey: string;
   url: string;
@@ -39,6 +40,8 @@ export function SimpleCrud<T extends { id: number }>({
   allowEdit?: (row: T) => boolean;
   searchable?: boolean;
   extraActions?: (row: T) => ReactNode;
+  /** Affichage en cartes plutôt qu'en tableau (les actions sont ajoutées à la carte). */
+  carte?: (row: T) => Omit<CarteContenu, "actions">;
 }) {
   const list = useListState({ per_page: 20 });
   const { data, isLoading, errorMessage } = usePaginated<T>(queryKey, url, list.params);
@@ -54,20 +57,16 @@ export function SimpleCrud<T extends { id: number }>({
     (editId ? crud.update.mutateAsync({ id: editId, body: form }) : crud.create.mutateAsync(form)).then(() => { setForm(null); setEditId(null); }).catch(() => {});
   };
 
+  const actions = (row: T) => (
+    <>
+      {extraActions?.(row)}
+      {!carte && (allowEdit?.(row) ?? true) && <Button size="sm" variant="ghost" onClick={() => { setEditId(row.id); setForm({ ...row }); }}><Pencil size={14} /></Button>}
+      {allowDelete?.(row) && <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(row)}><Trash2 size={14} className="text-rose-600" /></Button>}
+    </>
+  );
   const cols: Column<T>[] = [
     ...columns,
-    {
-      key: "__actions",
-      header: "",
-      align: "right",
-      render: (row) => (
-        <div className="flex justify-end gap-1">
-          {extraActions?.(row)}
-          {(allowEdit?.(row) ?? true) && <Button size="sm" variant="ghost" onClick={() => { setEditId(row.id); setForm({ ...row }); }}><Pencil size={14} /></Button>}
-          {allowDelete?.(row) && <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(row)}><Trash2 size={14} className="text-rose-600" /></Button>}
-        </div>
-      ),
-    },
+    { key: "__actions", header: "", align: "right", render: (row) => <div className="flex justify-end gap-1">{actions(row)}</div> },
   ];
 
   return (
@@ -79,7 +78,13 @@ export function SimpleCrud<T extends { id: number }>({
           <Button size="sm" onClick={() => { setEditId(null); setForm({ ...empty }); }}><Plus size={14} /> Ajouter</Button>
         </div>
       </div>
-      <DataTable columns={cols} data={data} isLoading={isLoading} error={errorMessage} rowKey={(r) => r.id} page={list.page} onPageChange={list.setPage} dense />
+      {carte ? (
+        <CardGrid sansImage data={data} isLoading={isLoading} error={errorMessage} rowKey={(r) => r.id} page={list.page} onPageChange={list.setPage} carte={(r) => ({ ...carte(r), actions: extraActions || allowDelete?.(r) ? actions(r) : undefined })}
+          onCardClick={(r) => { if (allowEdit?.(r) ?? true) { setEditId(r.id); setForm({ ...r }); } }}
+        />
+      ) : (
+        <DataTable columns={cols} data={data} isLoading={isLoading} error={errorMessage} rowKey={(r) => r.id} page={list.page} onPageChange={list.setPage} dense />
+      )}
       {deleteTarget && (
         <Modal title={`Supprimer  ${title}`} size="sm" onClose={() => setDeleteTarget(null)} footer={<><Button variant="secondary" onClick={() => setDeleteTarget(null)}>Annuler</Button><Button variant="danger" loading={crud.remove.isPending} onClick={() => crud.remove.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })}>Supprimer</Button></>}>
           <p className="text-sm text-ge7-black/80">Confirmer la suppression de <span className="font-semibold">{String((deleteTarget as any).name ?? deleteTarget.id)}</span> ?</p>

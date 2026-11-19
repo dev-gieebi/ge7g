@@ -7,6 +7,8 @@ import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/rbac";
 import { Button, Card, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/ui";
 import { Devis } from "./Devis";
+import { numeroProforma } from "./numero";
+import { AjoutProduitsModal, type LigneAjout } from "@/features/shared/AjoutProduitsModal";
 
 export function QuoteDetailPage() {
   const { id } = useParams();
@@ -17,6 +19,8 @@ export function QuoteDetailPage() {
   const canEdit = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
   // Frais annexes (manutention, livraison…) enregistrés sur la proforma.
   const [extras, setExtras] = useState<{ label: string; amount: number }[]>([]);
+  // Ajout de produits : seulement tant que la proforma n'est pas validée.
+  const [ajout, setAjout] = useState(false);
 
   useEffect(() => {
     if (quote.data?.extras) {
@@ -34,6 +38,11 @@ export function QuoteDetailPage() {
     { keys: ["quote", "quotes"], success: "Frais annexes enregistrés", body: (v) => v },
   );
 
+  const ajouterProduits = useAction<{ items: LigneAjout[] }, Quote>(
+    () => `/quotes/${id}/items`,
+    { keys: ["quote", "quotes"], success: "Produits ajoutés à la proforma", body: (v) => v },
+  );
+
   if (quote.isLoading) return <Loading />;
   if (!quote.data) return <ErrorState message="Proforma introuvable" />;
   const q = quote.data;
@@ -47,31 +56,38 @@ export function QuoteDetailPage() {
               <ArrowLeft size={12} /> Proforma
             </Link>
           }
-          title={q.number}
+          title={numeroProforma(q.number)}
           subtitle={<StatusBadge status={q.status} />}
           action={
             <>
+              {canEdit && q.status === "BROUILLON" && (
+                <Button variant="secondary" onClick={() => setAjout(true)}><Plus size={15} /> Ajouter des produits</Button>
+              )}
+              {/* Ordre imposé : d'abord valider, ensuite envoyer. */}
               {canChangeStatus && q.status === "BROUILLON" && (
-                <Button variant="purple" loading={setStatus.isPending} onClick={() => setStatus.mutate({ status: "ENVOYE" })}>
-                  <Send size={15} /> Marquer envoyé
+                <Button variant="dark" loading={setStatus.isPending} onClick={() => setStatus.mutate({ status: "VALIDE" })}>
+                  <CheckCircle2 size={15} /> Valider
                 </Button>
               )}
-              {canChangeStatus && (q.status === "BROUILLON" || q.status === "ENVOYE") && (
-                <>
-                  <Button variant="dark" loading={setStatus.isPending} onClick={() => setStatus.mutate({ status: "VALIDE" })}>
-                    <CheckCircle2 size={15} /> Valider
-                  </Button>
-                  <Button variant="secondary" loading={setStatus.isPending} onClick={() => setStatus.mutate({ status: "ANNULE" })}>
-                    <XCircle size={15} /> Annuler
-                  </Button>
-                </>
+              {canChangeStatus && q.status === "VALIDE" && (
+                <Button variant="purple" loading={setStatus.isPending} onClick={() => setStatus.mutate({ status: "ENVOYE" })}>
+                  <Send size={15} /> Envoyer
+                </Button>
               )}
-              <Button onClick={() => window.print()}><Printer size={15} /> Imprimer</Button>
+              {/* Annuler : seulement sur un brouillon ; validée ou envoyée, la proforma ne s'annule plus. */}
+              {canChangeStatus && q.status === "BROUILLON" && (
+                <Button variant="secondary" loading={setStatus.isPending} onClick={() => setStatus.mutate({ status: "ANNULE" })}>
+                  <XCircle size={15} /> Annuler
+                </Button>
+              )}
+              {/* Impression seulement une fois la proforma validée (validée ou envoyée). */}
+              {(q.status === "VALIDE" || q.status === "ENVOYE") && <Button onClick={() => window.print()}><Printer size={15} /> Imprimer</Button>}
             </>
           }
         />
       </div>
-      {canEdit && (
+      {/* Frais annexes : modifiables seulement tant que la proforma est en brouillon. */}
+      {canEdit && q.status === "BROUILLON" && (
         <Card className="no-print mx-auto mb-4 max-w-3xl" padded>
           <h3 className="text-sm font-extrabold text-ge7-black/80">Frais annexes</h3>
           <p className="mt-0.5 text-xs text-ge7-black/50">Manutention, coût de livraison… chaque ligne s'ajoute au TOTAL TTC du document.</p>
@@ -117,8 +133,29 @@ export function QuoteDetailPage() {
           </div>
         </Card>
       )}
-      <Devis quote={{ ...q, extras }} />
+      {/* Proforma non validée : visible à l'écran, mais l'impression (même Ctrl+P) ne sort qu'un avertissement. */}
+      {q.status === "VALIDE" || q.status === "ENVOYE" ? (
+        <Devis quote={{ ...q, extras }} />
+      ) : (
+        <>
+          <div className="print:hidden">
+            <Devis quote={{ ...q, extras }} />
+          </div>
+          <p className="hidden p-10 text-center text-lg font-bold print:block">
+            Proforma {numeroProforma(q.number)} non validée : impression impossible.
+          </p>
+        </>
+      )}
       <div className="no-print mt-6 text-center"><Link to="/admin/devis"><Button variant="purple">Retour aux proformas</Button></Link></div>
+      {ajout && (
+        <AjoutProduitsModal
+          titre={`Ajouter des produits à ${numeroProforma(q.number)}`}
+          zoneId={q.zone_id}
+          enCours={ajouterProduits.isPending}
+          onClose={() => setAjout(false)}
+          onValider={(items) => ajouterProduits.mutateAsync({ items }).then(() => setAjout(false)).catch(() => {})}
+        />
+      )}
     </>
   );
 }

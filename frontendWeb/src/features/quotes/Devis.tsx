@@ -2,12 +2,11 @@ import { Mail, MapPin, Phone } from "lucide-react";
 import type { Quote } from "@/types";
 import { datetime, money, moneyInWords, qty } from "@/lib/format";
 import { GE7_COMPANY, cfaNumber } from "@/features/shared/companyInfo";
+import { numeroProforma } from "./numero";
 
 export function Devis({ quote }: { quote: Quote }) {
   const q = quote;
-  // Transforme le N° de devis « DEV-2026-00012 » en « DEV-00012-2026 ».
-  const parts = q.number.split("-");
-  const number = parts.length === 3 ? `DEV-${parts[2]}-${parts[1]}` : q.number;
+  const number = numeroProforma(q.number);
   const ratePct = (Number(q.tax_rate) * 100).toFixed(2).replace(/\.?0+$/, "");
   const discountRate = Number(q.discount_rate ?? 0);
   const discountAmount = Math.round(Number(q.subtotal) * discountRate / 100);

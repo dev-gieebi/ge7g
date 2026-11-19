@@ -16,7 +16,7 @@ use Tests\TestCase;
 
 /**
  * Tableau de bord pilotage du magasin : indicateurs clés, état du stock
- * par article et saisie des comptages physiques (Direction + CDG).
+ * par article et saisie des comptages physiques (Direction + Super admin).
  */
 class PilotageTest extends TestCase
 {
@@ -42,7 +42,7 @@ class PilotageTest extends TestCase
 
     public function test_pilotage_renvoie_indicateurs_et_etat_du_stock(): void
     {
-        $cdg = User::factory()->create(['role' => 'CDG_ADMIN']);
+        $cdg = User::factory()->create(['role' => 'DG_ADMIN']);
         $produit = $this->produit(['stock_quantity' => 8, 'min_stock' => 10]);
 
         // Un achat reçu et une vente livrée pour alimenter les mouvements.
@@ -79,7 +79,7 @@ class PilotageTest extends TestCase
 
     public function test_pilotage_renvoie_les_prix_par_ville(): void
     {
-        $cdg = User::factory()->create(['role' => 'CDG_ADMIN']);
+        $cdg = User::factory()->create(['role' => 'DG_ADMIN']);
         $produit = $this->produit();
         $libreville = Zone::create(['name' => 'Libreville', 'code' => 'LBV']);
         Price::create([
@@ -106,7 +106,7 @@ class PilotageTest extends TestCase
 
     public function test_prix_vente_replie_sur_toutes_villes_sans_bareme_caisse(): void
     {
-        $cdg = User::factory()->create(['role' => 'CDG_ADMIN']);
+        $cdg = User::factory()->create(['role' => 'DG_ADMIN']);
         // Produit sans prix de base ni barème caisse : le prix « Toutes villes » s'applique.
         $produit = $this->produit(['sale_price' => 0, 'stock_quantity' => 4]);
         Price::create(['product_id' => $produit->id, 'zone_id' => null, 'amount' => 50000]);
@@ -122,7 +122,7 @@ class PilotageTest extends TestCase
 
     public function test_pilotage_calcule_ca_et_marge_sur_quantites_livrees(): void
     {
-        $cdg = User::factory()->create(['role' => 'CDG_ADMIN']);
+        $cdg = User::factory()->create(['role' => 'DG_ADMIN']);
         $caissier = User::factory()->create(['role' => 'CAISSIER']);
         $produit = $this->produit(['purchase_price' => 6000]);
 
@@ -148,7 +148,7 @@ class PilotageTest extends TestCase
 
     public function test_inventaire_enregistre_les_comptages_physiques(): void
     {
-        $cdg = User::factory()->create(['role' => 'CDG_ADMIN']);
+        $cdg = User::factory()->create(['role' => 'DG_ADMIN']);
         $produit = $this->produit(['stock_quantity' => 50]);
 
         $this->actingAs($cdg, 'api')->postJson('/api/reports/inventaire', [
@@ -167,8 +167,14 @@ class PilotageTest extends TestCase
         $this->assertEquals(1, $res->json('data.indicateurs.ecarts_physiques'));
     }
 
-    public function test_pilotage_reserve_a_la_direction_et_au_cdg(): void
+    public function test_pilotage_reserve_a_la_direction_et_au_super_admin(): void
     {
+        // Chiffres financiers : ni le CDG ni la logistique.
+        $cdg = User::factory()->create(['role' => 'CDG_ADMIN']);
+        $this->actingAs($cdg, 'api')->getJson('/api/reports/pilotage')->assertForbidden();
+        $this->actingAs($cdg, 'api')->getJson('/api/reports/sales')->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => 'SUPERADMIN']), 'api')->getJson('/api/reports/pilotage')->assertOk();
+
         $logistique = User::factory()->create(['role' => 'LG_ADMIN']);
         $this->actingAs($logistique, 'api')->getJson('/api/reports/pilotage')->assertForbidden();
         $this->actingAs($logistique, 'api')->postJson('/api/reports/inventaire', [

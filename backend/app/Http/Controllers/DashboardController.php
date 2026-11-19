@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
+    /** Rôles qui voient les chiffres financiers : Direction et Super admin. */
+    public const FINANCE_ROLES = ['DG_ADMIN', 'SUPERADMIN'];
+
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -59,6 +62,14 @@ class DashboardController extends Controller
             ];
         });
 
+        // Chiffres financiers (ventes caisse, CA) : Direction et Super admin uniquement.
+        if (! in_array($user->role, self::FINANCE_ROLES, true)) {
+            $data['pos_sales'] = null;
+            $data['revenue'] = null;
+            $data['online_sales'] = null;
+            $data['sales_series'] = [];
+        }
+
         return response()->json(['data' => $data]);
     }
 
@@ -66,7 +77,8 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        if (! in_array($user->role, ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CAISSIER', 'CDG_ADMIN'], true)) {
+        // Courbe du chiffre d'affaires : Direction et Super admin uniquement.
+        if (! in_array($user->role, self::FINANCE_ROLES, true)) {
             abort(403, 'Accès réservé.');
         }
 

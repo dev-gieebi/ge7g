@@ -41,6 +41,16 @@ export const relative = (v: string | null | undefined) => {
 export const humanize = (s: string | null | undefined) =>
   (s ?? "").replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
+/**
+ * N° de document affiché comme les factures : « VNT-2026-00028 » →
+ * « VNT-00028-2026 ». Un n° déjà au bon format (FAC-00012-2026,
+ * BL-00001-2026) est laissé tel quel.
+ */
+export const numeroDocument = (n: string | null | undefined) => {
+  const parts = (n ?? "").split("-");
+  return parts.length === 3 && /^\d{4}$/.test(parts[1]) && /^\d+$/.test(parts[2]) ? `${parts[0]}-${parts[2]}-${parts[1]}` : (n ?? "");
+};
+
 /* ===== Montants en lettres (français) ===== */
 
 const UNITS = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf"];

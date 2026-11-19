@@ -1,4 +1,5 @@
-import { ShoppingCart, ShoppingBag, Package, Settings, Warehouse, LayoutDashboard, FileSignature, BarChart3, Receipt, Truck, type LucideIcon } from "lucide-react";
+import { ShoppingCart, ShoppingBag, Package, Settings, Warehouse, LayoutDashboard, FileSignature, BarChart3, Receipt, type LucideIcon } from "lucide-react";
+// [LOGISTIQUE] Remettre « Truck » dans l'import ci-dessus avec la section Logistique.
 import type { Role } from "@/types";
 
 export interface NavItem {
@@ -19,11 +20,17 @@ export interface NavGroup {
 
 const ADMIN_DIR: Role[] = ["LG_ADMIN", "DG_ADMIN"];
 
-/** Pilotage + Commercial + Gestion : CDG_ADMIN a accès à tout ce périmètre. */
+/** Pilotage : Direction, agent logistique et approvisionneur. */
 const ADMINS: Role[] = [...ADMIN_DIR, "CDG_ADMIN"];
 
-/** Rapports de suivi : Direction et CDG_ADMIN (LG_ADMIN n'y a pas accès). */
-const REPORTS: Role[] = ["DG_ADMIN", "CDG_ADMIN"];
+/** Commercial (commandes, proformas, ventes) : sans l'approvisionneur (CDG_ADMIN). */
+const COMMERCIAL: Role[] = ADMIN_DIR;
+
+/** Gestion (catalogue, approvisionnement) : sans l'agent logistique (LG_ADMIN). */
+const GESTION: Role[] = ["DG_ADMIN", "CDG_ADMIN"];
+
+/** Rapports (chiffres financiers) : Direction et Super admin uniquement. */
+const REPORTS: Role[] = ["DG_ADMIN"];
 
 /**
  * Menu principal Web, plateforme interne G7 Energy, montée sous /admin.
@@ -41,30 +48,31 @@ export const NAVIGATION: NavGroup[] = [
     title: "Commercial",
     items: [
       { label: "Caisse", to: "/admin/caisse", icon: ShoppingCart, roles: ["LG_ADMIN", "CAISSIER"], end: true },
-      { label: "Commandes en ligne", to: "/admin/commandes", icon: ShoppingBag, roles: ADMINS, paths: ["/admin/commandes"] },
-      { label: "Proforma", to: "/admin/devis", icon: FileSignature, roles: ADMINS, paths: ["/admin/devis"] },
-      { label: "Ventes", to: "/admin/caisse/ventes", icon: Receipt, roles: [...ADMINS, "CAISSIER"], paths: ["/admin/caisse/ventes"] },
+      { label: "Commandes en ligne", to: "/admin/commandes", icon: ShoppingBag, roles: COMMERCIAL, paths: ["/admin/commandes"] },
+      { label: "Proforma", to: "/admin/devis", icon: FileSignature, roles: COMMERCIAL, paths: ["/admin/devis"] },
+      { label: "Ventes", to: "/admin/caisse/ventes", icon: Receipt, roles: [...COMMERCIAL, "CAISSIER"], paths: ["/admin/caisse/ventes"] },
     ],
   },
   {
     title: "Gestion",
     items: [
-      { label: "Catalogue", to: "/admin/produits", icon: Package, roles: ADMINS, paths: ["/admin/produits", "/admin/categories", "/admin/unites", "/admin/prix"] },
-      { label: "Approvisionnement", to: "/admin/stock", icon: Warehouse, roles: ADMINS, paths: ["/admin/stock", "/admin/fournisseurs", "/admin/achats"] },
+      { label: "Catalogue", to: "/admin/produits", icon: Package, roles: GESTION, paths: ["/admin/produits", "/admin/categories", "/admin/unites", "/admin/prix"] },
+      { label: "Approvisionnement", to: "/admin/stock", icon: Warehouse, roles: GESTION, paths: ["/admin/stock", "/admin/fournisseurs", "/admin/achats"] },
     ],
   },
-  {
-    title: "Logistique",
-    items: [
-      {
-        label: "Logistique",
-        to: "/admin/logistique",
-        icon: Truck,
-        roles: ADMIN_DIR,
-        paths: ["/admin/logistique", "/admin/preparation", "/admin/chauffeurs", "/admin/vehicules", "/admin/missions", "/admin/livraisons"],
-      },
-    ],
-  },
+  // [LOGISTIQUE] Section mise en pause : décommenter pour la réafficher.
+  // {
+  //   title: "Logistique",
+  //   items: [
+  //     {
+  //       label: "Logistique",
+  //       to: "/admin/logistique",
+  //       icon: Truck,
+  //       roles: ADMIN_DIR,
+  //       paths: ["/admin/logistique", "/admin/preparation", "/admin/chauffeurs", "/admin/vehicules", "/admin/missions", "/admin/livraisons"],
+  //     },
+  //   ],
+  // },
   // [CHAUFFEUR] Espace chauffeur en pause (voir CHAUFFEUR.md).
   // {
   //   title: "Livraisons",

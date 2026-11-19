@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, FileSpreadsheet } from "lucide-react";
 import { api, toApiError } from "@/lib/api";
 import type { SalesReport } from "@/types";
-import { money, qty } from "@/lib/format";
+import { money, qty, numeroDocument } from "@/lib/format";
 import { Button, Card, CardHeader, ErrorState, Input, Loading, PageHeader } from "@/components/ui";
 import { PilotageSection } from "./PilotageSection";
 
@@ -115,7 +115,7 @@ function ReportTables({ r }: { r: SalesReport }) {
           <tbody>
             {r.reliquats.map((l, i) => (
               <tr key={`${l.sale_id}-${i}`} className="border-b border-ge7-black/5">
-                <td className="py-2 font-semibold">{l.number}</td>
+                <td className="py-2 font-semibold">{numeroDocument(l.number)}</td>
                 <td className="py-2">{l.customer}</td>
                 <td className="py-2">{l.product}</td>
                 <td className="py-2 text-center">{qty(l.ordered, l.unit ?? undefined)}</td>

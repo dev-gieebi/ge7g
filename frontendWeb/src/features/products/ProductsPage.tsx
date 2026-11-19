@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ModuleTabs } from "@/components/ui";
 import { CATALOGUE_TABS } from "@/app/moduleTabs";
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { Category, Product, Unit } from "@/types";
 import { fieldErrors, useCrud, useListState, usePaginated } from "@/lib/hooks";
 import { useCategories, useUnits } from "@/features/shared/refData";
@@ -9,7 +9,7 @@ import { qty } from "@/lib/format";
 import {
   Badge,
   Button,
-  DataTable,
+  CardGrid,
   FormGrid,
   Input,
   Modal,
@@ -17,7 +17,6 @@ import {
   SearchInput,
   Select,
   Textarea,
-  type Column,
 } from "@/components/ui";
 
 type ProductForm = Partial<Omit<Product, "id" | "category" | "unit">>;
@@ -65,45 +64,6 @@ export function ProductsPage() {
   };
   const errors = fieldErrors(crud.create.error ?? crud.update.error);
 
-  const columns: Column<Product>[] = [
-    { key: "reference", header: "Référence", sortable: true, render: (p) => (
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-ge7-gold-soft text-xs font-bold text-ge7-bronze">
-            {p.image_url ? <img src={p.image_url} alt="" className="h-full w-full object-cover" /> : p.name.slice(0, 2).toUpperCase()}
-          </div>
-          <p className="font-mono text-xs font-bold">{p.reference}</p>
-        </div>
-      ),
-    },
-    {
-      key: "name",
-      header: "Désignation",
-      sortable: true,
-      render: (p) => <span className="font-semibold">{p.name}</span>,
-    },
-    { key: "category", header: "Catégorie", render: (p) => p.category?.name ?? "" },
-    { key: "stock", header: "Stock dispo", align: "right", render: (p) => qty(p.available_quantity, p.unit?.symbol) },
-    { key: "min_stock", header: "Stock minimum", align: "right", render: (p) => qty(p.min_stock, p.unit?.symbol) },
-    {
-      key: "alert",
-      header: "État",
-      render: (p) => {
-        const s = stockTone(p);
-        return <Badge tone={s.tone}>{s.label}</Badge>;
-      },
-    },
-    {
-      key: "actions",
-      header: "",
-      align: "right",
-      render: (p) => (
-        <Button size="sm" variant="ghost" onClick={() => open(p)}>
-          <Pencil size={14} />
-        </Button>
-      ),
-    },
-  ];
-
   return (
     <>
       <ModuleTabs tabs={CATALOGUE_TABS} />
@@ -131,17 +91,30 @@ export function ProductsPage() {
           <option value="out">Rupture</option>
         </Select>
       </div>
-      <DataTable
-        columns={columns}
+      <CardGrid
         data={data}
         isLoading={isLoading}
         error={errorMessage}
         rowKey={(p) => p.id}
         page={list.page}
         onPageChange={list.setPage}
-        sort={list.sort}
-        onSortChange={list.setSort}
+        onCardClick={open}
         emptyTitle="Aucun produit"
+        carte={(p) => {
+          const s = stockTone(p);
+          return {
+            image: p.image_url,
+            initiale: p.name,
+            badge: <Badge tone={s.tone}>{s.label}</Badge>,
+            titre: p.name,
+            sousTitre: <span className="font-mono">{p.reference}</span>,
+            details: [
+              { label: "Stock dispo", valeur: qty(p.available_quantity, p.unit?.symbol) },
+              { label: "Stock minimum", valeur: qty(p.min_stock, p.unit?.symbol) },
+            ],
+            pied: p.category?.name ? <Badge>{p.category.name}</Badge> : undefined,
+          };
+        }}
       />
 
       {editing && (

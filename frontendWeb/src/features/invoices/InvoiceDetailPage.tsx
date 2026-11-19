@@ -6,7 +6,7 @@ import { useAction, useOne } from "@/lib/hooks";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/rbac";
-import { datetime, money } from "@/lib/format";
+import { datetime, money, numeroDocument } from "@/lib/format";
 import { Button, Card, CardHeader, ErrorState, FormGrid, Input, Loading, Modal, PageHeader, Select, StatusBadge } from "@/components/ui";
 import { PrintableDocument } from "./PrintableDocument";
 
@@ -38,7 +38,7 @@ export function InvoiceDetailPage() {
       <div className="no-print">
         <PageHeader
           breadcrumb={<Link to="/admin/factures" className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Factures</Link>}
-          title={inv.number}
+          title={numeroDocument(inv.number)}
           subtitle={<span className="flex items-center gap-2"><StatusBadge status={inv.status} />{remaining > 0 && <span className="text-sm text-ge7-black/60">Reste à payer : <strong>{money(remaining)}</strong></span>}</span>}
           action={
             <>

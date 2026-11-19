@@ -27,7 +27,7 @@ class CommandeController extends Controller
     /** Décision sur une remise demandée par le client : la direction générale. */
     private const REMISE_ROLES = ['DG_ADMIN', 'SUPERADMIN'];
 
-    /** Affectation d'un chauffeur : gestionnaires + contrôle de gestion. */
+    /** Affectation d'un chauffeur : gestionnaires + approvisionneur. */
     private const ASSIGN_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'CDG_ADMIN', 'SUPERADMIN'];
 
     /** Livraison et échec : chauffeur affecté ou gestionnaires. */
@@ -335,15 +335,17 @@ class CommandeController extends Controller
     /** Indicateurs du tableau de bord boutique. */
     public function stats(Request $request): JsonResponse
     {
-        $this->authorizeUser($request, self::VIEW_ROLES);
+        $user = $this->authorizeUser($request, self::VIEW_ROLES);
+        // CA boutique : Direction et Super admin uniquement.
+        $finances = in_array($user->role, DashboardController::FINANCE_ROLES, true);
 
         $base = Commande::query()->whereNotIn('statut', [StatutCommande::Refusee, StatutCommande::Annulee]);
 
         return response()->json(['data' => [
             'en_attente' => Commande::where('statut', StatutCommande::EnAttente)->count(),
             'commandes_jour' => (clone $base)->whereDate('created_at', today())->count(),
-            'ca_boutique_jour' => (int) (clone $base)->whereDate('created_at', today())->sum('total'),
-            'ca_boutique_mois' => (int) (clone $base)->whereYear('created_at', now()->year)->whereMonth('created_at', now()->month)->sum('total'),
+            'ca_boutique_jour' => $finances ? (int) (clone $base)->whereDate('created_at', today())->sum('total') : null,
+            'ca_boutique_mois' => $finances ? (int) (clone $base)->whereYear('created_at', now()->year)->whereMonth('created_at', now()->month)->sum('total') : null,
             'taux_livrees' => Commande::whereIn('statut', [StatutCommande::Livree, StatutCommande::EnLivraison, StatutCommande::EchecLivraison])->count() > 0
                 ? round(Commande::where('statut', StatutCommande::Livree)->count() / Commande::whereIn('statut', [StatutCommande::Livree, StatutCommande::EnLivraison, StatutCommande::EchecLivraison])->count() * 100, 1)
                 : 0,

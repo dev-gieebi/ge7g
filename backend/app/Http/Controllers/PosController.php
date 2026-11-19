@@ -9,11 +9,11 @@ use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Tax;
 use App\Models\User;
+use App\Services\NumerotationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class PosController extends Controller
@@ -29,6 +29,9 @@ class PosController extends Controller
 
     /** Saisie des livraisons : rôles opérationnels + CDG_ADMIN. */
     private const DELIVER_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CDG_ADMIN'];
+
+    /** Ajout de produits à une vente déjà enregistrée : agent logistique, Direction, Super admin. */
+    private const ADD_ITEMS_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN'];
 
     private function authorizeUser(Request $request, array $roles = self::SALE_ROLES): User
     {
@@ -208,7 +211,8 @@ class PosController extends Controller
 
         $sale = DB::transaction(function () use ($validated, $user, $taxRate, $taxType, $taxes, $prices, $zoneId) {
             $sale = PosSale::create([
-                'number' => (string) Str::uuid(),
+                // N° annuel : la première vente de chaque année repart à 00001.
+                'number' => app(NumerotationService::class)->nextAnneeDabord('VNT'),
                 'user_id' => $user->id,
                 'zone_id' => $zoneId,
                 'customer_name' => $validated['customer_name'] ?? null,
@@ -301,7 +305,6 @@ class PosController extends Controller
             $sale->tax_amount = $taxAmount;
             $sale->tax_details = $taxDetails;
             $sale->total = $netSubtotal + $taxAmount;
-            $sale->number = 'VNT-'.now()->format('Y').'-'.str_pad((string) $sale->id, 5, '0', STR_PAD_LEFT);
             $sale->save();
 
             return $sale;
@@ -310,6 +313,158 @@ class PosController extends Controller
         $sale->load(['cashier', 'zone', 'items.product.unit']);
 
         return response()->json(['data' => $sale], 201);
+    }
+
+    /**
+     * Produits ajoutés à une vente de caisse déjà enregistrée, livrés tout de
+     * suite (sortie de stock). Impossible d'ajouter plus que le stock
+     * disponible ni un produit en rupture. Un produit déjà présent voit sa
+     * quantité augmenter au prix de sa ligne ; les totaux sont recalculés.
+     */
+    public function addItems(Request $request, PosSale $sale): JsonResponse
+    {
+        $user = $this->authorizeUser($request, self::ADD_ITEMS_ROLES);
+
+        if ($sale->annulee) {
+            abort(422, 'Une vente annulée ne peut plus être modifiée.');
+        }
+        if ($sale->source === 'boutique_en_ligne') {
+            abort(422, 'Une vente de la boutique en ligne se modifie depuis sa commande.');
+        }
+        if ($sale->soldee_le) {
+            abort(422, 'Une facture soldée ne peut plus recevoir de produits.');
+        }
+
+        $validated = $request->validate([
+            'items' => 'required|array|min:1|max:50',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+        ]);
+
+        $prices = $this->g7gPrices(array_column($validated['items'], 'product_id'), $sale->zone_id);
+
+        DB::transaction(function () use ($sale, $validated, $prices, $user) {
+            foreach ($validated['items'] as $input) {
+                $product = Product::lockForUpdate()->findOrFail($input['product_id']);
+                $qty = (float) $input['quantity'];
+                $available = max(0.0, (float) $product->stock_quantity - (float) $product->reserved_quantity);
+
+                // On n'ajoute jamais plus que le stock disponible.
+                if ($qty > $available) {
+                    throw ValidationException::withMessages([
+                        'items' => $available > 0
+                            ? 'Stock insuffisant pour « '.$product->name.' » : il ne reste que '.rtrim(rtrim(number_format($available, 2, ',', ' '), '0'), ',').', impossible d\'en ajouter '.rtrim(rtrim(number_format($qty, 2, ',', ' '), '0'), ',').'.'
+                            : '« '.$product->name.' » est en rupture de stock : il ne peut pas être ajouté.',
+                    ]);
+                }
+                $delivered = $qty;
+
+                $item = $sale->items()->where('product_id', $product->id)->first();
+                if ($item) {
+                    $item->quantity = (float) $item->quantity + $qty;
+                    $item->delivered_quantity = (float) $item->delivered_quantity + $delivered;
+                    $item->total = round((float) $item->quantity * (float) $item->unit_price, 4);
+                    $item->save();
+                } else {
+                    $g7gPrice = $prices->get($product->id);
+                    $floor = $g7gPrice && (float) $g7gPrice->amount > 0 ? (float) $g7gPrice->amount : (float) $product->sale_price;
+                    $unitPrice = isset($input['unit_price']) ? (float) $input['unit_price'] : $floor;
+
+                    if ($unitPrice < $floor - 0.0001) {
+                        throw ValidationException::withMessages([
+                            'items' => 'Le prix de « '.$product->name.' » ne peut pas être inférieur au barème de la ville ('.number_format($floor, 0, ',', ' ').' FCFA).',
+                        ]);
+                    }
+
+                    PosSaleItem::create([
+                        'pos_sale_id' => $sale->id,
+                        'product_id' => $product->id,
+                        'quantity' => $qty,
+                        'delivered_quantity' => $delivered,
+                        'unit_price' => $unitPrice,
+                        'total' => round($qty * $unitPrice, 4),
+                    ]);
+                }
+
+                if ($delivered > 0) {
+                    $newStock = (float) $product->stock_quantity - $delivered;
+                    $product->stock_quantity = $newStock;
+                    $product->save();
+
+                    StockMovement::create([
+                        'product_id' => $product->id,
+                        'type' => 'VENTE',
+                        'quantity' => -$delivered,
+                        'balance_after' => $newStock,
+                        'reference_type' => 'PosSale',
+                        'reference_id' => $sale->id,
+                        'reference_number' => $sale->number,
+                        'note' => 'Ajout à la vente',
+                        'user_id' => $user->id,
+                    ]);
+                }
+            }
+
+            $this->recalculerTotaux($sale);
+        });
+
+        $sale->load(['cashier', 'zone', 'items.product.unit', 'extras']);
+
+        return response()->json(['data' => $sale]);
+    }
+
+    /**
+     * Vente soldée : enregistrée, elle passe en « Payée » et le tampon
+     * « Soldé » reste sur la facture. Elle ne se retire que sur demande
+     * explicite (`soldee` = false).
+     */
+    public function solder(Request $request, PosSale $sale): JsonResponse
+    {
+        $this->authorizeUser($request, self::DELIVER_ROLES);
+
+        $validated = $request->validate(['soldee' => 'required|boolean']);
+
+        if ($sale->annulee) {
+            abort(422, 'Une vente annulée ne peut pas être soldée.');
+        }
+
+        if ($validated['soldee']) {
+            $sale->soldee_le ??= now();
+            $sale->status = 'PAYEE';
+        } else {
+            $sale->soldee_le = null;
+        }
+        $sale->save();
+
+        $sale->load(['cashier', 'zone', 'items.product.unit', 'extras']);
+
+        return response()->json(['data' => $sale]);
+    }
+
+    /** Totaux depuis les lignes, avec la remise et les taux de taxe figés de la vente. */
+    private function recalculerTotaux(PosSale $sale): void
+    {
+        $subtotal = (float) $sale->items()->sum('total');
+        $netSubtotal = $subtotal - round($subtotal * (float) $sale->discount_rate / 100);
+
+        if (is_array($sale->tax_details) && count($sale->tax_details) > 0) {
+            $taxAmount = 0;
+            $sale->tax_details = array_map(function (array $t) use ($netSubtotal, &$taxAmount) {
+                $signed = $t['type'] === 'TPS' ? -(float) $t['rate'] : (float) $t['rate'];
+                $t['amount'] = (int) round($netSubtotal * $signed / 100);
+                $taxAmount += $t['amount'];
+
+                return $t;
+            }, $sale->tax_details);
+        } else {
+            $taxAmount = (int) round($netSubtotal * (float) $sale->tax_rate);
+        }
+
+        $sale->subtotal = $subtotal;
+        $sale->tax_amount = $taxAmount;
+        $sale->total = $netSubtotal + $taxAmount;
+        $sale->save();
     }
 
     public function applyDiscount(Request $request, PosSale $sale): JsonResponse

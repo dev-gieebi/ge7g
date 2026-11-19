@@ -4,7 +4,7 @@ import { COMMERCIAL_TABS } from "@/app/moduleTabs";
 import type { Invoice } from "@/types";
 import { useListState, usePaginated } from "@/lib/hooks";
 import { useClientsRef } from "@/features/shared/refData";
-import { date, money } from "@/lib/format";
+import { date, money, numeroDocument } from "@/lib/format";
 import { Badge, DataTable, Input, PageHeader, SearchInput, Select, StatusBadge, type Column } from "@/components/ui";
 
 export function InvoicesPage() {
@@ -14,7 +14,7 @@ export function InvoicesPage() {
   const { data: clients } = useClientsRef();
 
   const columns: Column<Invoice>[] = [
-    { key: "number", header: "N°", sortable: true, render: (i) => <span className="font-semibold">{i.number}</span> },
+    { key: "number", header: "N°", sortable: true, render: (i) => <span className="font-semibold">{numeroDocument(i.number)}</span> },
     { key: "type", header: "Type", render: (i) => <Badge tone={i.type === "AVOIR" ? "red" : i.type === "TICKET" ? "gray" : "gold"}>{i.type}</Badge> },
     { key: "date", header: "Date", sortable: true, render: (i) => date(i.date) },
     { key: "client", header: "Client", render: (i) => i.client?.company_name ?? "Comptoir" },

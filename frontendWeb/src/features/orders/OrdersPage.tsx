@@ -5,7 +5,7 @@ import type { CommandeListItem, StatutCommande } from "@/types";
 import { useListState, usePaginated } from "@/lib/hooks";
 import { useToast } from "@/lib/toast";
 import { date, money } from "@/lib/format";
-import { Badge, DataTable, Input, PageHeader, SearchInput, Select, StatusBadge, type Column } from "@/components/ui";
+import { Badge, CardGrid, Input, PageHeader, SearchInput, Select, StatusBadge } from "@/components/ui";
 import { STATUT_LABELS, STATUTS } from "./statuts";
 
 export function OrdersPage() {
@@ -27,29 +27,6 @@ export function OrdersPage() {
   }, [enAttente, notify]);
 
   const statut = String(list.params.statut ?? "");
-
-  const columns: Column<CommandeListItem>[] = [
-    { key: "numero", header: "N°", render: (c) => <span className="font-semibold">{c.numero}</span> },
-    { key: "cree_le", header: "Date", render: (c) => date(c.cree_le) },
-    {
-      key: "client",
-      header: "Client",
-      render: (c) => (
-        <span className="flex flex-wrap items-center gap-1.5">
-          <span className="font-medium">{c.client}</span>
-          {c.espace_client && <Badge tone="purple">compte</Badge>}
-          {c.remise_statut === "demandee" && <Badge tone="amber">remise</Badge>}
-          {!!c.annotations && <Badge tone="gold">{c.annotations} annot.</Badge>}
-          {!!c.a_referencer && <Badge tone="amber">{c.a_referencer} à référencer</Badge>}
-        </span>
-      ),
-    },
-    { key: "telephone", header: "Téléphone", render: (c) => c.telephone },
-    { key: "quartier", header: "Quartier", render: (c) => `${c.quartier} · ${c.ville}` },
-    { key: "total", header: "Montant", align: "right", render: (c) => <span className="font-bold">{money(c.total)}</span> },
-    { key: "statut", header: "Statut", render: (c) => <StatusBadge status={c.statut} /> },
-    { key: "chauffeur", header: "Chauffeur", render: (c) => c.chauffeur ?? "" },
-  ];
 
   return (
     <>
@@ -76,16 +53,36 @@ export function OrdersPage() {
         <Input type="date" value={String(list.filters.from ?? "")} onChange={(e) => list.setFilter("from", e.target.value)} />
         <Input type="date" value={String(list.filters.to ?? "")} onChange={(e) => list.setFilter("to", e.target.value)} />
       </div>
-      <DataTable
-        columns={columns}
+      <CardGrid
+        sansImage
         data={data}
         isLoading={isLoading}
         error={errorMessage}
         rowKey={(c) => c.id}
-        onRowClick={(c) => navigate(`/admin/commandes/${c.id}`)}
+        onCardClick={(c) => navigate(`/admin/commandes/${c.id}`)}
         page={list.page}
         onPageChange={list.setPage}
         emptyTitle="Aucune commande"
+        carte={(c) => ({
+          badge: <StatusBadge status={c.statut} />,
+          titre: c.numero,
+          sousTitre: c.client,
+          details: [
+            { label: "Date", valeur: date(c.cree_le) },
+            { label: "Téléphone", valeur: c.telephone },
+            { label: "Quartier", valeur: `${c.quartier} · ${c.ville}` },
+            ...(c.chauffeur ? [{ label: "Chauffeur", valeur: c.chauffeur }] : []),
+          ],
+          pied: (
+            <>
+              {c.espace_client && <Badge tone="purple">compte</Badge>}
+              {c.remise_statut === "demandee" && <Badge tone="amber">remise</Badge>}
+              {!!c.annotations && <Badge tone="gold">{c.annotations} annot.</Badge>}
+              {!!c.a_referencer && <Badge tone="amber">{c.a_referencer} à référencer</Badge>}
+            </>
+          ),
+          valeur: money(c.total),
+        })}
       />
     </>
   );

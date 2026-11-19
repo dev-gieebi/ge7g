@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ModuleTabs } from "@/components/ui";
 import { APPRO_TABS } from "@/app/moduleTabs";
 import { useSearchParams } from "react-router-dom";
-import { ArrowLeftRight, ChevronLeft, ChevronRight, FileSpreadsheet, History, Inbox, Loader2, AlertCircle, Table2 } from "lucide-react";
+import { ArrowLeftRight, FileSpreadsheet, History, Inbox, Loader2, AlertCircle, Table2 } from "lucide-react";
 import { EtatStockTable } from "./EtatStockTable";
 import type { Product, StockMovement } from "@/types";
 import { api } from "@/lib/api";
@@ -12,7 +12,7 @@ import { datetime, money, qty } from "@/lib/format";
 import { stockTone } from "@/features/products/ProductsPage";
 import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/rbac";
-import { Badge, Button, DataTable, Input, PageHeader, SearchInput, Select, type Column } from "@/components/ui";
+import { Badge, Button, CardGrid, Input, PageHeader, Pagination, SearchInput, Select } from "@/components/ui";
 
 type Tab = "levels" | "etat" | "movements";
 
@@ -30,21 +30,14 @@ export function StockPage() {
   const { user } = useAuth();
   // Suivi des mouvements (entrées/sorties, factures, BL) : Direction et CDG uniquement.
   const canSeeMovements = hasRole(user, "DG_ADMIN", "CDG_ADMIN");
+  // État du stock (valeurs financières) : Direction et Super admin uniquement.
+  const canSeeEtat = hasRole(user, "DG_ADMIN");
   const [tab, setTab] = useState<Tab>("levels");
   const levels = useListState({ per_page: 20, alert: params.get("alert") ?? undefined });
   const movements = useListState({ per_page: 25 });
   const lv = usePaginated<Product>("products", "/stocks", levels.params, tab === "levels");
   const mv = usePaginated<StockMovement>("stock-movements", "/stock-movements", movements.params, tab === "movements");
   const { data: products } = useProductsRef();
-
-  const levelCols: Column<Product>[] = [
-    { key: "name", header: "Produit", sortable: true, render: (p) => <div><p className="font-semibold">{p.name}</p><p className="text-xs text-ge7-black/50">{p.reference}</p></div> },
-    { key: "stock_quantity", header: "Stock actuel", align: "right", sortable: true, render: (p) => qty(p.stock_quantity, p.unit?.symbol) },
-    { key: "reserved_quantity", header: "Réservé", align: "right", render: (p) => <span className="text-ge7-purple">{qty(p.reserved_quantity, p.unit?.symbol)}</span> },
-    { key: "available_quantity", header: "Disponible", align: "right", render: (p) => <span className="font-bold">{qty(p.available_quantity, p.unit?.symbol)}</span> },
-    { key: "min_stock", header: "Stock min.", align: "right", render: (p) => qty(p.min_stock, p.unit?.symbol) },
-    { key: "state", header: "État", render: (p) => { const s = stockTone(p); return <Badge tone={s.tone}>{s.label}</Badge>; } },
-  ];
 
   const mvRows = mv.data?.data ?? [];
   const mvMeta = mv.data?.meta;
@@ -79,7 +72,7 @@ export function StockPage() {
       />
       {canSeeMovements && (
         <div className="mb-4 flex gap-2">
-          {([["levels", "Niveaux de stock", ArrowLeftRight], ["etat", "État du stock", Table2], ["movements", "Mouvements", History]] as const).map(([k, label, Icon]) => (
+          {([["levels", "Niveaux de stock", ArrowLeftRight], ["etat", "État du stock", Table2], ["movements", "Mouvements", History]] as const).filter(([k]) => k !== "etat" || canSeeEtat).map(([k, label, Icon]) => (
             <button key={k} onClick={() => setTab(k)} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${tab === k ? "bg-ge7-black text-ge7-gold-light" : "bg-white text-ge7-black/70 hover:bg-ge7-gold-soft/50"}`}>
               <Icon size={15} /> {label}
             </button>
@@ -87,7 +80,7 @@ export function StockPage() {
         </div>
       )}
 
-      {tab === "etat" && canSeeMovements ? (
+      {tab === "etat" && canSeeEtat ? (
         <EtatStockTable />
       ) : !canSeeMovements || tab === "levels" ? (
         <>
@@ -99,7 +92,33 @@ export function StockPage() {
               <option value="out">Rupture</option>
             </Select>
           </div>
-          <DataTable columns={levelCols} data={lv.data} isLoading={lv.isLoading} error={lv.errorMessage} rowKey={(p) => p.id} page={levels.page} onPageChange={levels.setPage} sort={levels.sort} onSortChange={levels.setSort} />
+          <CardGrid
+            sansImage
+            data={lv.data}
+            isLoading={lv.isLoading}
+            error={lv.errorMessage}
+            rowKey={(p) => p.id}
+            page={levels.page}
+            onPageChange={levels.setPage}
+            emptyTitle="Aucun produit"
+            carte={(p) => {
+              const s = stockTone(p);
+              return {
+                image: p.image_url,
+                initiale: p.name,
+                badge: <Badge tone={s.tone}>{s.label}</Badge>,
+                titre: p.name,
+                sousTitre: <span className="font-mono">{p.reference}</span>,
+                details: [
+                  { label: "Stock actuel", valeur: qty(p.stock_quantity, p.unit?.symbol) },
+                  { label: "Réservé", valeur: <span className="text-ge7-purple">{qty(p.reserved_quantity, p.unit?.symbol)}</span> },
+                  { label: "Stock min.", valeur: qty(p.min_stock, p.unit?.symbol) },
+                ],
+                pied: <span className="text-xs text-ge7-black/50">Disponible</span>,
+                valeur: qty(p.available_quantity, p.unit?.symbol),
+              };
+            }}
+          />
         </>
       ) : (
         <>
@@ -134,6 +153,7 @@ export function StockPage() {
             </div>
           )}
 
+          <Pagination meta={mvMeta} page={movements.page} onPageChange={movements.setPage} />
           <div className="overflow-hidden rounded-3xl border border-ge7-black/5 bg-white shadow-soft">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1500px] border-collapse text-[11px]">
@@ -197,20 +217,6 @@ export function StockPage() {
                 </tbody>
               </table>
             </div>
-            {mvMeta && mvMeta.last_page > 1 && (
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ge7-black/5 px-4 py-3 text-sm text-ge7-black/60">
-                <span>{mvMeta.from ?? 0}–{mvMeta.to ?? 0} sur {mvMeta.total}</span>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="secondary" disabled={mvMeta.current_page <= 1} onClick={() => movements.setPage(mvMeta.current_page - 1)}>
-                    <ChevronLeft size={14} /> Précédent
-                  </Button>
-                  <span className="px-2 font-semibold text-ge7-black">{mvMeta.current_page} / {mvMeta.last_page}</span>
-                  <Button size="sm" variant="secondary" disabled={mvMeta.current_page >= mvMeta.last_page} onClick={() => movements.setPage(mvMeta.current_page + 1)}>
-                    Suivant <ChevronRight size={14} />
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
         </>
       )}

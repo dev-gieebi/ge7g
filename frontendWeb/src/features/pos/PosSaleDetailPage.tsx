@@ -5,7 +5,8 @@ import type { PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/rbac";
-import { qty } from "@/lib/format";
+import { AjoutProduitsModal, type LigneAjout } from "@/features/shared/AjoutProduitsModal";
+import { qty, numeroDocument } from "@/lib/format";
 import { Badge, Button, Card, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/ui";
 import { PrintableDocument } from "@/features/invoices/PrintableDocument";
 import { Facture } from "./Facture";
@@ -21,12 +22,11 @@ export function PosSaleDetailPage() {
   // Remise : rôles de facturation. Saisie des livraisons : rôles opérationnels + CDG_ADMIN.
   const canDiscount = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
   const canDeliver = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
+  // Ajout de produits à la vente : agent logistique, Direction, Super admin.
+  const canAddItems = hasRole(user, "LG_ADMIN", "DG_ADMIN");
+  const [ajout, setAjout] = useState(false);
   const [deliverQty, setDeliverQty] = useState<Record<number, number>>({});
   const [discountRate, setDiscountRate] = useState<number | null>(null);
-  // Document affiché/imprimé : facture A4 ou bon de commande (même modèle).
-  const [bonCommande, setBonCommande] = useState(false);
-  // Tampon « SOLDÉ » ajouté sur le document avant impression.
-  const [solde, setSolde] = useState(false);
   // Frais annexes (manutention, livraison…) : chargés depuis la vente, modifiables puis enregistrés.
   const [extras, setExtras] = useState<{ label: string; amount: number }[]>([]);
 
@@ -60,9 +60,21 @@ export function PosSaleDetailPage() {
     window.print();
   }, [navigate]);
 
+  const ajouterProduits = useAction<{ items: LigneAjout[] }, PosSale>(
+    () => `/pos/sales/${id}/items`,
+    { keys: ["pos-sale", "pos-sales", "pos-products", "products", "stock-movements"], success: "Produits ajoutés à la vente", body: (v) => v },
+  );
+
+  // Soldé enregistré : reste sur la facture ; retiré seulement par un clic explicite.
+  const solder = useAction<{ soldee: boolean }, PosSale>(
+    () => `/pos/sales/${id}/solde`,
+    { keys: ["pos-sale", "pos-sales", "dashboard"], success: "Statut « Soldé » mis à jour", body: (v) => v },
+  );
+
   if (sale.isLoading) return <Loading />;
   if (!sale.data) return <ErrorState message="Vente introuvable" />;
   const s = sale.data;
+  const solde = !!s.soldee_le;
 
   const doc = {
     kind: (mode === "ticket" ? "TICKET" : "FACTURE") as "TICKET" | "FACTURE",
@@ -89,14 +101,27 @@ export function PosSaleDetailPage() {
               <ArrowLeft size={12} /> {isCashier ? "Caisse" : "Ventes"}
             </Link>
           }
-          title={s.number}
+          title={numeroDocument(s.number)}
           subtitle={<span className="inline-flex items-center gap-2"><StatusBadge status={s.status} /><StatusBadge status={s.delivery_status} />{s.zone ? <Badge tone="purple">{s.zone.name}</Badge> : null}</span>}
           action={
             <>
               {!isCashier && (
                 <>
-                  <Button variant={bonCommande ? "secondary" : "purple"} onClick={() => setBonCommande(!bonCommande)}><Truck size={15} /> {bonCommande ? "Facture" : "Bon de commande"}</Button>
-                  <Button variant={solde ? "secondary" : "purple"} onClick={() => setSolde(!solde)}><BadgeCheck size={15} /> Soldé</Button>
+                  {/* Facture soldée : plus d'ajout de produits. */}
+                  {canAddItems && !s.annulee && !solde && s.source !== "boutique_en_ligne" && (
+                    <Button variant="secondary" onClick={() => setAjout(true)}><Plus size={15} /> Ajouter des produits</Button>
+                  )}
+                  <Button
+                    variant={solde ? "secondary" : "purple"}
+                    loading={solder.isPending}
+                    title={solde ? "Cliquer pour retirer le tampon « Soldé »" : "Marquer la vente comme soldée"}
+                    onClick={() => {
+                      if (!solde) solder.mutate({ soldee: true });
+                      else if (window.confirm("Retirer le tampon « Soldé » de cette facture ?")) solder.mutate({ soldee: false });
+                    }}
+                  >
+                    <BadgeCheck size={15} /> {solde ? "Soldée" : "Soldé"}
+                  </Button>
                 </>
               )}
               <Button onClick={handlePrint}><Printer size={15} /> Imprimer</Button>
@@ -216,9 +241,19 @@ export function PosSaleDetailPage() {
       {isCashier ? (
         <PrintableDocument compact doc={doc} />
       ) : (
-        <Facture sale={s} docTitle={bonCommande ? "BON DE COMMANDE" : "FACTURE"} solde={solde} extras={extras} />
+        <Facture sale={s} docTitle="FACTURE" solde={solde} extras={extras} />
       )}
       <div className="no-print mt-6 text-center"><Link to="/admin/caisse"><Button variant="purple">Nouvelle vente</Button></Link></div>
+      {ajout && (
+        <AjoutProduitsModal
+          titre={`Ajouter des produits à la vente ${numeroDocument(s.number)}`}
+          zoneId={s.zone_id}
+          montrerStock
+          enCours={ajouterProduits.isPending}
+          onClose={() => setAjout(false)}
+          onValider={(items) => ajouterProduits.mutateAsync({ items }).then(() => setAjout(false)).catch(() => {})}
+        />
+      )}
     </>
   );
 }

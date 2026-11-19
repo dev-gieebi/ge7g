@@ -8,11 +8,11 @@ use App\Models\Quote;
 use App\Models\QuoteItem;
 use App\Models\Tax;
 use App\Models\User;
+use App\Services\NumerotationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class QuoteController extends Controller
@@ -103,7 +103,8 @@ class QuoteController extends Controller
 
         $quote = DB::transaction(function () use ($validated, $user) {
             $quote = Quote::create([
-                'number' => (string) Str::uuid(),
+                // N° annuel : la première proforma de chaque année repart à 00001.
+                'number' => app(NumerotationService::class)->nextAnneeDabord('DEV'),
                 'user_id' => $user->id,
                 'zone_id' => $validated['zone_id'],
                 'customer_name' => $validated['customer_name'],
@@ -116,7 +117,6 @@ class QuoteController extends Controller
             ]);
 
             $this->fillTotals($quote, $validated['items'], $validated['tax_ids'] ?? [], (int) $validated['zone_id']);
-            $quote->number = 'DEV-'.now()->format('Y').'-'.str_pad((string) $quote->id, 5, '0', STR_PAD_LEFT);
             $quote->save();
             $this->syncExtras($quote, $validated['extras'] ?? []);
 
@@ -132,8 +132,8 @@ class QuoteController extends Controller
     {
         $this->authorizeUser($request, self::MANAGE_ROLES);
 
-        if (in_array($quote->status, ['VALIDE', 'ANNULE'], true)) {
-            abort(422, 'Une proforma validée ou annulée ne peut plus être modifiée.');
+        if (in_array($quote->status, ['VALIDE', 'ENVOYE', 'ANNULE'], true)) {
+            abort(422, 'Une proforma validée, envoyée ou annulée ne peut plus être modifiée.');
         }
 
         $validated = $request->validate($this->rules());
@@ -172,6 +172,11 @@ class QuoteController extends Controller
             'extras.*.amount' => 'required|numeric|min:0|max:999999999',
         ]);
 
+        // Frais annexes figés dès que la proforma est validée, envoyée ou annulée.
+        if ($quote->status !== 'BROUILLON') {
+            abort(422, 'Les frais annexes ne se modifient que sur une proforma en brouillon.');
+        }
+
         $this->syncExtras($quote, $validated['extras']);
 
         $quote->load(['creator', 'zone', 'items.product.unit', 'extras']);
@@ -183,13 +188,100 @@ class QuoteController extends Controller
     {
         $this->authorizeUser($request, self::MANAGE_ROLES);
 
-        if ($quote->status === 'VALIDE') {
-            abort(422, 'Une proforma validée ne peut pas être supprimée.');
+        if (in_array($quote->status, ['VALIDE', 'ENVOYE'], true)) {
+            abort(422, 'Une proforma validée ou envoyée ne peut pas être supprimée.');
         }
 
         $quote->delete();
 
         return response()->json(['data' => true]);
+    }
+
+    /**
+     * Produits ajoutés à une proforma tant qu'elle n'est pas validée. Un
+     * produit déjà présent voit sa quantité augmenter (prix de la ligne
+     * conservé) ; les totaux sont recalculés avec les taxes de la proforma.
+     */
+    public function addItems(Request $request, Quote $quote): JsonResponse
+    {
+        $this->authorizeUser($request, self::MANAGE_ROLES);
+
+        if ($quote->status !== 'BROUILLON') {
+            abort(422, 'Des produits ne peuvent être ajoutés qu\'à une proforma non validée.');
+        }
+
+        $validated = $request->validate([
+            'items' => 'required|array|min:1|max:50',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+        ]);
+
+        DB::transaction(function () use ($quote, $validated) {
+            $products = Product::whereIn('id', array_column($validated['items'], 'product_id'))->get()->keyBy('id');
+            $floors = $this->floorPrices($products->keys()->all(), $quote->zone_id);
+
+            foreach ($validated['items'] as $input) {
+                /** @var Product $product */
+                $product = $products->get($input['product_id']);
+                $qty = (float) $input['quantity'];
+                $existing = $quote->items()->where('product_id', $product->id)->first();
+
+                if ($existing) {
+                    $existing->quantity = (float) $existing->quantity + $qty;
+                    $existing->total = round((float) $existing->quantity * (float) $existing->unit_price, 4);
+                    $existing->save();
+
+                    continue;
+                }
+
+                $floorPrice = $floors->get($product->id);
+                $floor = $floorPrice && (float) $floorPrice->amount > 0 ? (float) $floorPrice->amount : (float) $product->sale_price;
+                $unitPrice = isset($input['unit_price']) ? (float) $input['unit_price'] : $floor;
+
+                if ($unitPrice < $floor - 0.0001) {
+                    throw ValidationException::withMessages([
+                        'items' => 'Le prix de « '.$product->name.' » ne peut pas être inférieur au barème de la ville ('.number_format($floor, 0, ',', ' ').' FCFA).',
+                    ]);
+                }
+
+                QuoteItem::create([
+                    'quote_id' => $quote->id,
+                    'product_id' => $product->id,
+                    'quantity' => $qty,
+                    'unit_price' => $unitPrice,
+                    'total' => round($qty * $unitPrice, 4),
+                ]);
+            }
+
+            $this->recalculerTotaux($quote);
+        });
+
+        $quote->load(['creator', 'zone', 'items.product.unit', 'extras']);
+
+        return response()->json(['data' => $quote]);
+    }
+
+    /** Totaux depuis les lignes, avec la remise et les taux de taxe figés de la proforma. */
+    private function recalculerTotaux(Quote $quote): void
+    {
+        $subtotal = (float) $quote->items()->sum('total');
+        $netSubtotal = $subtotal - round($subtotal * (float) $quote->discount_rate / 100);
+
+        $taxAmount = 0;
+        $details = is_array($quote->tax_details) ? $quote->tax_details : [];
+        $quote->tax_details = array_map(function (array $t) use ($netSubtotal, &$taxAmount) {
+            $signed = $t['type'] === 'TPS' ? -(float) $t['rate'] : (float) $t['rate'];
+            $t['amount'] = (int) round($netSubtotal * $signed / 100);
+            $taxAmount += $t['amount'];
+
+            return $t;
+        }, $details);
+
+        $quote->subtotal = $subtotal;
+        $quote->tax_amount = $taxAmount;
+        $quote->total = $netSubtotal + $taxAmount;
+        $quote->save();
     }
 
     public function updateStatus(Request $request, Quote $quote): JsonResponse
@@ -199,6 +291,22 @@ class QuoteController extends Controller
         $validated = $request->validate([
             'status' => 'required|in:BROUILLON,ENVOYE,VALIDE,ANNULE',
         ]);
+
+        // Ordre imposé : une proforma est d'abord validée, puis envoyée.
+        $transitions = [
+            'BROUILLON' => ['VALIDE', 'ANNULE'],
+            'VALIDE' => ['ENVOYE'],
+            'ENVOYE' => [],
+            'ANNULE' => [],
+        ];
+
+        if (! in_array($validated['status'], $transitions[$quote->status] ?? [], true)) {
+            throw ValidationException::withMessages([
+                'status' => $quote->status === 'BROUILLON' && $validated['status'] === 'ENVOYE'
+                    ? 'La proforma doit être validée avant d\'être envoyée.'
+                    : 'Changement de statut impossible pour cette proforma.',
+            ]);
+        }
 
         $quote->status = $validated['status'];
         $quote->save();

@@ -143,7 +143,6 @@ export const router = createBrowserRouter([
               { path: "/admin/factures", element: <InvoicesPage /> },
               { path: "/admin/factures/:id", element: <InvoiceDetailPage /> },
               { path: "/admin/produits", element: <ProductsPage /> },
-              { path: "/admin/prix", element: <PricesPage /> },
               { path: "/admin/stock", element: <StockPage /> },
               { path: "/admin/achats", element: <PurchasesPage /> },
               // Anciennes pages logistiques B2B (missions/véhicules/chantiers)
@@ -181,21 +180,21 @@ export const router = createBrowserRouter([
             ],
           },
           {
-            // Rapports de suivi : Direction + CDG_ADMIN (LG_ADMIN n'y a pas accès).
-            element: <RequireRole roles={["DG_ADMIN", "CDG_ADMIN"]} />,
-            children: [{ path: "/admin/rapports", element: <ReportsPage /> }],
+            // Rapports (chiffres financiers) : Direction et Super admin uniquement.
+            element: <RequireRole roles={["DG_ADMIN"]} />,
+            children: [
+              { path: "/admin/rapports", element: <ReportsPage /> },
+              // Prix / Barème : Direction et Super admin uniquement.
+              { path: "/admin/prix", element: <PricesPage /> },
+            ],
           },
-          // [CHAUFFEUR] Espace chauffeur en pause (voir CHAUFFEUR.md).
-          // {
-          //   // Espace chauffeur : ses livraisons uniquement (filtre serveur).
-          //   // strict : même le SUPERADMIN n'y a pas accès, c'est l'espace
-          //   // personnel du chauffeur connecté.
-          //   element: <RequireRole roles={["CHAUFFEUR"]} strict />,
-          //   children: [
-          //     { path: "/admin/mes-livraisons", element: <DriverHomePage /> },
-          //     { path: "/admin/mes-livraisons/:id", element: <OrderDetailPage /> },
-          //   ],
-          // },
+          /*{
+              element: <RequireRole roles={["CHAUFFEUR"]} strict />,
+              children: [
+                 { path: "/admin/mes-livraisons", element: <DriverHomePage /> },
+                 { path: "/admin/mes-livraisons/:id", element: <OrderDetailPage /> },
+               ],
+             },*/
           {
             element: <RequireRole roles={["LG_ADMIN", "CAISSIER"]} />,
             children: [{ path: "/admin/caisse", element: <PosPage /> }],

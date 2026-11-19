@@ -15,12 +15,15 @@ import type { CommandeStats, DashboardStats, SalesSeriesPoint } from "@/types";
 import { money, relative } from "@/lib/format";
 import { Card, CardHeader, ErrorState, KpiCard, Loading, PageHeader } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
+import { hasRole } from "@/lib/rbac";
 
 export function DashboardPage() {
   const { user } = useAuth();
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth() + 1;
+  // Chiffres financiers (ventes caisse, CA) : Direction et Super admin uniquement.
+  const voitFinances = hasRole(user, "DG_ADMIN");
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["dashboard"],
@@ -31,6 +34,7 @@ export function DashboardPage() {
   const { data: salesSeries } = useQuery({
     queryKey: ["sales-series", year, month],
     queryFn: () => getOne<SalesSeriesPoint[]>(`/dashboard/sales-series?year=${year}&month=${month}`),
+    enabled: voitFinances,
   });
 
   const { data: boutique } = useQuery({
@@ -51,7 +55,7 @@ export function DashboardPage() {
         breadcrumb="Pilotage"
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className={`grid gap-4 sm:grid-cols-2 ${voitFinances ? "xl:grid-cols-5" : "xl:grid-cols-4"}`}>
         {/*<KpiCard label="Chiffre d'affaires" value={money(data.revenue)} trend={data.revenue_trend} hint="vs période précédente" icon={Banknote} tone="gold" />
         <KpiCard label="Commandes" value={data.orders_count} icon={ShoppingCart} tone="purple" to="/admin/commandes" />
         <KpiCard label="Ventes en ligne" value={money(data.online_sales)} icon={Globe} tone="purple" to="/admin/commandes" />
@@ -62,20 +66,25 @@ export function DashboardPage() {
         <KpiCard label="Produits vendus aujourd'hui" value={data.products_sold_today} icon={ShoppingCart} tone="purple" to="/admin/caisse/ventes" />
         <KpiCard label="Stock faible" value={data.low_stock} icon={AlertTriangle} tone={data.low_stock ? "red" : "green"} to="/admin/stock?alert=low" />
         <KpiCard label="Ruptures" value={data.out_of_stock} icon={PackageX} tone={data.out_of_stock ? "red" : "green"} to="/admin/stock?alert=out" />
-        <KpiCard label="Ventes caisse" value={money(data.pos_sales)} icon={CreditCard} tone="gold" to="/admin/caisse/ventes" />
+        {voitFinances && <KpiCard label="Ventes caisse" value={money(data.pos_sales ?? 0)} icon={CreditCard} tone="gold" to="/admin/caisse/ventes" />}
       </div>
 
       {boutique && (
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className={`mt-4 grid gap-4 sm:grid-cols-2 ${voitFinances ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>
           <KpiCard label="Commandes en attente" value={boutique.en_attente} icon={ShoppingBag} tone={boutique.en_attente ? "red" : "green"} to="/admin/commandes?statut=en_attente" />
           <KpiCard label="Commandes du jour" value={boutique.commandes_jour} icon={ShoppingBag} tone="purple" to="/admin/commandes" />
-          <KpiCard label="CA boutique (jour)" value={money(boutique.ca_boutique_jour)} icon={Globe} tone="gold" to="/admin/commandes" />
-          <KpiCard label="CA boutique (mois)" value={money(boutique.ca_boutique_mois)} icon={Globe} tone="purple" to="/admin/commandes" />
+          {voitFinances && (
+            <>
+              <KpiCard label="CA boutique (jour)" value={money(boutique.ca_boutique_jour ?? 0)} icon={Globe} tone="gold" to="/admin/commandes" />
+              <KpiCard label="CA boutique (mois)" value={money(boutique.ca_boutique_mois ?? 0)} icon={Globe} tone="purple" to="/admin/commandes" />
+            </>
+          )}
           <KpiCard label="Taux de livraison" value={`${boutique.taux_livrees} %`} icon={Package} tone="green" to="/admin/commandes?statut=livree" />
         </div>
       )}
 
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        {voitFinances && (
         <Card className="xl:col-span-2">
           <CardHeader title="Ventes caisse sur la période" subtitle="Chiffre d'affaires et volume des ventes en caisse" />
           <div className="h-72">
@@ -96,8 +105,9 @@ export function DashboardPage() {
             </ResponsiveContainer>
           </div>
         </Card>
+        )}
 
-        <Card>
+        <Card className={voitFinances ? undefined : "xl:col-span-3"}>
           <CardHeader title="Top produits" subtitle="Parts des ventes" />
           <div className="h-72">
             <ResponsiveContainer>

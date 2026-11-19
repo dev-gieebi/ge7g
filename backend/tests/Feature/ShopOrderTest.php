@@ -151,7 +151,7 @@ class ShopOrderTest extends TestCase
         $this->assertEquals($admin->id, $commande->validee_par);
 
         $facture = Facture::firstOrFail();
-        $this->assertMatchesRegularExpression('/^FAC-\d{6}-'.date('Y').'$/', $facture->numero);
+        $this->assertMatchesRegularExpression('/^FAC-\d{5}-'.date('Y').'$/', $facture->numero);
         $this->assertEquals('non_payee', $facture->statut_paiement);
         $this->assertEquals(30000, (int) $facture->montant_total);
         $this->assertCount(1, $facture->lignes);
@@ -282,7 +282,7 @@ class ShopOrderTest extends TestCase
         DB::transaction(function () use ($service) {
             $this->assertEquals('CMD-00001-'.date('Y'), $service->next('CMD'));
             $this->assertEquals('CMD-00002-'.date('Y'), $service->next('CMD'));
-            $this->assertMatchesRegularExpression('/^FAC-\d{6}-/', $service->next('FAC'));
+            $this->assertMatchesRegularExpression('/^FAC-\d{5}-/', $service->next('FAC'));
         });
 
         // Nouvelle année : la séquence repart à 1.

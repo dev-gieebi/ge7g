@@ -5,6 +5,8 @@ export * from "./KpiCard";
 export * from "./Modal";
 export * from "./Form";
 export * from "./DataTable";
+export * from "./CardGrid";
+export * from "./NumberField";
 export * from "./PageHeader";
 export * from "./SearchInput";
 export * from "./States";

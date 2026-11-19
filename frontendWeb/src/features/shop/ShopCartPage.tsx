@@ -34,7 +34,7 @@ export function ShopCartPage() {
               <p className="text-xs text-ge7-black/50">{money(i.prix)}</p>
             </div>
             <div className="flex items-center rounded-full border border-ge7-black/15">
-              <button onClick={() => cart.setQuantite(i.produit_id, i.quantite - 1)} className="p-2 text-ge7-black/60 hover:text-ge7-black"><Minus size={14} /></button>
+              <button onClick={() => cart.setQuantite(i.produit_id, Math.max(1, i.quantite - 1))} className="p-2 text-ge7-black/60 hover:text-ge7-black"><Minus size={14} /></button>
               <span className="w-8 text-center text-sm font-bold">{i.quantite}</span>
               <button onClick={() => cart.setQuantite(i.produit_id, i.quantite + 1)} className="p-2 text-ge7-black/60 hover:text-ge7-black"><Plus size={14} /></button>
             </div>

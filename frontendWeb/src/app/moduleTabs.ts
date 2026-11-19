@@ -16,7 +16,8 @@ export const CATALOGUE_TABS: ModuleTab[] = [
   { label: "Produits", to: "/admin/produits", roles: ADMINS },
   { label: "Catégories", to: "/admin/categories", roles: ADMINS },
   { label: "Unités", to: "/admin/unites", roles: ADMINS },
-  { label: "Prix / Barème", to: "/admin/prix", roles: ADMINS },
+  // Prix / Barème : Direction et Super admin uniquement.
+  { label: "Prix / Barème", to: "/admin/prix", roles: ["DG_ADMIN"] },
 ];
 
 export const APPRO_TABS: ModuleTab[] = [

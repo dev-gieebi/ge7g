@@ -6,9 +6,9 @@ import type { Purchase, PurchaseItem } from "@/types";
 import { fieldErrors, useAction, useCrud, useListState, useOne, usePaginated } from "@/lib/hooks";
 import { useProductsRef, useSuppliersRef } from "@/features/shared/refData";
 import { LineItemsEditor, type LineItem } from "@/features/shared/LineItemsEditor";
-import { date, money, qty } from "@/lib/format";
+import { date, money, numeroDocument, qty } from "@/lib/format";
 import { useToast } from "@/lib/toast";
-import { Button, DataTable, FormGrid, Input, Modal, PageHeader, SearchInput, Select, StatusBadge, type Column } from "@/components/ui";
+import { Button, CardGrid, FormGrid, Input, Modal, PageHeader, SearchInput, Select, StatusBadge } from "@/components/ui";
 import { BonDeCommande } from "./BonDeCommande";
 
 interface PurchaseForm {
@@ -29,13 +29,16 @@ export function PurchasesPage() {
   const detail = useOne<Purchase>("purchase", receiveId ? `/purchases/${receiveId}` : null);
   const [received, setReceived] = useState<Record<number, number>>({});
   const [printDoc, setPrintDoc] = useState<Purchase | null>(null);
+  // Clic sur une carte : le bon de commande s'affiche sans lancer l'impression.
+  const [impressionAuto, setImpressionAuto] = useState(false);
+  const ouvrirBon = (p: Purchase, imprimer: boolean) => { setImpressionAuto(imprimer); setPrintDoc(p); };
   const notify = useToast();
 
   useEffect(() => {
-    if (!printDoc) return;
+    if (!printDoc || !impressionAuto) return;
     const t = window.setTimeout(() => window.print(), 400);
     return () => window.clearTimeout(t);
-  }, [printDoc]);
+  }, [printDoc, impressionAuto]);
 
   const receive = useAction<{ id: number; items: { item_id: number; quantity: number }[] }>((v) => `/purchases/${v.id}/receive`, {
     keys: ["purchases", "purchase", "products", "stock-movements", "dashboard"],
@@ -54,7 +57,7 @@ export function PurchasesPage() {
       notify("Veuillez sélectionner un produit et une quantité valide pour chaque ligne", "error");
       return;
     }
-    crud.create.mutateAsync(form).then((created) => { setForm(null); setPrintDoc(created); }).catch(() => {});
+    crud.create.mutateAsync(form).then((created) => { setForm(null); ouvrirBon(created, true); }).catch(() => {});
   };
   const errors = fieldErrors(crud.create.error);
 
@@ -69,29 +72,6 @@ export function PurchasesPage() {
       .filter((x) => x.quantity > 0);
     receive.mutateAsync({ id: receiveId, items }).then(() => setReceiveId(null)).catch(() => {});
   };
-
-  const columns: Column<Purchase>[] = [
-    { key: "number", header: "N°", sortable: true, render: (p) => <span className="font-semibold">{p.number}</span> },
-    { key: "supplier", header: "Fournisseur", render: (p) => p.supplier?.name },
-    { key: "date", header: "Date", sortable: true, render: (p) => date(p.date) },
-    { key: "total", header: "Montant", align: "right", render: (p) => <span className="font-semibold">{money(p.total)}</span> },
-    { key: "status", header: "Statut", render: (p) => <StatusBadge status={p.status} /> },
-    {
-      key: "actions",
-      header: "",
-      align: "right",
-      render: (p) => (
-        <div className="flex justify-end gap-2">
-          {p.status !== "RECU" && (
-            <Button size="sm" variant="secondary" onClick={() => setPrintDoc(p)}><Printer size={14} /> Imprimer</Button>
-          )}
-          {p.status === "COMMANDE" || p.status === "RECU_PARTIEL" ? (
-            <Button size="sm" variant="purple" onClick={() => openReceive(p)}><PackageCheck size={14} /> Réceptionner</Button>
-          ) : null}
-        </div>
-      ),
-    },
-  ];
 
   if (printDoc) {
     return (
@@ -120,7 +100,33 @@ export function PurchasesPage() {
           {["COMMANDE", "RECU_PARTIEL", "RECU", "ANNULE"].map((s) => <option key={s} value={s}>{s}</option>)}
         </Select>
       </div>
-      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(p) => p.id} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucun achat" />
+      <CardGrid
+        sansImage
+        data={data}
+        isLoading={isLoading}
+        error={errorMessage}
+        rowKey={(p) => p.id}
+        page={list.page}
+        onPageChange={list.setPage}
+        onCardClick={(p) => ouvrirBon(p, false)}
+        emptyTitle="Aucun achat"
+        carte={(p) => ({
+          initiale: p.supplier?.name ?? p.number,
+          badge: <StatusBadge status={p.status} />,
+          titre: numeroDocument(p.number),
+          sousTitre: p.supplier?.name,
+          details: [{ label: "Date", valeur: date(p.date) }],
+          valeur: money(p.total),
+          actions:
+            // Bon entièrement reçu : plus rien à imprimer ni à réceptionner.
+            p.status !== "RECU" ? (
+              <>
+                <Button size="sm" variant="secondary" onClick={() => ouvrirBon(p, true)}><Printer size={14} /> Imprimer</Button>
+                {(p.status === "COMMANDE" || p.status === "RECU_PARTIEL") && <Button size="sm" variant="purple" onClick={() => openReceive(p)}><PackageCheck size={14} /> Réceptionner</Button>}
+              </>
+            ) : undefined,
+        })}
+      />
 
       {form && (
         <Modal title="Nouveau bon d'achat" size="lg" onClose={() => setForm(null)} footer={<><Button variant="secondary" onClick={() => setForm(null)}>Annuler</Button><Button type="submit" form="pur-form" loading={crud.create.isPending} disabled={!form.supplier_id || form.items.length === 0 || form.items.some((it) => !it.product_id || it.quantity <= 0)}>Créer le bon</Button></>}>
@@ -139,7 +145,7 @@ export function PurchasesPage() {
       )}
 
       {receiveId && (
-        <Modal title={`Réception ${detail.data?.number ?? ""}`} subtitle="Saisissez les quantités réellement reçues. Le stock est incrémenté et un mouvement ENTREE est créé par ligne." onClose={() => setReceiveId(null)} footer={<><Button variant="secondary" onClick={() => setReceiveId(null)}>Annuler</Button><Button variant="purple" onClick={submitReceive} loading={receive.isPending}>Valider la réception</Button></>}>
+        <Modal title={`Réception ${numeroDocument(detail.data?.number)}`} subtitle="Saisissez les quantités réellement reçues. Le stock est incrémenté et un mouvement ENTREE est créé par ligne." onClose={() => setReceiveId(null)} footer={<><Button variant="secondary" onClick={() => setReceiveId(null)}>Annuler</Button><Button variant="purple" onClick={submitReceive} loading={receive.isPending}>Valider la réception</Button></>}>
           {detail.data?.items ? (
             <div className="space-y-2">
               {detail.data.items.map((it: PurchaseItem) => {

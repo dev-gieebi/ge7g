@@ -7,11 +7,11 @@ use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Services\NumerotationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class PurchaseController extends Controller
 {
@@ -97,7 +97,8 @@ class PurchaseController extends Controller
 
         $purchase = DB::transaction(function () use ($validated) {
             $purchase = Purchase::create([
-                'number' => (string) Str::uuid(),
+                // N° annuel : le premier bon d'achat de chaque année repart à 00001.
+                'number' => app(NumerotationService::class)->nextAnneeDabord('ACH'),
                 'supplier_id' => $validated['supplier_id'],
                 'date' => $validated['date'],
                 'status' => 'COMMANDE',
@@ -106,7 +107,6 @@ class PurchaseController extends Controller
 
             $total = $this->syncItems($purchase, $validated['items']);
             $purchase->total = $total;
-            $purchase->number = 'ACH-'.now()->format('Y').'-'.str_pad((string) $purchase->id, 5, '0', STR_PAD_LEFT);
             $purchase->save();
 
             return $purchase;

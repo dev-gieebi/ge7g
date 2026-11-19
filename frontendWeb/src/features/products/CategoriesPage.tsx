@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { ModuleTabs } from "@/components/ui";
 import { CATALOGUE_TABS } from "@/app/moduleTabs";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import type { Category } from "@/types";
 import { fieldErrors, useCrud, useListState, usePaginated } from "@/lib/hooks";
-import { Button, DataTable, FormGrid, Input, Modal, PageHeader, SearchInput, type Column } from "@/components/ui";
+import { Button, CardGrid, FormGrid, Input, Modal, PageHeader, SearchInput } from "@/components/ui";
 
 type Form = Partial<Omit<Category, "id" | "products_count">>;
 
@@ -30,30 +30,6 @@ export function CategoriesPage() {
   };
   const errors = fieldErrors(crud.create.error ?? crud.update.error);
 
-  const columns: Column<Category>[] = [
-    { key: "name", header: "Catégorie", sortable: true, render: (c) => <span className="font-semibold">{c.name}</span> },
-    { key: "products_count", header: "Produits", align: "center", render: (c) => c.products_count ?? 0 },
-    {
-      key: "actions",
-      header: "",
-      align: "right",
-      render: (c) => (
-        <div className="flex justify-end gap-1">
-          <Button size="sm" variant="ghost" onClick={() => open(c)}><Pencil size={14} /></Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={(c.products_count ?? 0) > 0}
-            title={(c.products_count ?? 0) > 0 ? "Catégorie utilisée" : "Supprimer"}
-            onClick={() => confirm(`Supprimer « ${c.name} » ?`) && crud.remove.mutate(c.id)}
-          >
-            <Trash2 size={14} className="text-rose-600" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
   return (
     <>
       <ModuleTabs tabs={CATALOGUE_TABS} />
@@ -66,7 +42,35 @@ export function CategoriesPage() {
       <div className="mb-4 max-w-sm">
         <SearchInput value={list.search} onChange={list.setSearch} />
       </div>
-      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(c) => c.id} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucune catégorie" />
+      <CardGrid
+        sansImage
+        data={data}
+        isLoading={isLoading}
+        error={errorMessage}
+        rowKey={(c) => c.id}
+        page={list.page}
+        onPageChange={list.setPage}
+        onCardClick={open}
+        emptyTitle="Aucune catégorie"
+        carte={(c) => ({
+          initiale: c.name,
+          titre: c.name,
+          valeur: <span className="text-ge7-bronze">{c.products_count ?? 0} produit{(c.products_count ?? 0) > 1 ? "s" : ""}</span>,
+          actions: (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={(c.products_count ?? 0) > 0}
+                title={(c.products_count ?? 0) > 0 ? "Catégorie utilisée" : "Supprimer"}
+                onClick={() => confirm(`Supprimer « ${c.name} » ?`) && crud.remove.mutate(c.id)}
+              >
+                <Trash2 size={14} className="text-rose-600" />
+              </Button>
+            </>
+          ),
+        })}
+      />
 
       {editing && (
         <Modal

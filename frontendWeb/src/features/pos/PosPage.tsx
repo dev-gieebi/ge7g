@@ -8,7 +8,7 @@ import { useTaxes, useZones } from "@/features/shared/refData";
 import { useAction } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
 import { money, qty } from "@/lib/format";
-import { Badge, Button, Card, ErrorState, Input, Loading, PageHeader, SearchInput, Select } from "@/components/ui";
+import { Badge, Button, Card, ErrorState, Input, Loading, NumberField, PageHeader, SearchInput, Select } from "@/components/ui";
 
 interface Line { product: PosProduct; quantity: number; delivered: number; unit_price: number }
 interface Payload {
@@ -45,7 +45,6 @@ export function PosPage() {
   const [customer, setCustomer] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
-  const [remise, setRemise] = useState<number | "">("");
   const [received, setReceived] = useState<number | "">("");
   const [zoneId, setZoneId] = useState<number | "">("");
   const [partial, setPartial] = useState(false);
@@ -88,8 +87,8 @@ export function PosPage() {
   }, [products.data]);
 
   const subtotal = cart.reduce((s, l) => s + l.unit_price * l.quantity, 0);
-  const discount = remise === "" ? 0 : Math.round(subtotal * Number(remise) / 100);
-  const netSubtotal = subtotal - discount;
+  // Plus de remise saisie à la caisse : les taxes portent sur le total HT.
+  const netSubtotal = subtotal;
   const rate = selectedTaxes.reduce((s, t) => s + (t.type === "AUCUNE" ? 0 : (t.type === "TPS" ? -Number(t.rate) : Number(t.rate))), 0) / 100;
   const taxAmount = Math.round(netSubtotal * rate);
   const total = netSubtotal + taxAmount;
@@ -105,7 +104,9 @@ export function PosPage() {
     });
     setFamily(null);
   };
-  const setQty = (id: number, q: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, quantity: Math.max(0, q), delivered: Math.min(Math.max(0, q), l.product.available_quantity) } : l)).filter((l) => l.quantity > 0));
+  // Quantité jamais sous 1 : seule la corbeille retire la ligne du panier.
+  const setQty = (id: number, q: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, quantity: Math.max(1, q), delivered: Math.min(Math.max(1, q), l.product.available_quantity) } : l)));
+  const removeLine = (id: number) => setCart((c) => c.filter((l) => l.product.id !== id));
   const setDelivered = (id: number, d: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, delivered: Math.max(0, Math.min(d, l.quantity, l.product.available_quantity)) } : l)));
   // Prix majorable uniquement : jamais en dessous du barème de la ville choisie.
   const setPrice = (id: number, p: number) => setCart((c) => c.map((l) => (l.product.id === id ? { ...l, unit_price: Math.max(l.product.sale_price, p) } : l)));
@@ -115,8 +116,8 @@ export function PosPage() {
   const checkout = () => {
     if (zoneId === "") return;
     pay
-      .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity, delivered_quantity: partial ? Math.min(l.delivered, l.quantity, l.product.available_quantity) : l.quantity, unit_price: l.unit_price })), tax_ids: taxIds, payment_method: method, customer_name: customer || null, customer_phone: customerPhone || null, customer_address: customerAddress || null, discount_rate: remise === "" ? null : Number(remise), amount_received: received === "" ? null : Number(received), zone_id: zoneId })
-      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setCustomerPhone(""); setCustomerAddress(""); setRemise(""); setTaxIds([]); setPartial(false); navigate(`/admin/caisse/ventes/${s.id}`); })
+      .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity, delivered_quantity: partial ? Math.min(l.delivered, l.quantity, l.product.available_quantity) : l.quantity, unit_price: l.unit_price })), tax_ids: taxIds, payment_method: isCashier ? method : "AUTRE", customer_name: customer || null, customer_phone: customerPhone || null, customer_address: customerAddress || null, discount_rate: null, amount_received: received === "" ? null : Number(received), zone_id: zoneId })
+      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setCustomerPhone(""); setCustomerAddress(""); setTaxIds([]); setPartial(false); navigate(`/admin/caisse/ventes/${s.id}`); })
       .catch(() => {});
   };
 
@@ -177,7 +178,7 @@ export function PosPage() {
 
         <Card className="xl:sticky xl:top-20 xl:self-start">
           <h3 className="flex items-center gap-2 text-lg font-extrabold"><ShoppingBag size={18} className="text-ge7-bronze" /> Panier{zone ? <Badge tone="purple"><MapPin size={11} /> {zone.name}</Badge> : null}</h3>
-          <div className="mt-4 max-h-[38vh] space-y-2 overflow-y-auto pr-1">
+          <div className="mt-4 max-h-[max(64vh,36rem)] space-y-2 overflow-y-auto pr-1">
             {cart.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-ge7-black/15 p-8 text-center text-sm text-ge7-black/50">Panier vide</p>
             ) : (
@@ -185,25 +186,22 @@ export function PosPage() {
                 <div key={l.product.id} className="rounded-2xl bg-ge7-cream p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0"><p className="truncate font-semibold">{l.product.name}{l.product.type ? <span className="text-ge7-black/50"> · {l.product.type}</span> : null}</p><p className="font-mono text-[11px] text-ge7-black/40">{l.product.reference}</p><p className="text-xs text-ge7-black/50">{money(l.product.sale_price)} / {l.product.unit?.symbol}</p></div>
-                    <button onClick={() => setQty(l.product.id, 0)} className="text-rose-600"><Trash2 size={15} /></button>
+                    <button onClick={() => removeLine(l.product.id)} className="text-rose-600" title="Retirer du panier"><Trash2 size={15} /></button>
                   </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => setQty(l.product.id, l.quantity - 1)} className="grid size-8 place-items-center rounded-lg bg-white"><Minus size={14} /></button>
-                      <input type="number" min={0} step="any" value={l.quantity} onChange={(e) => setQty(l.product.id, Number(e.target.value))} className="w-16 rounded-lg border border-ge7-black/10 px-2 py-1 text-center text-sm" />
-                      <button onClick={() => setQty(l.product.id, l.quantity + 1)} className="grid size-8 place-items-center rounded-lg bg-white"><Plus size={14} /></button>
-                    </div>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <button onClick={() => setQty(l.product.id, l.quantity - 1)} className="grid size-10 shrink-0 place-items-center rounded-lg bg-white"><Minus size={14} /></button>
+                    <NumberField min={0} step="any" value={l.quantity} onValue={(q) => setQty(l.product.id, q)} aria-label="Quantité" className="min-w-0 flex-1 rounded-lg border border-ge7-black/15 bg-white px-2.5 py-2 text-center text-base font-semibold focus:border-ge7-gold focus:outline-none" />
+                    <button onClick={() => setQty(l.product.id, l.quantity + 1)} className="grid size-10 shrink-0 place-items-center rounded-lg bg-white"><Plus size={14} /></button>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-ge7-black/5 pt-2">
+                    <NumberField min={l.product.sale_price} step="any" value={l.unit_price} valide={(p) => p >= l.product.sale_price} onValue={(p) => setPrice(l.product.id, p)} aria-label="Prix unitaire" title={`Prix unitaire (minimum ${money(l.product.sale_price)})`} className="w-[6.5rem] rounded-lg border border-ge7-black/15 bg-white px-2 py-1.5 text-right text-sm font-semibold focus:border-ge7-gold focus:outline-none" />
                     <span className="font-bold">{money(l.unit_price * l.quantity)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-ge7-black/5 pt-2 text-xs">
-                    <span className="text-ge7-black/60">P.U  min {money(l.product.sale_price)}</span>
-                    <input type="number" min={l.product.sale_price} step="any" value={l.unit_price} onChange={(e) => setPrice(l.product.id, Number(e.target.value))} className="w-24 rounded-lg border border-ge7-black/10 px-2 py-1 text-right text-sm" />
                   </div>
                   {partial && (
                     <div className="mt-2 flex items-center justify-between gap-2 border-t border-ge7-black/5 pt-2 text-xs">
                       <span className="text-ge7-black/60">Livrée maintenant</span>
                       <span className="flex items-center gap-1.5">
-                        <input type="number" min={0} step="any" value={l.delivered} onChange={(e) => setDelivered(l.product.id, Number(e.target.value))} className="w-16 rounded-lg border border-ge7-black/10 px-2 py-1 text-center text-sm" />
+                        <NumberField min={0} step="any" value={l.delivered} valide={(d) => d >= 0} onValue={(d) => setDelivered(l.product.id, d)} className="w-24 rounded-lg border border-ge7-black/15 bg-white px-2.5 py-2 text-center text-base font-semibold focus:border-ge7-gold focus:outline-none" />
                         <span className="text-ge7-black/50">reste {qty(l.quantity - l.delivered, l.product.unit?.symbol)}</span>
                       </span>
                     </div>
@@ -217,12 +215,15 @@ export function PosPage() {
             {!isCashier && (
               <>
                 <Input placeholder="Nom du client *" required value={customer} onChange={(e) => setCustomer(e.target.value)} />
-                <Input placeholder="Téléphone du client *" required value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
-                <Input placeholder="Adresse du client *" required value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
-                <Input placeholder="Remise % (optionnel)" type="number" min={0} max={100} step="any" value={remise} onChange={(e) => setRemise(e.target.value === "" ? "" : Number(e.target.value))} />
+                {/* Téléphone et adresse côte à côte : plus de place pour les articles du panier. */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Input placeholder="Téléphone du client *" required value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                  <Input placeholder="Adresse du client *" required value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
+                </div>
               </>
             )}
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid gap-3 ${isCashier ? "grid-cols-2" : "grid-cols-1"}`}>
+              {(taxes?.length ?? 0) > 0 && (
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-ge7-black/70">Taxes</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -261,28 +262,29 @@ export function PosPage() {
                   ))}
                 </div>
               </div>
-              <Select label="Paiement" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
-                {METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </Select>
+              )}
+              {/* Moyen de paiement : seulement pour la caissière qui encaisse. */}
+              {isCashier && (
+                <Select label="Paiement" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
+                  {METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </Select>
+              )}
             </div>
             <label className="flex items-center gap-2 rounded-lg border border-ge7-black/10 px-3 py-2 text-sm" title="Seule la quantité livrée est déduite du stock ; le reste sera livré plus tard.">
               <input type="checkbox" className="size-4 rounded border-ge7-black/20 text-ge7-bronze focus:ring-ge7-bronze" checked={partial} onChange={(e) => setPartial(e.target.checked)} />
               Livraison partielle <span className="text-xs text-ge7-black/50"></span>
             </label>
-            {method === "ESPECES" && <Input label="Montant reçu *" type="number" min={0} required value={received} onChange={(e) => setReceived(e.target.value === "" ? "" : Number(e.target.value))} />}
+            {isCashier && method === "ESPECES" && <Input label="Montant reçu *" type="number" min={0} required value={received} onChange={(e) => setReceived(e.target.value === "" ? "" : Number(e.target.value))} />}
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-ge7-black/60"><span>Total HT</span><span>{money(subtotal)}</span></div>
-              {discount > 0 && (
-                <>
-                  <div className="flex justify-between text-ge7-black/60"><span>Remise {remise} %</span><span>-{money(discount)}</span></div>
-                  <div className="flex justify-between text-ge7-black/60"><span>Total HT net</span><span>{money(netSubtotal)}</span></div>
-                </>
+              {/* Sans taxe : rien n'est écrit. */}
+              {selectedTaxes.length > 0 && (
+                <div className="flex justify-between text-ge7-black/60"><span>{`${selectedTaxes.map((t) => t.name).join(" + ")} ${(rate * 100).toFixed(2).replace(/\.?0+$/, "")} %`}</span><span>{money(taxAmount)}</span></div>
               )}
-              <div className="flex justify-between text-ge7-black/60"><span>{selectedTaxes.length === 0 ? "Taxe" : `${selectedTaxes.map((t) => t.name).join(" + ")} ${(rate * 100).toFixed(2).replace(/\.?0+$/, "")} %`}</span><span>{money(taxAmount)}</span></div>
               <div className="flex justify-between text-xl font-extrabold"><span>TOTAL</span><span className="text-ge7-bronze">{money(total)}</span></div>
               {change !== null && <div className={`flex justify-between font-semibold ${change < 0 ? "text-rose-600" : "text-emerald-700"}`}><span>Monnaie à rendre</span><span>{money(Math.max(0, change))}</span></div>}
             </div>
-            <Button size="lg" className="w-full" disabled={!cart.length || zoneId === "" || (!isCashier && (!customer.trim() || !customerPhone.trim() || !customerAddress.trim())) || (method === "ESPECES" && (received === "" || (change !== null && change < 0)))} loading={pay.isPending} onClick={checkout}>Encaisser {money(total)}</Button>
+            <Button size="lg" className="w-full" disabled={!cart.length || zoneId === "" || (!isCashier && (!customer.trim() || !customerPhone.trim() || !customerAddress.trim())) || (isCashier && method === "ESPECES" && (received === "" || (change !== null && change < 0)))} loading={pay.isPending} onClick={checkout}>Encaisser {money(total)}</Button>
           </div>
         </Card>
       </div>

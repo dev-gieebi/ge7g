@@ -10,6 +10,7 @@ use App\Models\Purchase;
 use App\Models\Quote;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Services\NumerotationService;
 use App\Support\Xlsx;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,9 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class ReportController extends Controller
 {
     /** Rapports de suivi : Direction et CDG_ADMIN (LG_ADMIN n'y a pas accès). */
-    private const VIEW_ROLES = ['CDG_ADMIN', 'DG_ADMIN', 'SUPERADMIN'];
+    // Chiffres financiers (CA, marge, valeur du stock, achats) : Direction et
+    // Super admin uniquement.
+    private const VIEW_ROLES = DashboardController::FINANCE_ROLES;
 
     private function authorizeUser(Request $request): User
     {
@@ -107,7 +110,7 @@ class ReportController extends Controller
         $rows[] = array_map(fn ($h) => [$h, 2], ['Facture', 'Client', 'Produit', 'Facturé', 'Livré', 'Reste', 'Valeur']);
         foreach ($r['reliquats'] as $l) {
             $rows[] = [
-                [$l['number'], 3],
+                [NumerotationService::affichage($l['number']), 3],
                 [$l['customer'], 3],
                 [$l['product'], 3],
                 [$l['ordered'], 4],

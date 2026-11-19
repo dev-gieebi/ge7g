@@ -11,7 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class PriceController extends Controller
 {
-    private const MANAGE_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CDG_ADMIN'];
+    /** Prix / Barème : Direction et Super admin uniquement. */
+    private const MANAGE_ROLES = DashboardController::FINANCE_ROLES;
 
     private function authorizeUser(Request $request): User
     {

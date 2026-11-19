@@ -78,6 +78,11 @@ export function SettingsPage() {
             ]}
             empty={{ type: "TVA"}}
             allowDelete={() => true}
+            carte={(t) => ({
+              titre: <Badge tone={t.type === "TPS" ? "purple" : "gold"}>{t.type}</Badge>,
+              sousTitre: "Taxe appliquée aux nouvelles factures",
+              valeur: <span className="text-ge7-purple">{`${Number(t.rate).toFixed(2).replace(/\.?0+$/, "")} %`}</span>,
+            })}
           />
         </>
       )}
@@ -92,6 +97,7 @@ export function SettingsPage() {
           fields={[{ name: "name", label: "Nom", required: true }, { name: "code", label: "Code", required: true }]}
           empty={{ name: "", code: "" }}
           allowDelete={() => true}
+          carte={(z) => ({ titre: z.name, sousTitre: "Zone géographique", valeur: <span className="font-mono text-ge7-bronze">{z.code}</span> })}
         />
       )}
 
@@ -123,11 +129,22 @@ export function SettingsPage() {
               },
             ]}
             empty={{ name: "", role: "CAISSIER" }}
+            carte={(u) => ({
+              titre: u.name,
+              sousTitre: <span className="font-mono">{u.code}</span>,
+              badge: <Badge tone={u.role === "SUPERADMIN" ? "dark" : u.role === "LG_ADMIN" ? "dark" : u.role === "CAISSIER" ? "gold" : "purple"}>{ROLE_LABELS[u.role]}</Badge>,
+              details: u.role === "CLIENT"
+                ? [
+                    { label: "Téléphone", valeur: u.phone ?? "" },
+                    { label: "Accès villes", valeur: u.zone?.name ?? "Toutes les villes" },
+                  ]
+                : undefined,
+            })}
             allowEdit={(u) => u.role !== "CHAUFFEUR"}
             allowDelete={(u) => u.id !== user?.id && u.role !== "CHAUFFEUR"}
             extraActions={(u) => (
-              <Button size="sm" variant="ghost" onClick={() => { setPasswordUser(u); setPassword(generatePassword()); }}>
-                <Key size={14} />
+              <Button size="sm" variant="ghost" title="Nouveau mot de passe" onClick={() => { setPasswordUser(u); setPassword(generatePassword()); }}>
+                <Key size={14} /> Mot de passe
               </Button>
             )}
           />

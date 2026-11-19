@@ -26,6 +26,7 @@ export function UnitsPage() {
           { name: "symbol", label: "Symbole", required: true },
         ]}
         empty={{ name: "", symbol: "" }}
+        carte={(u) => ({ initiale: u.name, titre: u.name, sousTitre: "Unité de mesure", valeur: <span className="font-mono text-ge7-bronze">{u.symbol}</span> })}
       />
     </>
   );

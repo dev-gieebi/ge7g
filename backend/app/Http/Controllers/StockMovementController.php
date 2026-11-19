@@ -6,6 +6,7 @@ use App\Models\PosSale;
 use App\Models\Purchase;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Services\NumerotationService;
 use App\Support\Xlsx;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -106,7 +107,7 @@ class StockMovementController extends Controller
                 [$isPurchase ? $m->party_name : '', 3],
                 [$m->user?->name ?? 'Système', 3],
                 [$isSale ? $m->party_name : '', 3],
-                [$m->invoice_number ?? '', 3],
+                [NumerotationService::affichage($m->invoice_number, ['VNT' => 'FAC', 'ACH' => 'BC']), 3],
                 [$m->product?->unit?->symbol ?? '', 3],
                 [$m->unit_price !== null ? (float) $m->unit_price : null, 4],
                 [$isIn ? (float) $m->quantity : null, 4],
@@ -114,7 +115,7 @@ class StockMovementController extends Controller
                 [! $isIn ? abs((float) $m->quantity) : null, 4],
                 [! $isIn && $m->amount !== null ? (float) $m->amount : null, 4],
                 [! $isIn ? $m->party_name ?? '' : '', 3],
-                [$m->bl_number ?? '', 3],
+                [NumerotationService::affichage($m->bl_number, ['VNT' => 'FAC', 'ACH' => 'BC']), 3],
                 [(float) $m->month_entries_quantity, 4],
                 [(float) $m->month_entries_amount, 4],
                 [(float) $m->month_exits_quantity, 4],

@@ -1,6 +1,6 @@
 import { Mail, MapPin, Phone } from "lucide-react";
 import type { PosSale } from "@/types";
-import { datetime, money, moneyInWords, qty } from "@/lib/format";
+import { datetime, money, moneyInWords, numeroDocument, qty } from "@/lib/format";
 import { GE7_COMPANY, cfaNumber } from "@/features/shared/companyInfo";
 
 /**
@@ -14,7 +14,7 @@ export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false
   const parts = s.number.split("-");
   // Le n° de facture suit la pièce comptable ; un autre document (bon de
   // livraison, bon de commande) porte le n° de la pièce d'origine.
-  const number = docTitle === "FACTURE" ? (s.invoice?.number ?? (parts.length === 3 ? `FAC-${parts[2]}-${parts[1]}` : s.number)) : s.number;
+  const number = docTitle === "FACTURE" ? (s.invoice?.number ?? (parts.length === 3 ? `FAC-${parts[2]}-${parts[1]}` : s.number)) : numeroDocument(s.number);
   const ratePct = (Number(s.tax_rate) * 100).toFixed(2).replace(/\.?0+$/, "");
   const discountRate = Number(s.discount_rate ?? 0);
   const discountAmount = Math.round(Number(s.subtotal) * discountRate / 100);

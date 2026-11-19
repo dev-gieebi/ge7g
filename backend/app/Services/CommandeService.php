@@ -378,7 +378,8 @@ class CommandeService
             // encaissée à la livraison. Le stock est déjà sorti : les lignes
             // sont marquées livrées pour ne pas fausser le suivi des reliquats.
             $vente = PosSale::create([
-                'number' => (string) Str::uuid(),
+                // Même séquence annuelle que les ventes de caisse.
+                'number' => $this->numerotation->nextAnneeDabord('VNT'),
                 'user_id' => $admin->id,
                 'zone_id' => $commande->zone_id,
                 'customer_name' => $commande->nom_livraison,
@@ -395,8 +396,6 @@ class CommandeService
                 'source' => 'boutique_en_ligne',
                 'facture_id' => $facture->id,
             ]);
-            $vente->number = 'VNT-'.now()->format('Y').'-'.str_pad((string) $vente->id, 5, '0', STR_PAD_LEFT);
-            $vente->save();
 
             foreach ($commande->lignes as $ligne) {
                 $vente->items()->create([

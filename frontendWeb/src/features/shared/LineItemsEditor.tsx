@@ -1,7 +1,9 @@
 import { Plus, Trash2 } from "lucide-react";
 import type { Product } from "@/types";
 import { money, qty } from "@/lib/format";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, NumberField, Select } from "@/components/ui";
+
+const champ = "ge7-input";
 
 export interface LineItem {
   product_id?: number;
@@ -56,8 +58,8 @@ export function LineItemsEditor({
                 </option>
               ))}
             </Select>
-            <Input type="number" min={0} step="any" value={it.quantity} onChange={(e) => update(i, { quantity: Number(e.target.value) })} placeholder="Qté" />
-            <Input type="number" min={0} step="any" value={it.unit_price} onChange={(e) => update(i, { unit_price: Number(e.target.value) })} />
+            <NumberField min={0} step="any" value={it.quantity} onValue={(q) => update(i, { quantity: q })} placeholder="Qté" aria-label="Quantité" className={champ} />
+            <NumberField min={0} step="any" value={it.unit_price} valide={(p) => p >= 0} onValue={(p) => update(i, { unit_price: p })} aria-label={priceLabel} className={champ} />
             <span className="text-right text-sm font-bold">{money(it.quantity * it.unit_price)}{p?.unit ? <span className="block text-[10px] font-normal text-ge7-black/50">/ {p.unit.symbol}</span> : null}</span>
             <button type="button" onClick={() => remove(i)} className="justify-self-end rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={15} /></button>
           </div>

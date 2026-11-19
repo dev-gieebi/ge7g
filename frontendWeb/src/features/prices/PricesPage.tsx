@@ -8,7 +8,7 @@ import { useProductsRef, useZones } from "@/features/shared/refData";
 import { money } from "@/lib/format";
 import { getList } from "@/lib/api";
 import * as XLSX from "xlsx-js-style";
-import { Badge, Button, DataTable, FormGrid, Input, Modal, PageHeader, Select, type Column } from "@/components/ui";
+import { Badge, Button, CardGrid, FormGrid, Input, Modal, PageHeader, Select } from "@/components/ui";
 
 type Form = Partial<Omit<Price, "id" | "product" | "zone">>;
 
@@ -135,14 +135,6 @@ export function PricesPage() {
     }
   };
 
-  const columns: Column<Price>[] = [
-    { key: "product", header: "Produit", render: (p) => <span className="font-semibold">{p.product?.name}</span> },
-    { key: "zone", header: "Zone", render: (p) => p.zone?.name ?? <Badge>Toutes</Badge> },
-    { key: "competitor_price", header: "Prix concurrent", align: "right", render: (p) => money(p.competitor_price) },
-    { key: "amount", header: "Prix vente G-E7G", align: "right", sortable: true, render: (p) => <span className="font-bold text-ge7-purple">{money(p.amount)}</span> },
-    { key: "factory_price", header: "PU Usine HT", align: "right", render: (p) => money(p.factory_price) },
-  ];
-
   return (
     <>
       <ModuleTabs tabs={CATALOGUE_TABS} />
@@ -171,7 +163,30 @@ export function PricesPage() {
           {zones?.map((z: Zone) => <option key={z.id} value={z.id}>{z.name}</option>)}
         </Select>
       </div>
-      <DataTable columns={columns} data={data} isLoading={isLoading} error={errorMessage} rowKey={(p) => p.id} onRowClick={openEdit} page={list.page} onPageChange={list.setPage} sort={list.sort} onSortChange={list.setSort} emptyTitle="Aucun prix défini" emptyHint="Le prix de vente par défaut du produit s'applique." />
+      <CardGrid
+        sansImage
+        data={data}
+        isLoading={isLoading}
+        error={errorMessage}
+        rowKey={(p) => p.id}
+        onCardClick={openEdit}
+        page={list.page}
+        onPageChange={list.setPage}
+        emptyTitle="Aucun prix défini"
+        emptyHint="Le prix de vente par défaut du produit s'applique."
+        carte={(p) => ({
+          image: p.product?.image_url,
+          initiale: p.product?.name ?? "?",
+          badge: <Badge tone="purple">{p.zone?.name ?? "Toutes les zones"}</Badge>,
+          titre: p.product?.name ?? "",
+          details: [
+            { label: "Prix concurrent", valeur: money(p.competitor_price) },
+            { label: "PU usine HT", valeur: money(p.factory_price) },
+          ],
+          pied: <span className="text-xs text-ge7-black/50">Prix G-E7G</span>,
+          valeur: <span className="text-ge7-purple">{money(p.amount)}</span>,
+        })}
+      />
 
       {editing && (
         <Modal
