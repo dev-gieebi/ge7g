@@ -7,10 +7,10 @@ export const GE7_COMPANY = {
     "Toute opérations commerciales, financières, industrielles, mobilière ou immobilières se rattachant directement ou indirectement à l'objet social.",
   ],
   phones: "(+241) 7771 8803 / 6218 0492",
-  email: "g-e7g@g-energie7groupe.org",
+  email: "g-energie7groupe.org",
   address: "Ntoum -Gabon. Sis Nkoltang PK30.",
   bank: "Compte BGFI Bank : GA40003041204111701900161",
-  website: "www.g-energie7groupe.com",
+  website: "www.g-energie7groupe.org",
   signatoryTitle: "Gérante",
   signatoryName: "KOGUE Mélanie",
 };

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -7,26 +7,29 @@ import {
   MessageSquareText,
   Ban,
   Check,
+  PackageSearch,
+  Pencil,
   Plus,
   ClipboardList,
   FileDown,
-  MapPin,
+  // [CHAUFFEUR] MapPin, (bouton « Démarrer la mission »)
   PackageCheck,
   Printer,
-  RotateCcw,
+  // [CHAUFFEUR] RotateCcw, (effacer la signature)
   Truck,
   TriangleAlert,
   X,
 } from "lucide-react";
 import type { CommandeDetail, PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
-import { useChauffeurs } from "@/features/shared/refData";
+// [CHAUFFEUR] import { useChauffeurs } from "@/features/shared/refData";
+import { useProductsRef } from "@/features/shared/refData";
 import { api } from "@/lib/api";
 import { datetime, money } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/rbac";
-import { Badge, Button, Card, CardHeader, ErrorState, FormGrid, Input, Loading, Modal, PageHeader, Select, StatusBadge, Textarea } from "@/components/ui";
-import { SignaturePad, type SignaturePadRef } from "./SignaturePad";
+import { Badge, Button, Card, CardHeader, ErrorState, Input, Loading, Modal, PageHeader, Select, StatusBadge, Textarea } from "@/components/ui";
+// [CHAUFFEUR] import { SignaturePad, type SignaturePadRef } from "./SignaturePad";
 import { Facture } from "@/features/pos/Facture";
 import { CommandeMap } from "./CommandeMap";
 import { AnnotationsFil } from "./AnnotationsFil";
@@ -78,19 +81,22 @@ export function OrderDetailPage() {
   const peutGerer = hasRole(user, "LG_ADMIN", "DG_ADMIN");
   // Seul le DG accorde ou refuse une remise demandée par le client.
   const peutDeciderRemise = hasRole(user, "DG_ADMIN");
-  const peutAffecter = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
+  // [CHAUFFEUR] Affectation du chauffeur en pause (voir CHAUFFEUR.md).
+  // const peutAffecter = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
   const estChauffeur = user?.role === "CHAUFFEUR";
   const peutLivrer = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CHAUFFEUR");
 
   // Pendant la livraison, la carte suit la position du chauffeur (15 s).
   const commande = useOne<CommandeDetail>("commande", id ? `/commandes/${id}` : null, 15_000);
-  const { data: chauffeurs, isError: errChauffeurs, refetch: refetchChauffeurs } = useChauffeurs(!estChauffeur);
+  // [CHAUFFEUR] const { data: chauffeurs, isError: errChauffeurs, refetch: refetchChauffeurs } = useChauffeurs(!estChauffeur);
 
   const [motif, setMotif] = useState<{ action: MotifAction; valeur: string } | null>(null);
-  const [expedier, setExpedier] = useState<{ chauffeur_id?: number } | null>(null);
-  const [livrer, setLivrer] = useState<{ receptionnaire: string; montant: string; mode: string } | null>(null);
+  // [CHAUFFEUR] const [expedier, setExpedier] = useState<{ chauffeur_id?: number } | null>(null);
+  // [CHAUFFEUR] Livraison avec réceptionnaire, encaissement et signature (voir CHAUFFEUR.md).
+  // const [livrer, setLivrer] = useState<{ receptionnaire: string; montant: string; mode: string } | null>(null);
   const [impression, setImpression] = useState<"facture" | "bl" | null>(null);
-  const [solde, setSolde] = useState(false);
+  // Ligne à référencer (produit demandé hors catalogue) ou prix à ajuster, avant validation.
+  const [ligneEdit, setLigneEdit] = useState<{ id: number; designation: string; precision?: string | null; inconnu: boolean; produit_id: string; prix: string; filtre: string } | null>(null);
   // Fenêtre « Commentaires » : annotations, remise et données complètes de la commande.
   const [commentaires, setCommentaires] = useState(false);
   const [tauxRemise, setTauxRemise] = useState<string | null>(null);
@@ -99,7 +105,7 @@ export function OrderDetailPage() {
   // Position locale du chauffeur (même source que le partage GPS) : la carte
   // s'affiche pour lui dès le départ, sans attendre le retour du serveur.
   const [maPosition, setMaPosition] = useState<{ latitude: number; longitude: number } | null>(null);
-  const signature = useRef<SignaturePadRef>(null);
+  // [CHAUFFEUR] const signature = useRef<SignaturePadRef>(null);
 
   const valider = useAction(() => `/commandes/${id}/valider`, { keys: KEYS, success: "Commande validée facture et vente créées" });
   const preparer = useAction(() => `/commandes/${id}/preparer`, { keys: KEYS, success: "Commande passée en préparation" });
@@ -107,12 +113,21 @@ export function OrderDetailPage() {
     (v) => `/commandes/${id}/${v.action}`,
     { keys: KEYS, success: "Statut mis à jour", body: (v) => ({ motif: v.valeur }) },
   );
-  const doAffecter = useAction<{ chauffeur_id?: number }>(() => `/commandes/${id}/affecter`, { keys: KEYS, success: "Chauffeur affecté à la commande", body: (v) => v });
+  // [CHAUFFEUR] const doAffecter = useAction<{ chauffeur_id?: number }>(() => `/commandes/${id}/affecter`, { keys: KEYS, success: "Chauffeur affecté à la commande", body: (v) => v });
   const doDemarrer = useAction<{ latitude?: number; longitude?: number }>(() => `/commandes/${id}/demarrer`, { keys: KEYS, success: "Mission démarrée bonne route !", body: (v) => v });
-  const doLivrer = useAction<{ receptionnaire: string; montant: string; mode: string; signature?: string | null }>(
-    () => `/commandes/${id}/livrer`,
-    { keys: KEYS, success: "Livraison enregistrée", body: (v) => v },
+  // [CHAUFFEUR] Avec le chauffeur : réceptionnaire, montant, mode et signature envoyés ici.
+  // const doLivrer = useAction<{ receptionnaire: string; montant: string; mode: string; signature?: string | null }>(
+  //   () => `/commandes/${id}/livrer`,
+  //   { keys: KEYS, success: "Livraison enregistrée", body: (v) => v },
+  // );
+  // En attendant : un simple clic marque la commande livrée.
+  const doLivrer = useAction(() => `/commandes/${id}/livrer`, { keys: KEYS, success: "Commande marquée livrée" });
+  const modifierLigne = useAction<{ ligne: number; produit_id?: number; prix_unitaire?: number }>(
+    (v) => `/commandes/${id}/lignes/${v.ligne}`,
+    { keys: KEYS, success: "Ligne mise à jour", body: ({ produit_id, prix_unitaire }) => ({ produit_id, prix_unitaire }) },
   );
+  const solder = useAction(() => `/commandes/${id}/solder`, { keys: KEYS, success: "Facture soldée" });
+  const { data: produits } = useProductsRef();
   const annoter = useAction<{ contenu: string }>(() => `/commandes/${id}/annotations`, { keys: KEYS, success: "Annotation ajoutée", body: (v) => v });
   const decision = useAction<{ decision: "accorder" | "refuser"; taux?: number }>(
     () => `/commandes/${id}/remise`,
@@ -153,7 +168,7 @@ export function OrderDetailPage() {
   if (!commande.data) return <ErrorState message="Commande introuvable" />;
   const c = commande.data;
 
-  /** Départ de la mission : position GPS réelle récupérée au clic. */
+  /* [CHAUFFEUR] Départ de la mission par le chauffeur : position GPS réelle récupérée au clic.
   const demarrerMission = () => {
     if (!navigator.geolocation) {
       doDemarrer.mutate({});
@@ -169,11 +184,18 @@ export function OrderDetailPage() {
       { enableHighAccuracy: true, timeout: 10_000 },
     );
   };
+  */
 
-  const stockInsuffisant = c.statut === "en_attente" && c.lignes.some((l) => l.stock_disponible < l.quantite);
+  const stockInsuffisant = c.statut === "en_attente" && c.lignes.some((l) => l.produit_id !== null && l.stock_disponible < l.quantite);
+  // Produits demandés par le client hors catalogue : à référencer avant validation.
+  const aReferencer = c.lignes.filter((l) => l.produit_id === null).length;
+  // Prix laissés vides (commande sans ville tarifaire) : saisis par l'équipe avant validation.
+  const prixASaisir = c.lignes.filter((l) => l.produit_id !== null && l.prix_unitaire <= 0).length;
+  const solde = !!c.facture?.soldee_le;
   // Le bon de livraison accompagne la commande dès sa validation.
   const imprimable = ["validee", "en_preparation", "en_livraison", "livree"].includes(c.statut);
 
+  /* [CHAUFFEUR] Confirmation de livraison avec signature (voir CHAUFFEUR.md).
   const confirmerLivraison = () => {
     if (!livrer) return;
     doLivrer
@@ -181,6 +203,7 @@ export function OrderDetailPage() {
       .then(() => setLivrer(null))
       .catch(() => {});
   };
+  */
 
   // Aperçu d'impression : même modèle A4 que la facture d'achat caisse,
   // avec la mention « Commande en ligne » pour distinguer la provenance.
@@ -195,7 +218,21 @@ export function OrderDetailPage() {
         <div className="no-print mb-4 flex flex-wrap items-center gap-2">
           <Button variant="secondary" onClick={() => setImpression(null)}><ArrowLeft size={16} /> Retour</Button>
           {!estBl && (
-            <Button variant={solde ? "secondary" : "purple"} onClick={() => setSolde(!solde)}><BadgeCheck size={16} /> Soldé</Button>
+            solde ? (
+              <Badge tone="red"><BadgeCheck size={14} /> Soldée le {datetime(c.facture!.soldee_le!)}</Badge>
+            ) : (
+              peutGerer && c.facture && (
+                <Button
+                  variant="purple"
+                  loading={solder.isPending}
+                  onClick={() => {
+                    if (window.confirm("Marquer cette facture comme soldée ? Le tampon « Soldé » sera définitif, visible aussi par le client.")) solder.mutate();
+                  }}
+                >
+                  <BadgeCheck size={16} /> Soldé
+                </Button>
+              )
+            )
           )}
           <Button onClick={() => window.print()}><Printer size={16} /> Imprimer / PDF</Button>
         </div>
@@ -282,7 +319,7 @@ export function OrderDetailPage() {
             {peutGerer && c.statut === "en_attente" && (
               <>
                 <Button variant="danger" onClick={() => setMotif({ action: "refuser", valeur: "" })}><X size={16} /> Refuser</Button>
-                <Button onClick={() => valider.mutate()} loading={valider.isPending} disabled={c.remise.statut === "demandee"} title={c.remise.statut === "demandee" ? "Remise en attente de décision du DG" : undefined}><Check size={16} /> Valider</Button>
+                <Button onClick={() => valider.mutate()} loading={valider.isPending} disabled={c.remise.statut === "demandee" || aReferencer > 0 || prixASaisir > 0 || stockInsuffisant} title={c.remise.statut === "demandee" ? "Remise en attente de décision du DG" : aReferencer > 0 ? "Produits demandés à référencer" : prixASaisir > 0 ? "Prix à saisir" : stockInsuffisant ? "Stock insuffisant" : undefined}><Check size={16} /> Valider</Button>
               </>
             )}
             {peutGerer && c.statut === "validee" && (
@@ -291,11 +328,17 @@ export function OrderDetailPage() {
                 <Button variant="purple" onClick={() => preparer.mutate()} loading={preparer.isPending}><ClipboardList size={16} /> Passer en préparation</Button>
               </>
             )}
+            {/* [CHAUFFEUR] Affectation du chauffeur et départ de mission par le chauffeur (voir CHAUFFEUR.md).
             {peutAffecter && ["validee", "en_preparation", "echec_livraison"].includes(c.statut) && (
               <Button variant="purple" onClick={() => { setExpedier({}); void refetchChauffeurs(); }}><Truck size={16} /> {c.chauffeur ? "Réaffecter" : "Affecter un chauffeur"}</Button>
             )}
             {estChauffeur && c.chauffeur?.id === user?.id && ["validee", "en_preparation", "echec_livraison"].includes(c.statut) && (
               <Button onClick={demarrerMission} loading={doDemarrer.isPending}><MapPin size={16} /> Démarrer la mission</Button>
+            )}
+            */}
+            {/* [CHAUFFEUR] En attendant la partie chauffeur : le gestionnaire met lui-même la commande en livraison. */}
+            {peutGerer && ["validee", "en_preparation", "echec_livraison"].includes(c.statut) && (
+              <Button variant="purple" onClick={() => doDemarrer.mutate({})} loading={doDemarrer.isPending}><Truck size={16} /> Mettre en livraison</Button>
             )}
             {peutGerer && (c.statut === "en_preparation" || c.statut === "echec_livraison") && (
               <Button variant="danger" onClick={() => setMotif({ action: "annuler", valeur: "" })}><Ban size={16} /> Annuler</Button>
@@ -303,7 +346,15 @@ export function OrderDetailPage() {
             {peutLivrer && c.statut === "en_livraison" && (
               <>
                 <Button variant="danger" onClick={() => setMotif({ action: "echec", valeur: "" })}><TriangleAlert size={16} /> Échec de livraison</Button>
-                <Button onClick={() => setLivrer({ receptionnaire: "", montant: String(c.facture?.montant_total ?? c.total), mode: "ESPECES" })}><PackageCheck size={16} /> Confirmer la livraison</Button>
+                {/* [CHAUFFEUR] <Button onClick={() => setLivrer({ receptionnaire: "", montant: String(c.facture?.montant_total ?? c.total), mode: "ESPECES" })}><PackageCheck size={16} /> Confirmer la livraison</Button> */}
+                <Button
+                  loading={doLivrer.isPending}
+                  onClick={() => {
+                    if (window.confirm(`Marquer la commande ${c.numero} comme livrée ? Le bon de livraison sera créé.`)) doLivrer.mutate();
+                  }}
+                >
+                  <PackageCheck size={16} /> Livrée
+                </Button>
               </>
             )}
           </>
@@ -317,16 +368,32 @@ export function OrderDetailPage() {
         </div>
       )}
 
-      {stockInsuffisant && (
-        <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
-          Stock insuffisant pour au moins une ligne, la validation sera refusée tant que le stock n'est pas réapprovisionné.
+      {aReferencer > 0 && c.statut === "en_attente" && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-ge7-gold/50 bg-ge7-gold-soft/40 px-4 py-3 text-sm">
+          <span className="flex items-center gap-2">
+            <PackageSearch size={16} className="shrink-0 text-ge7-bronze" />
+            <span><strong>{aReferencer} produit(s) demandé(s) hors catalogue.</strong> Approvisionnez-les, créez-les dans Produits si besoin, puis associez chaque ligne à un produit avant de valider.</span>
+          </span>
+          <Link to="/admin/produits" className="text-sm font-semibold text-ge7-purple hover:underline">Produits</Link>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <Card padded={false}>
-            <table className="w-full text-sm">
+      {prixASaisir > 0 && c.statut === "en_attente" && (
+        <div className="mb-4 rounded-2xl border border-ge7-gold/50 bg-ge7-gold-soft/40 px-4 py-3 text-sm">
+          <strong>{prixASaisir} prix à saisir.</strong> Aucun prix de la ville de livraison pour ces produits : cliquez sur « Saisir le prix » sur chaque ligne avant de valider.
+        </div>
+      )}
+
+      {stockInsuffisant && (
+        <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+          Stock insuffisant pour au moins une ligne : la validation est bloquée tant que le stock n'est pas réapprovisionné.
+        </div>
+      )}
+
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1 space-y-6">
+          <Card padded={false} className="overflow-x-auto">
+            <table className="w-full min-w-[40rem] text-sm">
               <thead className="bg-ge7-black text-left text-xs uppercase tracking-wider text-ge7-gold-light">
                 <tr>
                   <th className="px-5 py-3">Désignation</th>
@@ -338,14 +405,30 @@ export function OrderDetailPage() {
               </thead>
               <tbody className="divide-y divide-ge7-black/5">
                 {c.lignes.map((l) => {
-                  const insuffisant = l.stock_disponible < l.quantite && c.statut === "en_attente";
+                  const inconnu = l.produit_id === null;
+                  const insuffisant = !inconnu && l.stock_disponible < l.quantite && c.statut === "en_attente";
                   return (
-                    <tr key={l.id}>
-                      <td className="px-5 py-3 font-semibold">{l.designation}</td>
+                    <tr key={l.id} className={inconnu ? "bg-ge7-gold-soft/30" : undefined}>
+                      <td className="px-5 py-3">
+                        <p className="font-semibold">{l.designation}</p>
+                        {inconnu && <Badge tone="amber">hors catalogue · à référencer</Badge>}
+                        {l.precision && <p className="text-xs text-ge7-black/50">{l.precision}</p>}
+                      </td>
                       <td className="px-5 py-3 text-right">{l.quantite} {l.unite ?? ""}</td>
-                      <td className="px-5 py-3 text-right">{money(l.prix_unitaire)}</td>
+                      <td className="px-5 py-3 text-right">
+                        {l.prix_unitaire > 0 ? money(l.prix_unitaire) : <Badge tone="amber">à saisir</Badge>}
+                        {peutGerer && c.statut === "en_attente" && (
+                          <button
+                            type="button"
+                            onClick={() => setLigneEdit({ id: l.id, designation: l.designation, precision: l.precision, inconnu, produit_id: l.produit_id ? String(l.produit_id) : "", prix: l.prix_unitaire > 0 ? String(l.prix_unitaire) : "", filtre: inconnu ? l.designation : "" })}
+                            className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-ge7-purple hover:underline"
+                          >
+                            <Pencil size={12} /> {inconnu ? "Référencer" : l.prix_unitaire > 0 ? "Modifier" : "Saisir le prix"}
+                          </button>
+                        )}
+                      </td>
                       <td className="px-5 py-3 text-right font-semibold">{money(l.total_ligne)}</td>
-                      <td className={`px-5 py-3 text-right ${insuffisant ? "font-bold text-rose-600" : "text-ge7-black/60"}`}>{l.stock_disponible}</td>
+                      <td className={`px-5 py-3 text-right ${insuffisant ? "font-bold text-rose-600" : "text-ge7-black/60"}`}>{inconnu ? "" : l.stock_disponible}</td>
                     </tr>
                   );
                 })}
@@ -395,7 +478,7 @@ export function OrderDetailPage() {
           
         </div>
 
-        <div className="space-y-6">
+        <div className="w-full shrink-0 space-y-6 lg:w-80 xl:w-96">
           <Card>
             <CardHeader title="Client & livraison" />
             <dl className="space-y-2 text-sm">
@@ -560,6 +643,69 @@ export function OrderDetailPage() {
         </Modal>
       )}
 
+      {ligneEdit && (() => {
+        const filtre = ligneEdit.filtre.trim().toLowerCase();
+        const options = (produits ?? []).filter((p) => !filtre || `${p.name} ${p.type ?? ""} ${p.reference}`.toLowerCase().includes(filtre)).slice(0, 50);
+        return (
+          <Modal
+            title={ligneEdit.inconnu ? "Référencer le produit demandé" : "Modifier la ligne"}
+            subtitle={ligneEdit.inconnu ? `Demande du client : « ${ligneEdit.designation} »${ligneEdit.precision ? ` (${ligneEdit.precision})` : ""}` : ligneEdit.designation}
+            size="sm"
+            onClose={() => setLigneEdit(null)}
+            footer={
+              <>
+                <Button variant="secondary" onClick={() => setLigneEdit(null)}>Annuler</Button>
+                <Button
+                  loading={modifierLigne.isPending}
+                  disabled={ligneEdit.inconnu ? !ligneEdit.produit_id : !(Number(ligneEdit.prix) > 0)}
+                  onClick={() =>
+                    modifierLigne
+                      .mutateAsync({
+                        ligne: ligneEdit.id,
+                        // Produit du catalogue : figé, seul le prix se modifie.
+                        produit_id: ligneEdit.inconnu && ligneEdit.produit_id ? Number(ligneEdit.produit_id) : undefined,
+                        prix_unitaire: ligneEdit.prix !== "" ? Number(ligneEdit.prix) : undefined,
+                      })
+                      .then(() => setLigneEdit(null))
+                      .catch(() => {})
+                  }
+                >
+                  Enregistrer
+                </Button>
+              </>
+            }
+          >
+            {ligneEdit.inconnu ? (
+              <>
+                {/* Produit demandé hors catalogue : on l'associe à un produit existant. */}
+                <Input label="Rechercher un produit du catalogue" value={ligneEdit.filtre} onChange={(e) => setLigneEdit({ ...ligneEdit, filtre: e.target.value })} />
+                <Select label="Produit" required value={ligneEdit.produit_id} onChange={(e) => setLigneEdit({ ...ligneEdit, produit_id: e.target.value })} className="mt-3">
+                  <option value="">Choisir le produit…</option>
+                  {options.map((p) => <option key={p.id} value={p.id}>{p.name}{p.type ? ` · ${p.type}` : ""} ({p.reference})</option>)}
+                </Select>
+                <p className="mt-1 text-xs text-ge7-black/50">Produit absent ? Créez-le d'abord dans <Link to="/admin/produits" className="font-semibold text-ge7-purple hover:underline">Produits</Link>, puis revenez ici.</p>
+              </>
+            ) : (
+              // Produit déjà au catalogue : choisi par le client, non modifiable.
+              <div>
+                <p className="mb-1 text-xs font-semibold text-ge7-black/60">Produit</p>
+                <p className="rounded-xl border border-ge7-black/10 bg-ge7-black/[0.04] px-3.5 py-2.5 text-sm font-semibold">{ligneEdit.designation}</p>
+              </div>
+            )}
+            <Input
+              label="Prix unitaire (FCFA)"
+              type="number"
+              min={0}
+              value={ligneEdit.prix}
+              onChange={(e) => setLigneEdit({ ...ligneEdit, prix: e.target.value })}
+              hint="Vide : prix du barème de la ville de livraison (vide si la commande n'a pas de ville tarifaire)."
+              className="mt-3"
+            />
+          </Modal>
+        );
+      })()}
+
+      {/* [CHAUFFEUR] Fenêtre d'affectation du chauffeur (voir CHAUFFEUR.md).
       {expedier && (
         <Modal
           title="Affecter un chauffeur"
@@ -586,7 +732,9 @@ export function OrderDetailPage() {
           {chauffeurs?.length === 0 && <p className="mt-2 text-xs text-amber-700">Aucun chauffeur disponible. Créez-en un dans Logistique → Chauffeurs.</p>}
         </Modal>
       )}
+      */}
 
+      {/* [CHAUFFEUR] Fenêtre de livraison : réceptionnaire, encaissement et signature (voir CHAUFFEUR.md).
       {livrer && (
         <Modal
           title="Confirmer la livraison"
@@ -623,6 +771,7 @@ export function OrderDetailPage() {
           </div>
         </Modal>
       )}
+      */}
     </>
   );
 }

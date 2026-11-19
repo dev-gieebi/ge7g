@@ -92,6 +92,8 @@ Route::middleware('auth:api')->group(function () {
     Route::post('commandes/{commande}/extras', [CommandeController::class, 'saveExtras']);
     Route::post('commandes/{commande}/annotations', [CommandeController::class, 'annoter']);
     Route::post('commandes/{commande}/remise', [CommandeController::class, 'remise']);
+    Route::post('commandes/{commande}/lignes/{ligne}', [CommandeController::class, 'modifierLigne']);
+    Route::post('commandes/{commande}/solder', [CommandeController::class, 'solder']);
     Route::post('commandes/{commande}/refuser', [CommandeController::class, 'refuser']);
     Route::post('commandes/{commande}/preparer', [CommandeController::class, 'preparer']);
     Route::post('commandes/{commande}/affecter', [CommandeController::class, 'affecter']);
@@ -106,11 +108,13 @@ Route::middleware('auth:api')->group(function () {
     // Espace client connecté (rôle CLIENT) : ses commandes uniquement.
     Route::prefix('client')->group(function () {
         Route::get('profil', [EspaceClientController::class, 'profil']);
+        Route::get('produits', [EspaceClientController::class, 'produits']);
         Route::get('commandes', [EspaceClientController::class, 'index']);
+        Route::get('documents', [EspaceClientController::class, 'documents']);
         Route::post('commandes', [EspaceClientController::class, 'store'])->middleware('throttle:30,60');
         Route::get('commandes/{commande}', [EspaceClientController::class, 'show']);
         Route::post('commandes/{commande}/annotations', [EspaceClientController::class, 'annoter']);
-        Route::post('commandes/{commande}/remise', [EspaceClientController::class, 'remise']);
+        Route::post('commandes/{commande}/lignes', [EspaceClientController::class, 'ajouterLignes']);
     });
 
     Route::get('dashboard', [DashboardController::class, 'index']);

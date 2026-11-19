@@ -27,7 +27,7 @@ export const APPRO_TABS: ModuleTab[] = [
 
 export const LOGISTIQUE_TABS: ModuleTab[] = [
   { label: "Tableau de bord", to: "/admin/logistique", roles: ADMIN_DIR },
-  { label: "Chauffeurs", to: "/admin/chauffeurs", roles: ADMIN_DIR },
+  // [CHAUFFEUR] { label: "Chauffeurs", to: "/admin/chauffeurs", roles: ADMIN_DIR },
 ];
 
 export const DEVIS_TABS: ModuleTab[] = [

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, BadgePercent, Check, CircleCheckBig, FileText, MapPin, PartyPopper, Printer, Truck, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Check, CircleCheckBig, FileText, MapPin, PackagePlus, PartyPopper, Printer, Receipt, Truck, TriangleAlert, X } from "lucide-react";
 import type { PosSale } from "@/types";
 import { toApiError } from "@/lib/api";
 import { datetime, money, relative } from "@/lib/format";
@@ -11,15 +11,17 @@ import { Facture } from "@/features/pos/Facture";
 import { CommandeMap } from "@/features/orders/CommandeMap";
 import { AnnotationsFil } from "@/features/orders/AnnotationsFil";
 import { clientApi, type CommandeClient } from "./espaceClient";
+import { CatalogueClient, ListeDemande, fusionner, versPayload, type LigneLocale } from "./DemandeProduits";
 
-const field = "w-full rounded-xl border border-ge7-black/15 bg-white px-3.5 py-2.5 text-sm focus:border-ge7-gold focus:outline-none";
-
-/** Bon de livraison A4 (même modèle que le back-office) reconstruit depuis la commande. */
-function bonDeLivraison(c: CommandeClient): PosSale {
+/**
+ * Facture ou bon de livraison A4 (même modèle que le back-office) reconstruit
+ * depuis la commande. Les prix ne sont présents qu'une fois la facture émise.
+ */
+export function documentCommande(c: CommandeClient, bl: boolean): PosSale {
   return {
     id: c.id,
-    number: c.bon_livraison?.numero ?? c.numero,
-    created_at: c.bon_livraison?.livre_le ?? c.livraison?.livree_le ?? c.cree_le,
+    number: bl ? (c.bon_livraison?.numero ?? c.numero) : (c.facture?.numero ?? c.numero),
+    created_at: bl ? (c.bon_livraison?.livre_le ?? c.livraison?.livree_le ?? c.cree_le) : (c.validee_le ?? c.cree_le),
     customer_name: c.client.nom,
     customer_phone: c.client.telephone,
     customer_address: `${c.adresse.ville} ${c.adresse.quartier}, ${c.adresse.point_repere}`,
@@ -29,15 +31,15 @@ function bonDeLivraison(c: CommandeClient): PosSale {
       quantity: l.quantite,
       delivered_quantity: l.quantite,
       remaining_quantity: 0,
-      unit_price: l.prix_unitaire,
-      total: l.total_ligne,
+      unit_price: l.prix_unitaire ?? 0,
+      total: l.total_ligne ?? 0,
     })) as PosSale["items"],
-    subtotal: c.sous_total,
+    subtotal: c.sous_total ?? 0,
     discount_rate: c.remise.taux,
     tax_type: "AUCUNE",
     tax_rate: 0,
     tax_amount: 0,
-    total: c.total,
+    total: c.total ?? 0,
     payment_method: "LIVRAISON",
     status: c.facture?.statut_paiement === "payee" ? "PAYEE" : "EMISE",
     source: "boutique_en_ligne",
@@ -45,15 +47,16 @@ function bonDeLivraison(c: CommandeClient): PosSale {
   };
 }
 
-/** Suivi d'une commande dans l'espace client, comme le suivi en ligne, avec remise, annotations et bon de livraison. */
+/** Suivi d'une commande dans l'espace client, comme le suivi en ligne, avec annotations, facture et bon de livraison. */
 export function ClientOrderDetailPage() {
   const { id } = useParams();
   const location = useLocation();
   const nouvelle = (location.state as { nouvelle?: boolean } | null)?.nouvelle;
   const qc = useQueryClient();
   const notify = useToast();
-  const [bl, setBl] = useState(false);
-  const [remise, setRemise] = useState<{ taux: string; motif: string } | null>(null);
+  const [doc, setDoc] = useState<"facture" | "bl" | null>(null);
+  // Ajout de produits tant que la commande est en attente de validation.
+  const [ajout, setAjout] = useState<LigneLocale[] | null>(null);
 
   // Rafraîchi régulièrement : validation, départ du chauffeur, position GPS.
   const { data: c, isLoading, isError } = useQuery({
@@ -72,30 +75,37 @@ export function ClientOrderDetailPage() {
     onSuccess: (data) => { majCache(data); notify("Annotation envoyée"); },
     onError: (e) => notify(toApiError(e).message, "error"),
   });
-  const demanderRemise = useMutation({
-    mutationFn: (v: { taux: string; motif: string }) => clientApi.demanderRemise(Number(id), Number(v.taux), v.motif.trim() || undefined),
-    onSuccess: (data) => { majCache(data); setRemise(null); notify("Demande de remise envoyée"); },
+  const ajouterLignes = useMutation({
+    mutationFn: (lignes: LigneLocale[]) => clientApi.ajouterLignes(Number(id), versPayload(lignes)),
+    onSuccess: (data) => { majCache(data); setAjout(null); notify("Produits ajoutés à la commande"); },
     onError: (e) => notify(toApiError(e).message, "error"),
   });
-
   if (isLoading) return <Loading />;
   if (isError || !c) return <ErrorState message="Commande introuvable." />;
 
-  if (bl && c.bon_livraison) {
+  if ((doc === "bl" && c.bon_livraison) || (doc === "facture" && c.facture)) {
+    const estBl = doc === "bl";
     return (
       <>
         <div className="no-print mb-4 flex flex-wrap items-center gap-2">
-          <button onClick={() => setBl(false)} className="inline-flex items-center gap-1.5 rounded-full border border-ge7-black/15 bg-white px-4 py-2 text-sm font-semibold"><ArrowLeft size={15} /> Retour</button>
+          <button onClick={() => setDoc(null)} className="inline-flex items-center gap-1.5 rounded-full border border-ge7-black/15 bg-white px-4 py-2 text-sm font-semibold"><ArrowLeft size={15} /> Retour</button>
           <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-full bg-ge7-gold px-4 py-2 text-sm font-bold text-ge7-black"><Printer size={15} /> Imprimer / PDF</button>
         </div>
-        <Facture sale={bonDeLivraison(c)} originLabel={`Commande : ${c.numero}`} docTitle="BON DE LIVRAISON" extras={c.extras} />
+        <Facture
+          sale={documentCommande(c, estBl)}
+          originLabel={`Commande : ${c.numero}`}
+          docTitle={estBl ? "BON DE LIVRAISON" : "FACTURE"}
+          solde={!estBl && !!c.facture?.soldee_le}
+          extras={c.extras}
+        />
       </>
     );
   }
 
   const indisponible = ["refusee", "annulee", "echec_livraison"].includes(c.statut);
   const valideeOuPlus = ["validee", "en_preparation", "en_livraison", "livree"].includes(c.statut);
-  const peutDemanderRemise = c.statut === "en_attente" && c.remise.statut !== "accordee" && c.remise.statut !== "demandee";
+  // Prix visibles une fois la facture émise (validation de la commande).
+  const prix = c.total !== null;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -138,7 +148,7 @@ export function ClientOrderDetailPage() {
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           <p className="flex items-center gap-2"><Check size={17} /> <span><strong>Livrée le {datetime(c.livraison.livree_le)}</strong>{c.livraison.receptionnaire ? `, reçue par ${c.livraison.receptionnaire}` : ""}.</span></p>
           {c.bon_livraison && (
-            <button onClick={() => setBl(true)} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-700 px-4 py-2 text-sm font-bold text-white"><FileText size={15} /> Bon de livraison {c.bon_livraison.numero}</button>
+            <button onClick={() => setDoc("bl")} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-700 px-4 py-2 text-sm font-bold text-white"><FileText size={15} /> Bon de livraison {c.bon_livraison.numero}</button>
           )}
         </div>
       )}
@@ -190,33 +200,51 @@ export function ClientOrderDetailPage() {
 
         <div className="rounded-2xl border border-ge7-black/10 bg-white p-5">
           <p className="mb-3 text-sm font-bold">Récapitulatif</p>
-          <ul className="space-y-1.5 text-sm">
+          <ul className="space-y-2 text-sm">
             {c.lignes.map((l) => (
               <li key={l.id} className="flex justify-between gap-3">
-                <span className="min-w-0">{l.quantite} {l.unite ?? ""} × {l.designation}</span>
-                <span className="shrink-0 font-semibold">{money(l.total_ligne)}</span>
+                <span className="min-w-0">
+                  {l.designation} ({l.quantite}{l.unite ? ` ${l.unite}` : ""})
+                  {l.inconnu && <span className="ml-1.5 rounded-full bg-ge7-gold-soft px-2 py-0.5 text-[10px] font-bold uppercase text-ge7-bronze">Recherche en cours</span>}
+                  {l.precision && <span className="block text-xs text-ge7-black/50">{l.precision}</span>}
+                </span>
+                {prix && <span className="shrink-0 font-semibold">{money(l.total_ligne ?? 0)}</span>}
               </li>
             ))}
           </ul>
-          {c.remise.montant > 0 && (
+          {prix && (c.remise.montant ?? 0) > 0 && (
             <div className="mt-3 space-y-1 border-t border-ge7-black/10 pt-3 text-sm">
-              <div className="flex justify-between"><span className="text-ge7-black/60">Sous-total</span><span>{money(c.sous_total)}</span></div>
-              <div className="flex justify-between text-emerald-700"><span>Remise {c.remise.taux} %</span><span>− {money(c.remise.montant)}</span></div>
+              <div className="flex justify-between"><span className="text-ge7-black/60">Sous-total</span><span>{money(c.sous_total ?? 0)}</span></div>
+              <div className="flex justify-between text-emerald-700"><span>Remise {c.remise.taux} %</span><span>− {money(c.remise.montant ?? 0)}</span></div>
             </div>
           )}
           {c.extras.map((x) => (
             <div key={x.label} className="mt-1 flex justify-between text-sm"><span className="text-ge7-black/60">{x.label}</span><span>{money(x.amount)}</span></div>
           ))}
-          <div className="mt-3 flex items-center justify-between border-t border-ge7-black/10 pt-3">
-            <span className="text-sm font-bold">{c.statut === "livree" ? "Montant" : "À payer à la livraison"}</span>
-            <span className="text-lg font-extrabold text-ge7-bronze">{money(c.total + c.extras.reduce((t, x) => t + x.amount, 0))}</span>
-          </div>
+          {prix ? (
+            <div className="mt-3 flex items-center justify-between border-t border-ge7-black/10 pt-3">
+              <span className="text-sm font-bold">{c.statut === "livree" ? "Montant" : "À payer à la livraison"}</span>
+              <span className="text-lg font-extrabold text-ge7-bronze">{money((c.total ?? 0) + c.extras.reduce((t, x) => t + x.amount, 0))}</span>
+            </div>
+          ) : (
+            <p className="mt-3 border-t border-ge7-black/10 pt-3 text-xs text-ge7-black/50">Les prix vous seront communiqués sur la facture, à la validation de la commande.</p>
+          )}
+          {c.statut === "en_attente" && !ajout && (
+            <button onClick={() => setAjout([])} className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-ge7-black/15 px-4 py-2 text-sm font-semibold hover:border-ge7-gold">
+              <PackagePlus size={15} /> Ajouter des produits
+            </button>
+          )}
           {c.note && <p className="mt-3 rounded-xl bg-ge7-black/[0.03] px-3 py-2 text-xs text-ge7-black/60">Note de livraison : {c.note}</p>}
           {(c.facture || c.bon_livraison) && (
             <div className="mt-3 space-y-1 border-t border-ge7-black/10 pt-3 text-xs text-ge7-black/60">
-              {c.facture && <p>Facture <strong className="text-ge7-black">{c.facture.numero}</strong></p>}
+              {c.facture && (
+                <button onClick={() => setDoc("facture")} className="flex items-center gap-1.5 font-semibold text-ge7-purple hover:underline">
+                  <Receipt size={13} /> Facture {c.facture.numero}
+                  {c.facture.soldee_le && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Soldée</span>}
+                </button>
+              )}
               {c.bon_livraison && (
-                <button onClick={() => setBl(true)} className="block font-semibold text-ge7-purple hover:underline">
+                <button onClick={() => setDoc("bl")} className="block font-semibold text-ge7-purple hover:underline">
                   Bon de livraison {c.bon_livraison.numero}
                 </button>
               )}
@@ -225,46 +253,46 @@ export function ClientOrderDetailPage() {
         </div>
       </div>
 
-      {/* Remise : demande, décision de l'équipe. */}
-      <div className="mt-5 rounded-2xl border border-ge7-black/10 bg-white p-5">
-        <p className="flex items-center gap-2 text-sm font-bold"><BadgePercent size={16} className="text-ge7-bronze" /> Remise</p>
-        {c.remise.statut === "demandee" && (
-          <p className="mt-2 text-sm text-ge7-black/70">Demande de <strong>{c.remise.taux_demande} %</strong> en cours d'étude{c.remise.motif ? ` (« ${c.remise.motif} »)` : ""}.</p>
-        )}
-        {c.remise.statut === "accordee" && (
-          <p className="mt-2 text-sm text-emerald-700">Remise de <strong>{c.remise.taux} %</strong> accordée : − {money(c.remise.montant)}.</p>
-        )}
-        {c.remise.statut === "refusee" && <p className="mt-2 text-sm text-rose-700">Votre demande de remise n'a pas été retenue.</p>}
-        {!c.remise.statut && !peutDemanderRemise && <p className="mt-2 text-sm text-ge7-black/50">Aucune remise sur cette commande.</p>}
-
-        {peutDemanderRemise && !remise && (
-          <button onClick={() => setRemise({ taux: "", motif: "" })} className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-ge7-black/15 px-4 py-2 text-sm font-semibold hover:border-ge7-gold">
-            <BadgePercent size={14} /> {c.remise.statut === "refusee" ? "Faire une nouvelle demande" : "Demander une remise"}
-          </button>
-        )}
-        {remise && (
-          <div className="mt-3 grid gap-3 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
+      {/* Grande fenêtre d'ajout : catalogue à gauche, produits à ajouter à droite. */}
+      {ajout && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 sm:items-center sm:p-6" onClick={() => setAjout(null)}>
+          <div
+            className="relative max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-t-3xl bg-white p-4 sm:rounded-3xl sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-ge7-black/60">Remise (%)</label>
-              <input type="number" min={0.5} max={100} step="0.5" className={field} value={remise.taux} onChange={(e) => setRemise({ ...remise, taux: e.target.value })} />
+              <p className="flex items-center gap-2 text-base font-bold"><PackagePlus size={18} className="text-ge7-bronze" /> Ajouter des produits à la commande {c.numero}</p>
+              <p className="mt-1 text-xs text-ge7-black/50">Possible tant que la commande n'est pas validée.</p>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-ge7-black/60">Motif</label>
-              <input maxLength={500} className={field} value={remise.motif} onChange={(e) => setRemise({ ...remise, motif: e.target.value })} placeholder="Ex. commande en volume" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setRemise(null)} className="rounded-full border border-ge7-black/15 px-4 py-2.5 text-sm font-semibold">Annuler</button>
-              <button
-                disabled={!(Number(remise.taux) > 0) || demanderRemise.isPending}
-                onClick={() => demanderRemise.mutate(remise)}
-                className="rounded-full bg-ge7-gold px-4 py-2.5 text-sm font-bold text-ge7-black disabled:opacity-50"
-              >
-                Envoyer
-              </button>
+            <button onClick={() => setAjout(null)} className="grid size-9 shrink-0 place-items-center rounded-full bg-ge7-black/5 hover:bg-ge7-black/10" aria-label="Fermer"><X size={18} /></button>
+          </div>
+          <div className="mt-4 grid gap-5 lg:grid-cols-[1.35fr_1fr]">
+            <CatalogueClient onAjouter={(l) => setAjout(fusionner(ajout, l))} />
+            <div className="h-fit rounded-2xl border border-ge7-black/10 p-4 lg:sticky lg:top-0">
+              <p className="mb-2 text-sm font-bold">À ajouter ({ajout.length})</p>
+              <ListeDemande
+                lignes={ajout}
+                onQuantite={(cle, q) => setAjout(ajout.map((l) => (l.cle === cle ? { ...l, quantite: q } : l)))}
+                onRetirer={(cle) => setAjout(ajout.filter((l) => l.cle !== cle))}
+              />
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => setAjout(null)} className="rounded-full border border-ge7-black/15 px-4 py-2.5 text-sm font-semibold">Annuler</button>
+                <button
+                  disabled={ajout.length === 0 || ajouterLignes.isPending}
+                  onClick={() => ajouterLignes.mutate(ajout)}
+                  className="flex-1 rounded-full bg-ge7-gold px-4 py-2.5 text-sm font-bold text-ge7-black disabled:opacity-50"
+                >
+                  {ajouterLignes.isPending ? "Envoi…" : "Ajouter à la commande"}
+                </button>
+              </div>
             </div>
           </div>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-5 rounded-2xl border border-ge7-black/10 bg-white p-5">
         <p className="mb-3 text-sm font-bold">Annotations</p>

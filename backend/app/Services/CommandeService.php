@@ -6,7 +6,9 @@ use App\Enums\StatutCommande;
 use App\Models\Client;
 use App\Models\Commande;
 use App\Models\CommandeAnnotation;
+use App\Models\CommandeLigne;
 use App\Models\Driver;
+use App\Models\Facture;
 use App\Models\Livraison;
 use App\Models\Paiement;
 use App\Models\PosSale;
@@ -50,11 +52,10 @@ class CommandeService
      * les lignes. Aucune facture, vente ni mouvement de stock à ce stade.
      *
      * `$compte` : compte CLIENT connecté (espace client), la commande lui est
-     * rattachée, l'annotation et la demande de remise éventuelles sont
-     * enregistrées, et la limite anti-abus des commandes publiques ne
+     * rattachée, l'annotation éventuelle est enregistrée, et la limite anti-abus des commandes publiques ne
      * s'applique pas.
      *
-     * @param  array{nom: string, telephone: string, ville: string, quartier: string, point_repere: string, note?: ?string, zone_id?: ?int, lignes: list<array{produit_id: int, quantite: mixed}>, annotation?: ?string, remise_taux?: mixed, remise_motif?: ?string}  $data
+     * @param  array{nom: string, telephone: string, ville: string, quartier: string, point_repere: string, note?: ?string, zone_id?: ?int, lignes: list<array{produit_id: int, quantite: mixed}>, annotation?: ?string}  $data
      */
     public function creer(array $data, ?User $compte = null): Commande
     {
@@ -94,39 +95,11 @@ class CommandeService
             $commande->numero = $this->numerotation->next('CMD');
             $commande->save();
 
-            $total = 0;
             foreach ($data['lignes'] as $ligne) {
-                $produit = Product::lockForUpdate()->find($ligne['produit_id']);
-
-                if (! $produit) {
-                    throw ValidationException::withMessages(['lignes' => 'Un produit de la commande est introuvable.']);
-                }
-
-                $quantite = (float) $ligne['quantite'];
-                if ($quantite <= 0) {
-                    throw ValidationException::withMessages(['lignes' => 'Quantité invalide pour « '.$produit->name.' ».']);
-                }
-
-                // Pas de blocage sur le stock à la commande : le client peut
-                // commander même en rupture (réapprovisionnement). Le stock
-                // est vérifié et déduit à la validation par l'admin.
-
-                // Prix figé au barème : prix de la ville si connue, sinon prix de base.
-                $prixUnitaire = $produit->prixBoutique($zone?->id);
-                $totalLigne = (int) round($prixUnitaire * $quantite);
-                $total += $totalLigne;
-
-                $commande->lignes()->create([
-                    'produit_id' => $produit->id,
-                    'designation' => $produit->name.($produit->type ? ' · '.$produit->type : ''),
-                    'prix_unitaire' => $prixUnitaire,
-                    'quantite' => $quantite,
-                    'total_ligne' => $totalLigne,
-                ]);
+                $this->creerLigne($commande, $ligne, $zone?->id, (bool) $compte);
             }
 
-            $commande->total = $total;
-            $commande->save();
+            $this->recalculer($commande);
 
             $this->historiser($commande, null, StatutCommande::EnAttente, $compte, 'Commande reçue');
 
@@ -134,11 +107,173 @@ class CommandeService
                 $this->annoter($commande, $compte, $data['annotation']);
             }
 
-            if ($compte && ! empty($data['remise_taux'])) {
-                $this->demanderRemise($commande, (float) $data['remise_taux'], $data['remise_motif'] ?? null, $compte);
+            return $commande->load('lignes');
+        });
+    }
+
+    /**
+     * Ligne de commande au prix figé du barème. Un compte CLIENT peut aussi
+     * demander un produit absent du catalogue (`designation` sans
+     * `produit_id`) : ligne à 0, référencée ensuite par l'équipe.
+     *
+     * @param  array{produit_id?: ?int, designation?: ?string, precision?: ?string, quantite: mixed}  $ligne
+     */
+    private function creerLigne(Commande $commande, array $ligne, ?int $zoneId, bool $produitInconnuPermis): CommandeLigne
+    {
+        $quantite = (float) $ligne['quantite'];
+
+        if (empty($ligne['produit_id'])) {
+            $designation = trim((string) ($ligne['designation'] ?? ''));
+            if (! $produitInconnuPermis || $designation === '') {
+                throw ValidationException::withMessages(['lignes' => 'Un produit de la commande est introuvable.']);
+            }
+            if ($quantite <= 0) {
+                throw ValidationException::withMessages(['lignes' => 'Quantité invalide pour « '.$designation.' ».']);
             }
 
-            return $commande->load('lignes');
+            return $commande->lignes()->create([
+                'produit_id' => null,
+                'designation' => $designation,
+                'precision' => isset($ligne['precision']) ? trim((string) $ligne['precision']) : null,
+                'prix_unitaire' => 0,
+                'quantite' => $quantite,
+                'total_ligne' => 0,
+            ]);
+        }
+
+        $produit = Product::lockForUpdate()->find($ligne['produit_id']);
+        if (! $produit) {
+            throw ValidationException::withMessages(['lignes' => 'Un produit de la commande est introuvable.']);
+        }
+        if ($quantite <= 0) {
+            throw ValidationException::withMessages(['lignes' => 'Quantité invalide pour « '.$produit->name.' ».']);
+        }
+
+        // Pas de blocage sur le stock à la commande : le client peut
+        // commander même en rupture (réapprovisionnement). Le stock est
+        // vérifié et déduit à la validation par l'admin.
+
+        // Prix figé au barème de la ville de livraison. Compte client sans
+        // ville tarifaire (toutes les villes, autre ville) : prix laissé vide,
+        // saisi par l'équipe. Boutique publique : prix de base.
+        $prixUnitaire = $produitInconnuPermis && $zoneId === null ? 0 : $produit->prixBoutique($zoneId);
+
+        return $commande->lignes()->create([
+            'produit_id' => $produit->id,
+            'designation' => $produit->name.($produit->type ? ' · '.$produit->type : ''),
+            'precision' => isset($ligne['precision']) ? trim((string) $ligne['precision']) : null,
+            'prix_unitaire' => $prixUnitaire,
+            'quantite' => $quantite,
+            'total_ligne' => (int) round($prixUnitaire * $quantite),
+        ]);
+    }
+
+    /** Total de la commande depuis ses lignes, remise accordée réappliquée. */
+    private function recalculer(Commande $commande): void
+    {
+        $sousTotal = (int) $commande->lignes()->sum('total_ligne');
+
+        $commande->remise_montant = $commande->remise_statut === 'accordee'
+            ? (int) round($sousTotal * (float) $commande->remise_taux / 100)
+            : 0;
+        $commande->total = $sousTotal - $commande->remise_montant;
+        $commande->save();
+    }
+
+    /**
+     * Produits ajoutés par le client à sa commande, tant qu'elle est en
+     * attente de validation (catalogue ou produits inconnus).
+     *
+     * @param  list<array{produit_id?: ?int, designation?: ?string, precision?: ?string, quantite: mixed}>  $lignes
+     */
+    public function ajouterLignes(Commande $commande, array $lignes, User $user): Commande
+    {
+        return DB::transaction(function () use ($commande, $lignes, $user) {
+            $commande = Commande::lockForUpdate()->findOrFail($commande->id);
+
+            if ($commande->statut !== StatutCommande::EnAttente) {
+                throw ValidationException::withMessages(['lignes' => 'Des produits ne peuvent être ajoutés que sur une commande en attente de validation.']);
+            }
+
+            $ajouts = [];
+            foreach ($lignes as $ligne) {
+                $ajouts[] = $this->creerLigne($commande, $ligne, $commande->zone_id, true);
+            }
+
+            $this->recalculer($commande);
+
+            $this->historiser($commande, null, $commande->statut, $user, 'Produits ajoutés : '.collect($ajouts)
+                ->map(fn (CommandeLigne $l) => rtrim(rtrim(number_format((float) $l->quantite, 2, ',', ''), '0'), ',').' × '.$l->designation)
+                ->implode(', '));
+
+            return $commande;
+        });
+    }
+
+    /**
+     * Référencement d'une ligne par l'équipe avant validation : produit du
+     * catalogue associé (produit demandé inconnu) et/ou prix unitaire ajusté.
+     */
+    public function modifierLigne(Commande $commande, CommandeLigne $ligne, ?int $produitId, ?int $prixUnitaire, User $admin): Commande
+    {
+        return DB::transaction(function () use ($commande, $ligne, $produitId, $prixUnitaire, $admin) {
+            $commande = Commande::lockForUpdate()->findOrFail($commande->id);
+
+            if ($commande->statut !== StatutCommande::EnAttente) {
+                throw ValidationException::withMessages(['ligne' => 'Les lignes se modifient avant la validation de la commande.']);
+            }
+
+            $avant = $ligne->designation;
+
+            // Produit choisi par le client dans le catalogue : figé, seul le prix change.
+            if ($produitId !== null && $ligne->produit_id !== null && $produitId !== (int) $ligne->produit_id) {
+                throw ValidationException::withMessages(['produit_id' => 'Ce produit vient du catalogue : il ne peut pas être remplacé, seul son prix peut être modifié.']);
+            }
+
+            if ($produitId !== null) {
+                $produit = Product::findOrFail($produitId);
+                $ligne->produit_id = $produit->id;
+                $ligne->designation = $produit->name.($produit->type ? ' · '.$produit->type : '');
+                $ligne->prix_unitaire = $prixUnitaire ?? ($commande->user_id && ! $commande->zone_id ? 0 : $produit->prixBoutique($commande->zone_id));
+            } elseif ($prixUnitaire !== null) {
+                $ligne->prix_unitaire = $prixUnitaire;
+            }
+
+            $ligne->total_ligne = (int) round($ligne->prix_unitaire * (float) $ligne->quantite);
+            $ligne->save();
+
+            $this->recalculer($commande);
+
+            $this->historiser($commande, null, $commande->statut, $admin, $produitId !== null && $avant !== $ligne->designation
+                ? 'Produit référencé : « '.$avant.' » → '.$ligne->designation
+                : 'Prix ajusté : '.$ligne->designation);
+
+            return $commande;
+        });
+    }
+
+    /**
+     * Facture soldée : marque définitive, visible côté équipe et côté
+     * client. Une facture soldée ne peut plus être « désoldée ».
+     */
+    public function solder(Commande $commande, User $admin): Commande
+    {
+        return DB::transaction(function () use ($commande, $admin) {
+            $facture = Facture::where('commande_id', $commande->id)->lockForUpdate()->first();
+
+            if (! $facture) {
+                throw ValidationException::withMessages(['facture' => "Cette commande n'a pas encore de facture."]);
+            }
+
+            if (! $facture->soldee_le) {
+                $facture->soldee_le = now();
+                $facture->soldee_par = $admin->id;
+                $facture->save();
+
+                $this->historiser($commande, null, $commande->statut, $admin, 'Facture '.$facture->numero.' soldée');
+            }
+
+            return $commande;
         });
     }
 
@@ -153,30 +288,6 @@ class CommandeService
             'auteur' => $user->role === 'CLIENT' ? 'client' : 'equipe',
             'contenu' => trim($contenu),
         ]);
-    }
-
-    /**
-     * Demande de remise du client, possible tant que la commande n'est pas
-     * validée (la facture reprend ensuite le montant net).
-     */
-    public function demanderRemise(Commande $commande, float $taux, ?string $motif, User $user): Commande
-    {
-        if ($commande->statut !== StatutCommande::EnAttente) {
-            throw ValidationException::withMessages(['remise_taux' => 'Une remise ne peut être demandée que sur une commande en attente de validation.']);
-        }
-
-        if ($commande->remise_statut === 'accordee') {
-            throw ValidationException::withMessages(['remise_taux' => 'Une remise a déjà été accordée sur cette commande.']);
-        }
-
-        $commande->remise_taux_demande = $taux;
-        $commande->remise_motif = $motif !== null ? trim($motif) : null;
-        $commande->remise_statut = 'demandee';
-        $commande->save();
-
-        $this->historiser($commande, null, $commande->statut, $user, 'Remise demandée : '.$this->pourcentage($taux).($commande->remise_motif ? ' ('.$commande->remise_motif.')' : ''));
-
-        return $commande;
     }
 
     /**
@@ -243,6 +354,16 @@ class CommandeService
             // La remise demandée doit d'abord être tranchée par le DG.
             if ($commande->remise_statut === 'demandee') {
                 throw ValidationException::withMessages(['remise' => 'Une remise est en attente de décision du DG : la commande ne peut pas encore être validée.']);
+            }
+
+            // Produits demandés hors catalogue : à référencer avant validation.
+            if ($commande->lignes->contains(fn (CommandeLigne $l) => $l->produit_id === null)) {
+                throw ValidationException::withMessages(['lignes' => 'Des produits demandés par le client ne sont pas encore référencés : associez-les à un produit du catalogue avant de valider.']);
+            }
+
+            // Prix laissés vides (commande sans ville tarifaire) : à saisir avant validation.
+            if ($commande->lignes->contains(fn (CommandeLigne $l) => (int) $l->prix_unitaire <= 0)) {
+                throw ValidationException::withMessages(['lignes' => 'Des prix restent à saisir : renseignez le prix de chaque ligne avant de valider.']);
             }
 
             $this->transition($commande, StatutCommande::Validee, $admin, null, false);
@@ -351,9 +472,12 @@ class CommandeService
      */
     public function demarrer(Commande $commande, User $user, ?float $latitude, ?float $longitude): Commande
     {
-        if (! $commande->chauffeur_id) {
-            throw ValidationException::withMessages(['chauffeur_id' => 'Aucun chauffeur affecté à cette commande.']);
-        }
+        // [CHAUFFEUR] Affectation du chauffeur mise en pause : un gestionnaire
+        // met la commande en livraison sans chauffeur. À réactiver avec la
+        // partie chauffeur (voir CHAUFFEUR.md).
+        // if (! $commande->chauffeur_id) {
+        //     throw ValidationException::withMessages(['chauffeur_id' => 'Aucun chauffeur affecté à cette commande.']);
+        // }
 
         return DB::transaction(function () use ($commande, $user, $latitude, $longitude) {
             $commande = Commande::lockForUpdate()->findOrFail($commande->id);

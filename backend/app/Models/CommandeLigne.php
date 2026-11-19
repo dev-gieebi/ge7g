@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['commande_id', 'produit_id', 'designation', 'prix_unitaire', 'quantite', 'total_ligne'])]
+#[Fillable(['commande_id', 'produit_id', 'designation', 'precision', 'prix_unitaire', 'quantite', 'total_ligne'])]
 class CommandeLigne extends Model
 {
     public $timestamps = false;

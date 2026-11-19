@@ -648,13 +648,17 @@ export interface CommandeListItem {
   espace_client?: boolean;
   remise_statut?: "demandee" | "accordee" | "refusee" | null;
   annotations?: number;
+  /** Lignes de produits demandés hors catalogue, à référencer avant validation. */
+  a_referencer?: number;
   cree_le: string;
 }
 
 export interface CommandeLigne {
   id: number;
-  produit_id: number;
+  /** `null` : produit demandé par le client hors catalogue, à référencer. */
+  produit_id: number | null;
   designation: string;
+  precision?: string | null;
   prix_unitaire: number;
   quantite: number;
   total_ligne: number;
@@ -708,6 +712,8 @@ export interface CommandeDetail {
     statut_paiement: "non_payee" | "partiellement_payee" | "payee" | "annulee";
     montant_total: number;
     encaisse: number;
+    /** Facture soldée : définitif, le tampon « Soldé » reste sur la facture. */
+    soldee_le?: string | null;
     avoir: { numero: string; montant: number } | null;
   } | null;
   livraison: {

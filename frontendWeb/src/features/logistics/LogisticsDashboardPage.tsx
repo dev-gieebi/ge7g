@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ModuleTabs } from "@/components/ui";
 import { LOGISTIQUE_TABS } from "@/app/moduleTabs";
-import { PackageCheck, Route, Truck, UserCheck, Users } from "lucide-react";
+import { PackageCheck, Route, Truck, UserCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getOne, toApiError } from "@/lib/api";
 import type { CommandeListItem, CommandeStats } from "@/types";
@@ -30,8 +30,10 @@ export function LogisticsDashboardPage() {
         <KpiCard label="Livraisons en cours" value={s.en_livraison} icon={Truck} tone="gold" to="/admin/commandes?statut=en_livraison" />
         <KpiCard label="Livrées aujourd'hui" value={s.livrees_jour} icon={PackageCheck} tone="green" to="/admin/commandes?statut=livree" />
         <KpiCard label="Livrées (total)" value={s.livrees_total} icon={Route} tone="dark" to="/admin/commandes?statut=livree" />
+        {/* [CHAUFFEUR] Indicateurs chauffeurs en pause (voir CHAUFFEUR.md).
         <KpiCard label="Chauffeurs en mission" value={s.chauffeurs_en_mission} icon={Truck} tone="purple" to="/admin/chauffeurs" />
         <KpiCard label="Chauffeurs" value={s.chauffeurs} icon={Users} tone="gold" to="/admin/chauffeurs" />
+        */}
       </div>
 
       <Card className="mt-6">

@@ -8,10 +8,11 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Vue d'une commande dans l'espace client : frise de suivi, lignes aux prix
- * figés, remise, annotations, journal et, une fois livrée, les données du
- * bon de livraison. Jamais exposés : le stock, les noms du personnel, les
- * données d'autres clients.
+ * Vue d'une commande dans l'espace client : frise de suivi, lignes, remise,
+ * annotations, journal, facture et, une fois livrée, le bon de livraison.
+ * Les prix ne sont envoyés qu'une fois la facture émise (validation).
+ * Jamais exposés : le stock, les noms du personnel, les données d'autres
+ * clients.
  *
  * @mixin Commande
  */
@@ -33,6 +34,8 @@ class ClientCommandeResource extends JsonResource
         }
 
         $livree = $this->statut === StatutCommande::Livree;
+        // Prix masqués au client tant que la facture n'est pas émise.
+        $prix = (bool) $this->facture;
 
         return [
             'id' => $this->id,
@@ -49,26 +52,31 @@ class ClientCommandeResource extends JsonResource
             'lignes' => $this->lignes->map(fn ($l) => [
                 'id' => $l->id,
                 'designation' => $l->designation,
-                'prix_unitaire' => (int) $l->prix_unitaire,
+                'precision' => $l->precision,
+                // Produit demandé hors catalogue, pas encore référencé par l'équipe.
+                'inconnu' => $l->produit_id === null,
+                'prix_unitaire' => $prix ? (int) $l->prix_unitaire : null,
                 'quantite' => (float) $l->quantite,
-                'total_ligne' => (int) $l->total_ligne,
+                'total_ligne' => $prix ? (int) $l->total_ligne : null,
                 'unite' => $l->produit?->unit?->symbol,
             ]),
-            'sous_total' => $this->sousTotal(),
+            'sous_total' => $prix ? $this->sousTotal() : null,
             'remise' => [
                 'statut' => $this->remise_statut,
                 'taux_demande' => $this->remise_taux_demande,
                 'motif' => $this->remise_motif,
                 'taux' => (float) $this->remise_taux,
-                'montant' => (int) $this->remise_montant,
+                'montant' => $prix ? (int) $this->remise_montant : null,
             ],
-            'total' => (int) $this->total,
-            'extras' => $this->extras->map(fn ($e) => ['label' => $e->label, 'amount' => (float) $e->amount])->values(),
+            'total' => $prix ? (int) $this->total : null,
+            'extras' => $prix ? $this->extras->map(fn ($e) => ['label' => $e->label, 'amount' => (float) $e->amount])->values() : [],
             'facture' => $this->facture ? [
                 'numero' => $this->facture->numero,
                 'statut_paiement' => $this->facture->statut_paiement,
                 'montant_total' => (int) $this->facture->montant_total,
                 'encaisse' => (int) $this->facture->paiements->sum('montant'),
+                // Soldée : définitif, le tampon « Soldé » figure sur la facture.
+                'soldee_le' => $this->facture->soldee_le?->toIso8601String(),
             ] : null,
             // Prénom du chauffeur uniquement, une fois en livraison.
             'chauffeur' => in_array($this->statut, [StatutCommande::EnLivraison, StatutCommande::Livree], true) && $this->chauffeur

@@ -8,12 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['numero', 'commande_id', 'client_id', 'montant_total', 'statut_paiement', 'user_id', 'emise_le'])]
+#[Fillable(['numero', 'commande_id', 'client_id', 'montant_total', 'statut_paiement', 'user_id', 'emise_le', 'soldee_le', 'soldee_par'])]
 class Facture extends Model
 {
     protected function casts(): array
     {
-        return ['emise_le' => 'datetime'];
+        return ['emise_le' => 'datetime', 'soldee_le' => 'datetime'];
     }
 
     public function commande(): BelongsTo

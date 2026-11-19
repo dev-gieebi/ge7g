@@ -59,6 +59,7 @@ class CommandeResource extends JsonResource
                 'id' => $l->id,
                 'produit_id' => $l->produit_id,
                 'designation' => $l->designation,
+                'precision' => $l->precision,
                 'prix_unitaire' => (int) $l->prix_unitaire,
                 'quantite' => (float) $l->quantite,
                 'total_ligne' => (int) $l->total_ligne,
@@ -74,6 +75,7 @@ class CommandeResource extends JsonResource
                 'statut_paiement' => $this->facture->statut_paiement,
                 'montant_total' => (int) $this->facture->montant_total,
                 'encaisse' => (int) $this->facture->paiements->sum('montant'),
+                'soldee_le' => $this->facture->soldee_le?->toIso8601String(),
                 'avoir' => $this->facture->avoir ? ['numero' => $this->facture->avoir->numero, 'montant' => (int) $this->facture->avoir->montant] : null,
             ] : null),
             'bon_livraison' => $this->bonLivraison ? [

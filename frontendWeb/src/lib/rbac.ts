@@ -20,7 +20,9 @@ export const canSeeCosts = (user: User | null) =>
   hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN") || hasRole(user, "SUPERADMIN") || can(user, "products.view_cost");
 
 /** Rôles autorisés sur l'application Web, le chauffeur a son espace livraisons. */
-export const WEB_ROLES: Role[] = ["LG_ADMIN", "CAISSIER", "DG_ADMIN", "SUPERADMIN", "CDG_ADMIN", "CHAUFFEUR"];
+// [CHAUFFEUR] Connexion des chauffeurs en pause : remettre "CHAUFFEUR" dans la liste (voir CHAUFFEUR.md).
+// export const WEB_ROLES: Role[] = ["LG_ADMIN", "CAISSIER", "DG_ADMIN", "SUPERADMIN", "CDG_ADMIN", "CHAUFFEUR"];
+export const WEB_ROLES: Role[] = ["LG_ADMIN", "CAISSIER", "DG_ADMIN", "SUPERADMIN", "CDG_ADMIN"];
 
 export const isWebRole = (role: Role) => WEB_ROLES.includes(role);
 
@@ -31,8 +33,8 @@ export const homeFor = (role: Role): string => {
     case "CHAUFFEUR":
       return "/admin/mes-livraisons";
     case "CLIENT":
-      // Espace client : uniquement la boutique (commande) et ses commandes.
-      return "/produits";
+      // Espace client : commande sans prix et suivi de ses commandes.
+      return "/mon-compte/commander";
     case "LG_ADMIN":
     case "DG_ADMIN":
     case "SUPERADMIN":

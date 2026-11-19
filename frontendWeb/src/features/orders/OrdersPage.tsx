@@ -40,6 +40,7 @@ export function OrdersPage() {
           {c.espace_client && <Badge tone="purple">compte</Badge>}
           {c.remise_statut === "demandee" && <Badge tone="amber">remise</Badge>}
           {!!c.annotations && <Badge tone="gold">{c.annotations} annot.</Badge>}
+          {!!c.a_referencer && <Badge tone="amber">{c.a_referencer} à référencer</Badge>}
         </span>
       ),
     },

@@ -14,6 +14,8 @@ import { ShopConfirmationPage } from "@/features/shop/ShopConfirmationPage";
 import { ShopTrackingPage } from "@/features/shop/ShopTrackingPage";
 import { ShopTrackingResultPage } from "@/features/shop/ShopTrackingResultPage";
 import { ClientOrdersPage } from "@/features/shop/ClientOrdersPage";
+import { ClientCommanderPage } from "@/features/shop/ClientCommanderPage";
+import { ClientDocumentViewerPage, ClientDocumentsPage } from "@/features/shop/ClientDocumentsPage";
 import { ClientOrderDetailPage } from "@/features/shop/ClientOrderDetailPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ClientsPage } from "@/features/clients/ClientsPage";
@@ -28,8 +30,9 @@ import { PurchasesPage } from "@/features/purchases/PurchasesPage";
 import { OrdersPage } from "@/features/orders/OrdersPage";
 import { OrderDetailPage } from "@/features/orders/OrderDetailPage";
 import { LogisticsDashboardPage } from "@/features/logistics/LogisticsDashboardPage";
-import { DriversPage } from "@/features/logistics/DriversPage";
-import { DriverHomePage } from "@/features/logistics/DriverHomePage";
+// [CHAUFFEUR] Partie chauffeur en pause (voir CHAUFFEUR.md).
+// import { DriversPage } from "@/features/logistics/DriversPage";
+// import { DriverHomePage } from "@/features/logistics/DriverHomePage";
 import { PosPage } from "@/features/pos/PosPage";
 import { PosSalesPage } from "@/features/pos/PosSalesPage";
 import { PosSaleDetailPage } from "@/features/pos/PosSaleDetailPage";
@@ -85,11 +88,17 @@ export const router = createBrowserRouter([
       </CartProvider>
     ),
     children: [
-      { path: "/", element: <ShopHomePage /> },
-      { path: "/produits", element: <ShopCatalogPage /> },
-      { path: "/produits/:id", element: <ShopProductPage /> },
-      { path: "/panier", element: <ShopCartPage /> },
-      { path: "/commande", element: <ShopCheckoutPage /> },
+      {
+        // Boutique avec prix : le client connecté passe par son espace commande (sans prix).
+        element: <SansCompteClient vers="/mon-compte/commander" />,
+        children: [
+          { path: "/", element: <ShopHomePage /> },
+          { path: "/produits", element: <ShopCatalogPage /> },
+          { path: "/produits/:id", element: <ShopProductPage /> },
+          { path: "/panier", element: <ShopCartPage /> },
+          { path: "/commande", element: <ShopCheckoutPage /> },
+        ],
+      },
       {
         // Commande sans compte : confirmation et suivi par numéro + téléphone.
         element: <SansCompteClient />,
@@ -103,9 +112,12 @@ export const router = createBrowserRouter([
         // Espace client connecté : ses commandes, leur suivi et le bon de livraison.
         element: <RequireClient />,
         children: [
-          { path: "/mon-compte", element: <Navigate to="/mon-compte/commandes" replace /> },
+          { path: "/mon-compte", element: <Navigate to="/mon-compte/commander" replace /> },
+          { path: "/mon-compte/commander", element: <ClientCommanderPage /> },
           { path: "/mon-compte/commandes", element: <ClientOrdersPage /> },
           { path: "/mon-compte/commandes/:id", element: <ClientOrderDetailPage /> },
+          { path: "/mon-compte/documents", element: <ClientDocumentsPage /> },
+          { path: "/mon-compte/documents/:id", element: <ClientDocumentViewerPage /> },
         ],
       },
     ],
@@ -149,7 +161,7 @@ export const router = createBrowserRouter([
               { path: "/admin/categories", element: <CategoriesPage /> },
               { path: "/admin/unites", element: <UnitsPage /> },
               { path: "/admin/fournisseurs", element: <SuppliersPage /> },
-              { path: "/admin/chauffeurs", element: <DriversPage /> },
+              // [CHAUFFEUR] { path: "/admin/chauffeurs", element: <DriversPage /> },
             ],
           },
           {
@@ -173,16 +185,17 @@ export const router = createBrowserRouter([
             element: <RequireRole roles={["DG_ADMIN", "CDG_ADMIN"]} />,
             children: [{ path: "/admin/rapports", element: <ReportsPage /> }],
           },
-          {
-            // Espace chauffeur : ses livraisons uniquement (filtre serveur).
-            // strict : même le SUPERADMIN n'y a pas accès, c'est l'espace
-            // personnel du chauffeur connecté.
-            element: <RequireRole roles={["CHAUFFEUR"]} strict />,
-            children: [
-              { path: "/admin/mes-livraisons", element: <DriverHomePage /> },
-              { path: "/admin/mes-livraisons/:id", element: <OrderDetailPage /> },
-            ],
-          },
+          // [CHAUFFEUR] Espace chauffeur en pause (voir CHAUFFEUR.md).
+          // {
+          //   // Espace chauffeur : ses livraisons uniquement (filtre serveur).
+          //   // strict : même le SUPERADMIN n'y a pas accès, c'est l'espace
+          //   // personnel du chauffeur connecté.
+          //   element: <RequireRole roles={["CHAUFFEUR"]} strict />,
+          //   children: [
+          //     { path: "/admin/mes-livraisons", element: <DriverHomePage /> },
+          //     { path: "/admin/mes-livraisons/:id", element: <OrderDetailPage /> },
+          //   ],
+          // },
           {
             element: <RequireRole roles={["LG_ADMIN", "CAISSIER"]} />,
             children: [{ path: "/admin/caisse", element: <PosPage /> }],

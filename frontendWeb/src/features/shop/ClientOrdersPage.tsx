@@ -39,7 +39,7 @@ export function ClientOrdersPage() {
             {profil.data && <> · {profil.data.zone ? `Ville : ${profil.data.zone.name}` : "Toutes les villes"}</>}
           </p>
         </div>
-        <Link to="/produits" className="inline-flex items-center gap-2 rounded-full bg-ge7-gold px-5 py-2.5 text-sm font-bold text-ge7-black transition hover:brightness-110">
+        <Link to="/mon-compte/commander" className="inline-flex items-center gap-2 rounded-full bg-ge7-gold px-5 py-2.5 text-sm font-bold text-ge7-black transition hover:brightness-110">
           <ShoppingBag size={16} /> Nouvelle commande
         </Link>
       </div>
@@ -61,7 +61,7 @@ export function ClientOrdersPage() {
         <Loading />
       ) : !data || data.data.length === 0 ? (
         <p className="mt-6 rounded-2xl border border-dashed border-ge7-black/15 bg-white/60 px-6 py-12 text-center text-sm text-ge7-black/50">
-          Aucune commande pour le moment. Parcourez le catalogue pour passer votre première commande.
+          Aucune commande pour le moment. Cliquez sur « Nouvelle commande » pour passer votre première commande.
         </p>
       ) : (
         <>
@@ -85,7 +85,7 @@ export function ClientOrdersPage() {
                     </div>
                     <p className="mt-0.5 text-xs text-ge7-black/50">{date(c.cree_le)} · {c.ville}</p>
                   </div>
-                  <span className="shrink-0 font-extrabold text-ge7-bronze">{money(c.total)}</span>
+                  {c.total !== null && <span className="shrink-0 font-extrabold text-ge7-bronze">{money(c.total)}</span>}
                   <ChevronRight size={18} className="shrink-0 text-ge7-black/30" />
                 </Link>
               </li>

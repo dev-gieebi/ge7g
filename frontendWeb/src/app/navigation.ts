@@ -65,12 +65,13 @@ export const NAVIGATION: NavGroup[] = [
       },
     ],
   },
-  {
-    title: "Livraisons",
-    items: [
-      { label: "Mes livraisons", to: "/admin/mes-livraisons", icon: Truck, roles: ["CHAUFFEUR"], paths: ["/admin/mes-livraisons"] },
-    ],
-  },
+  // [CHAUFFEUR] Espace chauffeur en pause (voir CHAUFFEUR.md).
+  // {
+  //   title: "Livraisons",
+  //   items: [
+  //     { label: "Mes livraisons", to: "/admin/mes-livraisons", icon: Truck, roles: ["CHAUFFEUR"], paths: ["/admin/mes-livraisons"] },
+  //   ],
+  // },
   {
     title: "Système",
     items: [{ label: "Paramètres", to: "/admin/parametres", icon: Settings, roles: ["SUPERADMIN"], paths: ["/admin/parametres", "/admin/audit"] }],

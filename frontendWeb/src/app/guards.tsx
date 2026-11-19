@@ -20,9 +20,9 @@ export function RequireAuth() {
  * Suivi par numéro + téléphone : réservé aux commandes sans compte. Un
  * client connecté suit toutes ses commandes depuis sa liste.
  */
-export function SansCompteClient() {
+export function SansCompteClient({ vers = "/mon-compte/commandes" }: { vers?: string }) {
   const { user } = useAuth();
-  if (user?.role === "CLIENT") return <Navigate to="/mon-compte/commandes" replace />;
+  if (user?.role === "CLIENT") return <Navigate to={vers} replace />;
   return <Outlet />;
 }
 

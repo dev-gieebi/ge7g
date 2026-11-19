@@ -6,6 +6,7 @@ use App\Enums\StatutCommande;
 use App\Http\Requests\StoreCommandeClientRequest;
 use App\Http\Resources\ClientCommandeResource;
 use App\Models\Commande;
+use App\Models\Product;
 use App\Models\User;
 use App\Models\Zone;
 use App\Services\CommandeService;
@@ -13,13 +14,16 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Espace client connecté (rôle CLIENT) : commande sans voir le stock, suivi
- * de ses propres commandes, annotations, demande de remise et bon de
- * livraison. Un client n'accède qu'à ses commandes et, s'il est rattaché à
+ * Espace client connecté (rôle CLIENT) : commande sans voir ni le stock ni
+ * les prix (tout le catalogue + produits inconnus), suivi de ses propres
+ * commandes, annotations, facture et bon de livraison. Un client n'accède qu'à ses commandes et, s'il est rattaché à
  * une ville, ne commande que pour cette ville.
  */
 class EspaceClientController extends Controller
 {
+    /** Commandes terminées : livrées, refusées ou annulées. */
+    private const TERMINEES = [StatutCommande::Livree, StatutCommande::Refusee, StatutCommande::Annulee];
+
     public function __construct(private readonly CommandeService $service) {}
 
     private function authorizeClient(Request $request): User
@@ -51,6 +55,8 @@ class EspaceClientController extends Controller
             'telephone' => $user->phone,
             'zone' => $user->zone ? ['id' => $user->zone->id, 'name' => $user->zone->name] : null,
             'non_lues' => $this->nonLues($user)->count(),
+            // Commandes pas encore arrivées chez le client (hors livrées, refusées, annulées).
+            'en_cours' => Commande::where('user_id', $user->id)->whereNotIn('statut', self::TERMINEES)->count(),
         ]]);
     }
 
@@ -66,14 +72,13 @@ class EspaceClientController extends Controller
         }
 
         // Historique : commandes en cours ou terminées (livrées, refusées, annulées).
-        $terminees = [StatutCommande::Livree, StatutCommande::Refusee, StatutCommande::Annulee];
         if ($request->input('etat') === 'en_cours') {
-            $query->whereNotIn('statut', $terminees);
+            $query->whereNotIn('statut', self::TERMINEES);
         } elseif ($request->input('etat') === 'terminees') {
-            $query->whereIn('statut', $terminees);
+            $query->whereIn('statut', self::TERMINEES);
         }
 
-        $paginator = $query->orderByDesc('created_at')->paginate(min((int) $request->input('per_page', 20), 50));
+        $paginator = $query->with('facture')->orderByDesc('created_at')->paginate(min((int) $request->input('per_page', 20), 50));
 
         return response()->json([
             'data' => collect($paginator->items())->map(fn (Commande $c) => [
@@ -82,7 +87,8 @@ class EspaceClientController extends Controller
                 'statut' => $c->statut->value,
                 'statut_libelle' => $c->statut->libelle(),
                 'ville' => $c->ville,
-                'total' => (int) $c->total,
+                // Prix masqués au client tant qu'aucune facture n'est émise.
+                'total' => $c->facture ? (int) $c->total : null,
                 'remise_statut' => $c->remise_statut,
                 'non_lu' => in_array($c->id, $nonLues, true),
                 'cree_le' => $c->created_at?->toIso8601String(),
@@ -94,6 +100,82 @@ class EspaceClientController extends Controller
                 'total' => $paginator->total(),
                 'from' => $paginator->firstItem(),
                 'to' => $paginator->lastItem(),
+            ],
+        ]);
+    }
+
+    /**
+     * Archive des documents du client : une entrée par commande facturée,
+     * avec sa facture et, une fois livrée, son bon de livraison.
+     */
+    public function documents(Request $request): JsonResponse
+    {
+        $user = $this->authorizeClient($request);
+
+        $paginator = Commande::where('user_id', $user->id)
+            ->whereHas('facture')
+            ->with(['facture', 'bonLivraison'])
+            ->orderByDesc('created_at')
+            ->paginate(min((int) $request->input('per_page', 20), 50));
+
+        return response()->json([
+            'data' => collect($paginator->items())->map(fn (Commande $c) => [
+                'commande_id' => $c->id,
+                'commande' => $c->numero,
+                'statut_libelle' => $c->statut->libelle(),
+                'facture' => [
+                    'numero' => $c->facture->numero,
+                    'emise_le' => $c->facture->emise_le?->toIso8601String(),
+                    'montant_total' => (int) $c->facture->montant_total,
+                    'soldee_le' => $c->facture->soldee_le?->toIso8601String(),
+                ],
+                'bon_livraison' => $c->bonLivraison ? [
+                    'numero' => $c->bonLivraison->numero,
+                    'livre_le' => $c->bonLivraison->livre_le?->toIso8601String(),
+                ] : null,
+            ]),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * Catalogue complet pour le client : tous les produits en base, sans prix
+     * ni stock (ni filtre de ville).
+     */
+    public function produits(Request $request): JsonResponse
+    {
+        $this->authorizeClient($request);
+
+        $query = Product::query()->with(['category', 'unit']);
+
+        if ($request->filled('categorie')) {
+            $query->where('category_id', (int) $request->input('categorie'));
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('reference', 'like', "%{$search}%"));
+        }
+
+        $paginator = $query->orderByDesc('mis_en_avant')->orderBy('name')->paginate(min((int) $request->input('per_page', 24), 48));
+
+        return response()->json([
+            'data' => collect($paginator->items())->map(fn (Product $p) => [
+                'id' => $p->id,
+                'reference' => $p->reference,
+                'designation' => $p->name.($p->type ? ' · '.$p->type : ''),
+                'description' => $p->description_publique,
+                'categorie' => $p->category?->name,
+                'unite' => $p->unit?->symbol,
+                'image' => $p->image_url,
+            ]),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total(),
             ],
         ]);
     }
@@ -147,17 +229,14 @@ class EspaceClientController extends Controller
         return new ClientCommandeResource($this->charger($commande));
     }
 
-    public function remise(Request $request, Commande $commande): ClientCommandeResource
+    /** Produits ajoutés à une commande encore en attente de validation. */
+    public function ajouterLignes(Request $request, Commande $commande): ClientCommandeResource
     {
         $user = $this->authorizeClient($request);
         $this->authorizeCommande($user, $commande);
 
-        $validated = $request->validate([
-            'remise_taux' => 'required|numeric|min:0.5|max:100',
-            'remise_motif' => 'nullable|string|max:500',
-        ]);
-
-        $this->service->demanderRemise($commande, (float) $validated['remise_taux'], $validated['remise_motif'] ?? null, $user);
+        $validated = $request->validate(StoreCommandeClientRequest::reglesLignes());
+        $this->service->ajouterLignes($commande, $validated['lignes'], $user);
 
         return new ClientCommandeResource($this->charger($commande));
     }

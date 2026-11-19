@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\StatutCommande;
 use App\Http\Resources\CommandeResource;
 use App\Models\Commande;
+use App\Models\CommandeLigne;
 use App\Models\Driver;
 use App\Models\User;
 use App\Services\CommandeService;
@@ -96,6 +97,7 @@ class CommandeController extends Controller
                 'espace_client' => $c->user_id !== null,
                 'remise_statut' => $c->remise_statut,
                 'annotations' => (int) $c->annotations_count,
+                'a_referencer' => $c->lignes->whereNull('produit_id')->count(),
                 'cree_le' => $c->created_at?->toIso8601String(),
             ]),
             'meta' => [
@@ -189,6 +191,40 @@ class CommandeController extends Controller
         return new CommandeResource($commande->load(self::DETAIL));
     }
 
+    /**
+     * Ligne à référencer avant validation : produit inconnu associé à un
+     * produit du catalogue et/ou prix unitaire ajusté.
+     */
+    public function modifierLigne(Request $request, Commande $commande, CommandeLigne $ligne): CommandeResource
+    {
+        $this->authorizeUser($request, self::MANAGE_ROLES);
+        abort_unless($ligne->commande_id === $commande->id, 404);
+
+        $validated = $request->validate([
+            'produit_id' => 'nullable|required_without:prix_unitaire|integer|exists:products,id',
+            'prix_unitaire' => 'nullable|required_without:produit_id|integer|min:0|max:999999999',
+        ]);
+
+        $this->service->modifierLigne(
+            $commande,
+            $ligne,
+            isset($validated['produit_id']) ? (int) $validated['produit_id'] : null,
+            isset($validated['prix_unitaire']) ? (int) $validated['prix_unitaire'] : null,
+            $request->user(),
+        );
+
+        return new CommandeResource($commande->refresh()->load(self::DETAIL));
+    }
+
+    /** Facture soldée : définitif, visible aussi par le client. */
+    public function solder(Request $request, Commande $commande): CommandeResource
+    {
+        $this->authorizeUser($request, self::MANAGE_ROLES);
+        $this->service->solder($commande, $request->user());
+
+        return new CommandeResource($commande->refresh()->load(self::DETAIL));
+    }
+
     public function refuser(Request $request, Commande $commande): CommandeResource
     {
         $this->authorizeUser($request, self::MANAGE_ROLES);
@@ -267,11 +303,13 @@ class CommandeController extends Controller
         $user = $this->authorizeUser($request, self::DELIVER_ROLES);
         $this->authorizeChauffeur($user, $commande);
 
+        // [CHAUFFEUR] Sans chauffeur, un simple clic « Livrée » suffit :
+        // réceptionnaire, encaissement et signature deviennent facultatifs.
         $validated = $request->validate([
-            'receptionnaire' => 'required|string|min:2|max:100',
+            'receptionnaire' => 'nullable|string|min:2|max:100',
             'signature' => 'nullable|string|max:500000',
-            'montant' => 'required|integer|min:0',
-            'mode' => 'required|in:ESPECES,AIRTEL_MONEY,MOOV_MONEY',
+            'montant' => 'nullable|integer|min:0',
+            'mode' => 'nullable|required_with:montant|in:ESPECES,AIRTEL_MONEY,MOOV_MONEY',
         ]);
 
         return new CommandeResource($this->service->livrer($commande, $validated, $user)->load(['historique.user', 'facture.paiements', 'livraison']));

@@ -18,7 +18,8 @@ export function ShopLayout() {
   const [menu, setMenu] = useState(false);
   const { user, logout } = useAuth();
   const estClient = useEstClient();
-  const nonLues = useProfilClient().data?.non_lues ?? 0;
+  // Compteur du menu : commandes en cours, pas encore livrées au client.
+  const enCours = useProfilClient().data?.en_cours ?? 0;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -26,14 +27,19 @@ export function ShopLayout() {
     setMenu(false);
   };
 
-  // Compte client connecté : ses commandes (avec nouveautés) remplacent le suivi par numéro.
-  const links = [
-    { to: "/", label: "Accueil", end: true },
-    { to: "/produits", label: "Catalogue", end: false },
-    estClient
-      ? { to: "/mon-compte/commandes", label: `Mes commandes${nonLues ? ` (${nonLues})` : ""}`, end: false }
-      : { to: "/suivi", label: "Suivi de commande", end: false },
-  ];
+  // Compte client connecté : espace commande sans prix + ses commandes (avec
+  // nouveautés) à la place de la boutique publique et du suivi par numéro.
+  const links = estClient
+    ? [
+        { to: "/mon-compte/commander", label: "Commander", end: true },
+        { to: "/mon-compte/commandes", label: `Mes commandes${enCours ? ` (${enCours})` : ""}`, end: false },
+        { to: "/mon-compte/documents", label: "Mes documents", end: false },
+      ]
+    : [
+        { to: "/", label: "Accueil", end: true },
+        { to: "/produits", label: "Catalogue", end: false },
+        { to: "/suivi", label: "Suivi de commande", end: false },
+      ];
 
   const compte = estClient ? (
     <button
@@ -56,11 +62,11 @@ export function ShopLayout() {
     <div className="flex min-h-screen flex-col bg-ge7-cream print:bg-white">
       <header className="no-print sticky top-0 z-40 bg-[#151515] text-white shadow-lg">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <Link to="/" className="shrink-0">
+          <Link to={estClient ? "/mon-compte/commander" : "/"} className="shrink-0">
             <Logo light size={40} />
           </Link>
 
-          <form onSubmit={submit} className="relative mx-auto hidden w-full max-w-md md:block">
+          <form onSubmit={submit} className={`relative mx-auto hidden w-full max-w-md ${estClient ? "" : "md:block"}`}>
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
             <input
               value={search}
@@ -85,7 +91,7 @@ export function ShopLayout() {
             ))}
           </nav>
 
-          <Link to="/panier" className="relative ml-auto rounded-full p-2.5 text-white/80 transition hover:bg-white/10 hover:text-white md:ml-0">
+          <Link to="/panier" className={`relative ml-auto rounded-full p-2.5 text-white/80 transition hover:bg-white/10 hover:text-white md:ml-0 ${estClient ? "invisible" : ""}`}>
             <ShoppingCart size={21} />
             {cart.count > 0 && (
               <span className="absolute -right-0.5 -top-0.5 grid min-w-5 place-items-center rounded-full bg-ge7-gold px-1 text-[11px] font-bold text-ge7-black">
@@ -103,7 +109,7 @@ export function ShopLayout() {
 
         {menu && (
           <div className="border-t border-white/10 px-4 pb-4 pt-3 md:hidden">
-            <form onSubmit={submit} className="relative mb-3">
+            <form onSubmit={submit} className={`relative mb-3 ${estClient ? "hidden" : ""}`}>
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
               <input
                 value={search}
@@ -159,7 +165,7 @@ export function ShopLayout() {
           </div>
           <div>
             <p className="mb-2 font-bold text-white">Boutique</p>
-            <Link to="/produits" className="block hover:text-white">Catalogue</Link>
+            <Link to={estClient ? "/mon-compte/commander" : "/produits"} className="block hover:text-white">{estClient ? "Commander" : "Catalogue"}</Link>
             <Link to={estClient ? "/mon-compte/commandes" : "/suivi"} className="mt-1 flex items-center gap-1.5 hover:text-white"><PackageSearch size={14} /> {estClient ? "Mes commandes" : "Suivre ma commande"}</Link>
             <p className="mt-3 text-xs">{GE7_COMPANY.website}</p>
           </div>

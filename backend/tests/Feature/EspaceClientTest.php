@@ -58,6 +58,8 @@ class EspaceClientTest extends TestCase
             'nom' => 'Quincaillerie Mba',
             'telephone' => '066112233',
             'ville' => 'Libreville',
+            // Ville tarifaire : prix du barème (sinon prix à saisir par l'équipe).
+            'zone_id' => Zone::firstOrCreate(['code' => 'LBV'], ['name' => 'Libreville'])->id,
             'quartier' => 'Glass',
             'point_repere' => 'Face à la pharmacie',
             'lignes' => [['produit_id' => $p->id, 'quantite' => 2]],
@@ -76,30 +78,31 @@ class EspaceClientTest extends TestCase
         $this->assertDatabaseHas('clients', ['id' => $compte->client_id, 'telephone' => '+241066112233']);
     }
 
-    public function test_client_commande_meme_en_rupture_avec_annotation_et_remise(): void
+    public function test_client_commande_meme_en_rupture_avec_annotation_sans_remise(): void
     {
         $compte = $this->creerCompteClient();
         $p = $this->produit(['stock_quantity' => 0]);
 
+        // Une remise envoyée par le navigateur est ignorée : le client n'en demande pas.
         $res = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p, [
             'annotation' => 'Livrer avant 10 h svp',
             'remise_taux' => 10,
-            'remise_motif' => 'Client fidèle',
         ]));
         $res->assertCreated();
 
         $commande = Commande::findOrFail($res->json('data.id'));
         $this->assertSame($compte->id, $commande->user_id);
         $this->assertSame($compte->client_id, $commande->client_id);
-        $this->assertSame('demandee', $commande->remise_statut);
-        $this->assertEquals(10, $commande->remise_taux_demande);
+        $this->assertNull($commande->remise_statut);
         $this->assertEquals(20000, (int) $commande->total);
         $this->assertDatabaseHas('commande_annotations', ['commande_id' => $commande->id, 'auteur' => 'client', 'contenu' => 'Livrer avant 10 h svp']);
 
         // Le détail client n'expose jamais le stock.
         $detail = $this->actingAs($compte, 'api')->getJson("/api/client/commandes/{$commande->id}");
-        $detail->assertOk()->assertJsonPath('data.remise.statut', 'demandee');
+        $detail->assertOk();
         $this->assertArrayNotHasKey('stock_disponible', $detail->json('data.lignes.0'));
+
+        $this->actingAs($compte, 'api')->postJson("/api/client/commandes/{$commande->id}/remise", ['remise_taux' => 10])->assertNotFound();
     }
 
     public function test_ville_imposee_par_le_compte(): void
@@ -124,7 +127,9 @@ class EspaceClientTest extends TestCase
         $dg = User::factory()->create(['role' => 'DG_ADMIN']);
         $p = $this->produit();
 
-        $id = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p, ['remise_taux' => 10]))->json('data.id');
+        $id = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p))->json('data.id');
+        // Demande de remise enregistrée avant le retrait de l'option côté client.
+        Commande::whereKey($id)->update(['remise_statut' => 'demandee', 'remise_taux_demande' => 10]);
 
         // Remise en attente : seul le DG décide, la validation attend sa décision.
         $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/remise", ['decision' => 'accorder'])->assertForbidden();
@@ -137,9 +142,8 @@ class EspaceClientTest extends TestCase
             ->assertJsonPath('data.total', 19000)
             ->assertJsonPath('data.sous_total', 20000);
 
-        // Décision prise : plus de seconde décision, ni de nouvelle demande.
+        // Décision prise : plus de seconde décision.
         $this->actingAs($dg, 'api')->postJson("/api/commandes/{$id}/remise", ['decision' => 'refuser'])->assertUnprocessable();
-        $this->actingAs($compte, 'api')->postJson("/api/client/commandes/{$id}/remise", ['remise_taux' => 20])->assertUnprocessable();
 
         $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/valider")->assertOk();
 
@@ -148,31 +152,6 @@ class EspaceClientTest extends TestCase
         $this->assertEquals(20000, (int) $vente->subtotal);
         $this->assertEquals(5, (float) $vente->discount_rate);
         $this->assertEquals(19000, (int) $vente->total);
-
-        // Plus de remise possible une fois validée.
-        $this->actingAs($compte, 'api')->postJson("/api/client/commandes/{$id}/remise", ['remise_taux' => 20])->assertUnprocessable();
-    }
-
-    public function test_remise_refusee_peut_etre_redemandee_tant_que_en_attente(): void
-    {
-        $compte = $this->creerCompteClient();
-        $dg = User::factory()->create(['role' => 'DG_ADMIN']);
-        $p = $this->produit();
-
-        $id = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p, ['remise_taux' => 10]))->json('data.id');
-
-        $this->actingAs($dg, 'api')->postJson("/api/commandes/{$id}/remise", ['decision' => 'refuser'])
-            ->assertOk()
-            ->assertJsonPath('data.remise.statut', 'refusee')
-            ->assertJsonPath('data.total', 20000);
-
-        $this->actingAs($compte, 'api')->postJson("/api/client/commandes/{$id}/remise", ['remise_taux' => 5])
-            ->assertOk()
-            ->assertJsonPath('data.remise.statut', 'demandee');
-
-        $this->actingAs($dg, 'api')->postJson("/api/commandes/{$id}/remise", ['decision' => 'accorder'])
-            ->assertOk()
-            ->assertJsonPath('data.remise.montant', 1000);
     }
 
     public function test_client_signale_les_nouveautes_et_les_annotations_de_l_equipe(): void
@@ -214,6 +193,157 @@ class EspaceClientTest extends TestCase
         $commande = Commande::findOrFail($id);
         $this->assertSame('Quincaillerie Mba', $commande->nom_livraison);
         $this->assertSame('+241066112233', $commande->telephone_livraison);
+    }
+
+    public function test_catalogue_client_complet_sans_prix_ni_stock(): void
+    {
+        $compte = $this->creerCompteClient();
+        // Produit sans aucun barème : absent de la boutique publique, visible du client.
+        $p = $this->produit(['name' => 'Câble 16 mm²']);
+
+        $res = $this->actingAs($compte, 'api')->getJson('/api/client/produits?search=Câble')->assertOk();
+
+        $res->assertJsonPath('data.0.id', $p->id)
+            ->assertJsonMissingPath('data.0.prix')
+            ->assertJsonMissingPath('data.0.disponibilite');
+
+        $this->actingAs(User::factory()->create(['role' => 'LG_ADMIN']), 'api')->getJson('/api/client/produits')->assertForbidden();
+    }
+
+    public function test_produit_inconnu_reference_par_l_equipe_avant_validation(): void
+    {
+        $compte = $this->creerCompteClient();
+        $admin = User::factory()->create(['role' => 'LG_ADMIN']);
+        $p = $this->produit();
+
+        $id = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p, [
+            'lignes' => [
+                ['produit_id' => $p->id, 'quantite' => 2],
+                ['designation' => 'Disjoncteur 63 A', 'precision' => 'Marque Schneider', 'quantite' => 3],
+            ],
+        ]))->assertCreated()->json('data.id');
+
+        // Le client ne voit aucun prix avant la facture.
+        $this->actingAs($compte, 'api')->getJson("/api/client/commandes/{$id}")
+            ->assertJsonPath('data.total', null)
+            ->assertJsonPath('data.lignes.0.prix_unitaire', null)
+            ->assertJsonPath('data.lignes.1.inconnu', true)
+            ->assertJsonPath('data.lignes.1.precision', 'Marque Schneider');
+        $this->actingAs($compte, 'api')->getJson('/api/client/commandes')->assertJsonPath('data.0.total', null);
+
+        // Validation bloquée tant que le produit demandé n'est pas référencé.
+        $this->actingAs($admin, 'api')->getJson('/api/commandes')->assertJsonPath('data.0.a_referencer', 1);
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/valider")->assertUnprocessable();
+
+        $nouveau = $this->produit(['name' => 'Disjoncteur 63 A', 'sale_price' => 5000]);
+        $ligne = Commande::findOrFail($id)->lignes()->whereNull('produit_id')->firstOrFail();
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/lignes/{$ligne->id}", ['produit_id' => $nouveau->id])
+            ->assertOk()
+            ->assertJsonPath('data.total', 35000);
+
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/valider")->assertOk();
+
+        // Facture émise : les prix deviennent visibles pour le client.
+        $this->actingAs($compte, 'api')->getJson("/api/client/commandes/{$id}")
+            ->assertJsonPath('data.total', 35000)
+            ->assertJsonPath('data.lignes.1.inconnu', false);
+    }
+
+    public function test_prix_selon_la_ville_ou_a_saisir_sans_ville(): void
+    {
+        $zone = Zone::firstOrCreate(['code' => 'LBV'], ['name' => 'Libreville']);
+        $compte = $this->creerCompteClient();
+        $admin = User::factory()->create(['role' => 'LG_ADMIN']);
+        $p = $this->produit();
+        $p->prices()->create(['zone_id' => $zone->id, 'amount' => 12000]);
+
+        // Ville tarifaire choisie : prix du barème de la ville.
+        $avecVille = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p, ['zone_id' => $zone->id]))->json('data.id');
+        $this->assertEquals(24000, (int) Commande::findOrFail($avecVille)->total);
+
+        // Sans ville tarifaire : prix vide, à saisir par l'équipe avant validation.
+        $sansVille = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p, ['ville' => 'Mouila', 'zone_id' => null]))->json('data.id');
+        $ligne = Commande::findOrFail($sansVille)->lignes()->firstOrFail();
+        $this->assertEquals(0, (int) $ligne->prix_unitaire);
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$sansVille}/valider")->assertUnprocessable();
+
+        // Produit choisi dans le catalogue : il ne peut pas être remplacé par un autre.
+        $autre = $this->produit(['name' => 'Autre produit']);
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$sansVille}/lignes/{$ligne->id}", ['produit_id' => $autre->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('produit_id');
+
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$sansVille}/lignes/{$ligne->id}", ['prix_unitaire' => 9000])
+            ->assertOk()
+            ->assertJsonPath('data.total', 18000);
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$sansVille}/valider")->assertOk();
+    }
+
+    public function test_client_ajoute_des_produits_tant_que_en_attente(): void
+    {
+        $compte = $this->creerCompteClient();
+        $admin = User::factory()->create(['role' => 'LG_ADMIN']);
+        $p = $this->produit();
+
+        $id = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p))->json('data.id');
+
+        $this->actingAs($compte, 'api')->postJson("/api/client/commandes/{$id}/lignes", [
+            'lignes' => [['produit_id' => $p->id, 'quantite' => 1], ['designation' => 'Gaine ICTA 20', 'quantite' => 5]],
+        ])->assertOk()->assertJsonCount(3, 'data.lignes');
+        $this->assertEquals(30000, (int) Commande::findOrFail($id)->total);
+
+        $ligne = Commande::findOrFail($id)->lignes()->whereNull('produit_id')->firstOrFail();
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/lignes/{$ligne->id}", ['produit_id' => $p->id, 'prix_unitaire' => 300])->assertOk();
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/valider")->assertOk();
+
+        $this->actingAs($compte, 'api')->postJson("/api/client/commandes/{$id}/lignes", [
+            'lignes' => [['produit_id' => $p->id, 'quantite' => 1]],
+        ])->assertUnprocessable();
+    }
+
+    public function test_facture_soldee_definitivement_et_visible_du_client(): void
+    {
+        $compte = $this->creerCompteClient();
+        $admin = User::factory()->create(['role' => 'LG_ADMIN']);
+        $p = $this->produit();
+
+        $id = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p))->json('data.id');
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/solder")->assertUnprocessable();
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/valider")->assertOk();
+
+        $soldee = $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/solder")->assertOk()->json('data.facture.soldee_le');
+        $this->assertNotNull($soldee);
+
+        // Un second appel ne change rien : soldée reste soldée.
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/solder")->assertOk()->assertJsonPath('data.facture.soldee_le', $soldee);
+
+        $this->actingAs($compte, 'api')->getJson("/api/client/commandes/{$id}")->assertJsonPath('data.facture.soldee_le', $soldee);
+        $this->actingAs($compte, 'api')->postJson("/api/commandes/{$id}/solder")->assertForbidden();
+    }
+
+    public function test_mise_en_livraison_sans_chauffeur(): void
+    {
+        $compte = $this->creerCompteClient();
+        $admin = User::factory()->create(['role' => 'LG_ADMIN']);
+        $p = $this->produit();
+
+        $id = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p))->json('data.id');
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/valider")->assertOk();
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/demarrer")->assertOk()->assertJsonPath('data.statut', 'en_livraison');
+        $this->actingAs($compte, 'api')->getJson('/api/client/profil')->assertJsonPath('data.en_cours', 1);
+
+        // Un simple clic « Livrée » : ni réceptionnaire, ni encaissement, ni signature.
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/livrer")->assertOk()->assertJsonPath('data.statut', 'livree');
+
+        $this->assertNotNull(BonLivraison::where('commande_id', $id)->first());
+        $this->actingAs($compte, 'api')->getJson('/api/client/profil')->assertJsonPath('data.en_cours', 0);
+
+        // Archive : la facture et le bon de livraison de la commande, rangés ensemble.
+        $this->actingAs($compte, 'api')->getJson('/api/client/documents')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.commande_id', $id)
+            ->assertJsonPath('data.0.bon_livraison.numero', BonLivraison::where('commande_id', $id)->value('numero'));
     }
 
     public function test_livraison_cree_le_bon_de_livraison_garde_dans_l_historique_client(): void
