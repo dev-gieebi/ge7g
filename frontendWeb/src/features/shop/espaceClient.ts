@@ -146,5 +146,5 @@ export function useEstClient() {
 /** Profil du client connecté (ville d'accès, nouveautés), rafraîchi chaque minute. */
 export function useProfilClient() {
   const estClient = useEstClient();
-  return useQuery({ queryKey: ["client", "profil"], queryFn: clientApi.profil, enabled: estClient, refetchInterval: 60_000 });
+  return useQuery({ queryKey: ["client", "profil"], queryFn: clientApi.profil, enabled: estClient, refetchInterval: 300_000 });
 }

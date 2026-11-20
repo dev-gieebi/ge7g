@@ -28,7 +28,7 @@ export function DashboardPage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => getOne<DashboardStats>("/dashboard"),
-    refetchInterval: 120_000,
+    refetchInterval: 300_000,
   });
 
   const { data: salesSeries } = useQuery({
@@ -40,7 +40,7 @@ export function DashboardPage() {
   const { data: boutique } = useQuery({
     queryKey: ["commande-stats"],
     queryFn: async () => (await api.get<{ data: CommandeStats }>("/commandes/stats")).data.data,
-    refetchInterval: 60_000,
+    refetchInterval: 300_000,
     retry: false,
   });
 

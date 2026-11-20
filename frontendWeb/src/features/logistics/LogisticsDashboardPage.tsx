@@ -14,7 +14,7 @@ import { Card, CardHeader, ErrorState, KpiCard, Loading, PageHeader, StatusBadge
  * des commandes boutique (le chauffeur voit, lui, uniquement les siennes).
  */
 export function LogisticsDashboardPage() {
-  const stats = useQuery({ queryKey: ["commande-stats"], queryFn: () => getOne<CommandeStats>("/commandes/stats"), refetchInterval: 60_000 });
+  const stats = useQuery({ queryKey: ["commande-stats"], queryFn: () => getOne<CommandeStats>("/commandes/stats"), refetchInterval: 300_000 });
   const enCours = usePaginated<CommandeListItem>("commandes-logistique", "/commandes", { statut: "en_livraison", per_page: 10 }, true, 30_000);
 
   if (stats.isLoading) return <Loading />;

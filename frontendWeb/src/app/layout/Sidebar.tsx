@@ -26,11 +26,11 @@ export function Sidebar({
   // Mobile : groupe dont les entrées sont déployées au-dessus de la barre du bas.
   const [openGroup, setOpenGroup] = useState<string | null>(null);
 
-  // Badge « commandes en attente » sur l'entrée Commandes en ligne (30 s).
+  // Badge « commandes en attente » sur l'entrée Commandes en ligne (5 min).
   const { data: commandeStats } = useQuery({
     queryKey: ["commande-stats"],
     queryFn: async () => (await api.get<{ data: CommandeStats }>("/commandes/stats")).data.data,
-    refetchInterval: 30_000,
+    refetchInterval: 300_000,
     retry: false,
     enabled: !!user && ["LG_ADMIN", "DG_ADMIN", "CDG_ADMIN", "SUPERADMIN"].includes(user.role),
   });

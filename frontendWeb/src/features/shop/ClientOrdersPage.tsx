@@ -26,7 +26,7 @@ export function ClientOrdersPage() {
     queryKey: ["client", "commandes", page, etat],
     queryFn: () => clientApi.commandes(page, etat),
     placeholderData: keepPreviousData,
-    refetchInterval: 60_000,
+    refetchInterval: 300_000,
   });
 
   return (

@@ -13,7 +13,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const { data } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => getList<Notification>("/notifications", { per_page: 10 }),
-    refetchInterval: 60_000,
+    refetchInterval: 300_000,
     retry: false,
   });
   const markAll = useMutation({

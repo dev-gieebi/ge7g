@@ -63,7 +63,7 @@ export function ClientOrderDetailPage() {
     queryKey: ["client", "commande", id],
     queryFn: () => clientApi.commande(id!),
     enabled: !!id,
-    refetchInterval: 20_000,
+    refetchInterval: 120_000,
   });
 
   const majCache = (data: CommandeClient) => {

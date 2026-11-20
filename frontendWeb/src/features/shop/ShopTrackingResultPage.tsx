@@ -17,7 +17,7 @@ export function ShopTrackingResultPage() {
     queryFn: () => shopApi.suivi(state!.numero!, state!.telephone!),
     enabled: !!state?.numero && !!state?.telephone,
     initialData: state?.suivi,
-    refetchInterval: 15_000,
+    refetchInterval: 120_000,
     retry: false,
   });
 
