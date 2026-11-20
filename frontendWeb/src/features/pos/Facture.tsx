@@ -8,13 +8,15 @@ import { GE7_COMPANY, cfaNumber } from "@/features/shared/companyInfo";
  * facture ou bon de livraison selon `docTitle`. `originLabel` distingue la
  * provenance, ex. « Commande en ligne : CMD-… ».
  */
-export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false, extras = [] }: { sale: PosSale; originLabel?: string; docTitle?: string; solde?: boolean; extras?: { label: string; amount: number }[] }) {
+export type Transport = { chauffeur: string; immatriculation: string; vehicule: string };
+
+export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false, extras = [], numero, quantitesSeules = false, transport }: { sale: PosSale; originLabel?: string; docTitle?: string; solde?: boolean; extras?: { label: string; amount: number }[]; numero?: string; quantitesSeules?: boolean; transport?: Transport }) {
   const s = sale;
   // Transforme le N° de vente « VNT-2026-00012 » en N° de facture « FAC-00012-2026 ».
   const parts = s.number.split("-");
   // Le n° de facture suit la pièce comptable ; un autre document (bon de
-  // livraison, bon de commande) porte le n° de la pièce d'origine.
-  const number = docTitle === "FACTURE" ? (s.invoice?.number ?? (parts.length === 3 ? `FAC-${parts[2]}-${parts[1]}` : s.number)) : numeroDocument(s.number);
+  // livraison, bon de commande) porte le n° de la pièce d'origine, sauf `numero` imposé.
+  const number = numero ?? (docTitle === "FACTURE" ? (s.invoice?.number ?? (parts.length === 3 ? `FAC-${parts[2]}-${parts[1]}` : s.number)) : numeroDocument(s.number));
   const ratePct = (Number(s.tax_rate) * 100).toFixed(2).replace(/\.?0+$/, "");
   const discountRate = Number(s.discount_rate ?? 0);
   const discountAmount = Math.round(Number(s.subtotal) * discountRate / 100);
@@ -54,13 +56,29 @@ export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false
           <p className="mt-1 text-center text-sm font-bold uppercase tracking-widest text-[#065baf]">{originLabel}</p>
         )}
 
-        <div className="mt-8 space-y-1">
-          <p>
-            <span className="font-bold underline">Date</span> : {datetime(s.created_at)}
-          </p>
-          <p>
-            <span className="font-bold underline">N° de {docTitle === "FACTURE" ? "facture" : docTitle.toLowerCase()}</span> : {number}
-          </p>
+        <div className="mt-8 flex items-start justify-between gap-6">
+          <div className="space-y-1">
+            <p>
+              <span className="font-bold underline">Date</span> : {datetime(s.created_at)}
+            </p>
+            <p>
+              <span className="font-bold underline">N° de {docTitle === "FACTURE" ? "facture" : docTitle.toLowerCase()}</span> : {number}
+            </p>
+          </div>
+          {/* Liste de colisage : transport, en face de la date et du n°. */}
+          {transport && (
+            <div className="space-y-1">
+              <p>
+                <span className="font-bold underline">Chauffeur</span> : {transport.chauffeur}
+              </p>
+              <p>
+                <span className="font-bold underline">Immatriculation</span> : {transport.immatriculation}
+              </p>
+              <p>
+                <span className="font-bold underline">Type de véhicule</span> : {transport.vehicule}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 space-y-1 border border-ge7-black/70 px-2 py-2">
@@ -81,8 +99,12 @@ export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false
               <th className="border border-ge7-black/70 px-2 py-2 text-left">DESIGNATIONS</th>
               <th className="border border-ge7-black/70 px-2 py-2">Unités</th>
               <th className="border border-ge7-black/70 px-2 py-2">Quantités</th>
-              <th className="border border-ge7-black/70 px-2 py-2">P.U(CFA)</th>
-              <th className="border border-ge7-black/70 px-2 py-2">Total (CFA)</th>
+              {!quantitesSeules && (
+                <>
+                  <th className="border border-ge7-black/70 px-2 py-2">P.U(CFA)</th>
+                  <th className="border border-ge7-black/70 px-2 py-2">Total (CFA)</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -94,13 +116,20 @@ export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false
                 </td>
                 <td className="border border-ge7-black/70 px-1 py-1 text-center">{it.product?.unit?.symbol ?? ""}</td>
                 <td className="border border-ge7-black/70 px-1 py-1 text-center">{qty(it.quantity)}</td>
-                <td className="border border-ge7-black/70 px-1 py-1 text-right">{cfaNumber.format(Number(it.unit_price))}</td>
-                <td className="border border-ge7-black/70 px-1 py-1 text-right">{cfaNumber.format(Number(it.total))}</td>
+                {!quantitesSeules && (
+                  <>
+                    <td className="border border-ge7-black/70 px-1 py-1 text-right">{cfaNumber.format(Number(it.unit_price))}</td>
+                    <td className="border border-ge7-black/70 px-1 py-1 text-right">{cfaNumber.format(Number(it.total))}</td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
 
+        {/* Bon de livraison / liste de colisage : ni prix, ni totaux, ni tampon « Soldé ». */}
+        {!quantitesSeules && (
+        <>
         <div className="mt-3 flex justify-end">
           <div className="w-64 space-y-0.5 text-[12px]">
             <div className="border border-ge7-black/80 p-1">
@@ -151,6 +180,8 @@ export function Facture({ sale, originLabel, docTitle = "FACTURE", solde = false
               Soldé
             </span>
           </div>
+        )}
+        </>
         )}
 
         <div className="mt-6 text-center">

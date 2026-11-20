@@ -1,15 +1,15 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, BadgeCheck, Plus, Printer, Truck, X } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Package, Plus, Printer, Truck, X } from "lucide-react";
 import type { PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/rbac";
 import { AjoutProduitsModal, type LigneAjout } from "@/features/shared/AjoutProduitsModal";
 import { qty, numeroDocument } from "@/lib/format";
-import { Badge, Button, Card, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/ui";
+import { Badge, Button, Card, ErrorState, Input, Loading, Modal, PageHeader, StatusBadge } from "@/components/ui";
 import { PrintableDocument } from "@/features/invoices/PrintableDocument";
-import { Facture } from "./Facture";
+import { Facture, type Transport } from "./Facture";
 
 export function PosSaleDetailPage() {
   const { id } = useParams();
@@ -24,6 +24,8 @@ export function PosSaleDetailPage() {
   const canDeliver = hasRole(user, "LG_ADMIN", "DG_ADMIN", "CDG_ADMIN");
   // Ajout de produits à la vente : agent logistique, Direction, Super admin.
   const canAddItems = hasRole(user, "LG_ADMIN", "DG_ADMIN");
+  // Bon de livraison et liste de colisage : agent logistique, Direction, Super admin.
+  const canPrintAnnexes = hasRole(user, "LG_ADMIN", "DG_ADMIN");
   const [ajout, setAjout] = useState(false);
   const [deliverQty, setDeliverQty] = useState<Record<number, number>>({});
   const [discountRate, setDiscountRate] = useState<number | null>(null);
@@ -50,6 +52,20 @@ export function PosSaleDetailPage() {
     () => `/pos/sales/${id}/extras`,
     { keys: ["pos-sale", "pos-sales"], success: "Frais annexes enregistrés", body: (v) => v },
   );
+
+  // Bon de livraison / liste de colisage : le document s'affiche le temps de
+  // l'impression, puis la facture revient (sans quitter la page).
+  const [annexe, setAnnexe] = useState<"BL" | "LC" | null>(null);
+  // Liste de colisage : chauffeur et véhicule saisis avant l'impression.
+  const [saisieTransport, setSaisieTransport] = useState(false);
+  const [transport, setTransport] = useState<Transport>({ chauffeur: "", immatriculation: "", vehicule: "" });
+  useEffect(() => {
+    if (!annexe) return;
+    const onAfter = () => setAnnexe(null);
+    window.addEventListener("afterprint", onAfter);
+    window.print();
+    return () => window.removeEventListener("afterprint", onAfter);
+  }, [annexe]);
 
   const handlePrint = useCallback(() => {
     const onAfter = () => {
@@ -122,6 +138,12 @@ export function PosSaleDetailPage() {
                   >
                     <BadgeCheck size={15} /> {solde ? "Soldée" : "Soldé"}
                   </Button>
+                </>
+              )}
+              {canPrintAnnexes && (
+                <>
+                  <Button variant="green" onClick={() => setAnnexe("BL")}><Truck size={15} /> Bon de livraison</Button>
+                  <Button variant="blue" onClick={() => setSaisieTransport(true)}><Package size={15} /> Liste de colisage</Button>
                 </>
               )}
               <Button onClick={handlePrint}><Printer size={15} /> Imprimer</Button>
@@ -240,10 +262,37 @@ export function PosSaleDetailPage() {
       )}
       {isCashier ? (
         <PrintableDocument compact doc={doc} />
+      ) : annexe ? (
+        <Facture
+          sale={s}
+          docTitle={annexe === "BL" ? "BON DE LIVRAISON" : "LISTE DE COLISAGE"}
+          numero={numeroDocument(s.number).replace(/^[A-Z]+/, annexe === "BL" ? "BN" : "LC")}
+          quantitesSeules
+          transport={annexe === "LC" ? transport : undefined}
+        />
       ) : (
         <Facture sale={s} docTitle="FACTURE" solde={solde} extras={extras} />
       )}
       <div className="no-print mt-6 text-center"><Link to="/admin/caisse"><Button variant="purple">Nouvelle vente</Button></Link></div>
+      {saisieTransport && (
+        <Modal
+          title="Liste de colisage"
+          subtitle="Transport de la marchandise"
+          onClose={() => setSaisieTransport(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setSaisieTransport(false)}>Annuler</Button>
+              <Button variant="blue" onClick={() => { setSaisieTransport(false); setAnnexe("LC"); }}><Printer size={15} /> Imprimer</Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <Input label="Nom du chauffeur" value={transport.chauffeur} onChange={(e) => setTransport((t) => ({ ...t, chauffeur: e.target.value }))} autoFocus />
+            <Input label="Immatriculation du véhicule" value={transport.immatriculation} onChange={(e) => setTransport((t) => ({ ...t, immatriculation: e.target.value.toUpperCase() }))} />
+            <Input label="Type de véhicule" placeholder="Ex. Camion benne, Pick-up…" value={transport.vehicule} onChange={(e) => setTransport((t) => ({ ...t, vehicule: e.target.value }))} />
+          </div>
+        </Modal>
+      )}
       {ajout && (
         <AjoutProduitsModal
           titre={`Ajouter des produits à la vente ${numeroDocument(s.number)}`}

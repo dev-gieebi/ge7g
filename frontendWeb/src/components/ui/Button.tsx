@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger" | "purple" | "dark";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "purple" | "dark" | "green" | "blue";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
@@ -14,6 +14,8 @@ const variants: Record<Variant, string> = {
     "border border-ge7-black/10 bg-white text-ge7-black hover:border-ge7-gold hover:bg-ge7-gold-soft/40",
   ghost: "text-ge7-black/70 hover:bg-ge7-black/5",
   danger: "bg-rose-600 text-white hover:bg-rose-700",
+  green: "bg-emerald-600 text-white hover:bg-emerald-700",
+  blue: "bg-blue-600 text-white hover:bg-blue-700",
 };
 
 const sizes: Record<Size, string> = {
