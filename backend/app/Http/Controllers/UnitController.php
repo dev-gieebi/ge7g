@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Unit;
 use App\Models\User;
+use App\Support\Doublon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -84,6 +85,10 @@ class UnitController extends Controller
             'symbol' => 'required|string|max:50|unique:units,symbol',
         ]);
 
+        // Pas deux unités du même nom ni du même symbole.
+        Doublon::refuser(Unit::class, 'name', $validated['name'], null, 'L\'unité');
+        Doublon::refuser(Unit::class, 'symbol', $validated['symbol'], null, 'Le symbole');
+
         $unit = Unit::create($validated);
 
         Cache::forget('units.index');
@@ -106,6 +111,9 @@ class UnitController extends Controller
             'name' => 'required|string|max:255',
             'symbol' => ['required', 'string', 'max:50', Rule::unique('units', 'symbol')->ignore($unit->id)],
         ]);
+
+        Doublon::refuser(Unit::class, 'name', $validated['name'], $unit->id, 'L\'unité');
+        Doublon::refuser(Unit::class, 'symbol', $validated['symbol'], $unit->id, 'Le symbole');
 
         $unit->update($validated);
 

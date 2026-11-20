@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\User;
+use App\Support\Doublon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -84,6 +85,9 @@ class CategoryController extends Controller
             'parent_id' => 'nullable|integer|exists:categories,id',
         ]);
 
+        // Pas deux catégories du même nom.
+        Doublon::refuser(Category::class, 'name', $validated['name'], null, 'La catégorie');
+
         $slug = $this->generateUniqueSlug($validated['name']);
 
         $category = Category::create([
@@ -112,6 +116,8 @@ class CategoryController extends Controller
             'name' => 'required|string|max:255',
             'parent_id' => 'nullable|integer|exists:categories,id',
         ]);
+
+        Doublon::refuser(Category::class, 'name', $validated['name'], $category->id, 'La catégorie');
 
         $slug = $this->generateUniqueSlug($validated['name'], $category->id);
 
