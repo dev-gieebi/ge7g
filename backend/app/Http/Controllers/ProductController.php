@@ -84,6 +84,8 @@ class ProductController extends Controller
             'mis_en_avant' => 'sometimes|boolean',
         ]);
 
+        $this->refuserDoublon($validated['name'], null);
+
         $data = $this->prepareData($validated);
         $data['reference'] = $this->generateReference((int) $validated['category_id']);
 
@@ -99,6 +101,29 @@ class ProductController extends Controller
         $product->load(['category', 'unit']);
 
         return response()->json(['data' => $product], 201);
+    }
+
+    /**
+     * Anti-doublon : un produit de même désignation et même type existe
+     * déjà (majuscules et espaces en trop ignorés) → enregistrement refusé.
+     */
+    private function refuserDoublon(string $name, ?string $type, ?int $ignorer = null): void
+    {
+        $normaliser = fn (?string $v) => mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', (string) $v)));
+        $nom = $normaliser($name);
+        $variante = $normaliser($type);
+
+        $existant = Product::query()
+            ->when($ignorer, fn ($q) => $q->whereKeyNot($ignorer))
+            ->select(['id', 'name', 'type', 'reference'])
+            ->cursor()
+            ->first(fn (Product $p) => $normaliser($p->name) === $nom && $normaliser($p->type) === $variante);
+
+        if ($existant) {
+            throw ValidationException::withMessages([
+                'name' => 'Ce produit existe déjà : « '.$existant->name.($existant->type ? ' · '.$existant->type : '').' » (réf. '.$existant->reference.').',
+            ]);
+        }
     }
 
     public function show(Request $request, Product $product): JsonResponse
@@ -126,6 +151,8 @@ class ProductController extends Controller
             'description_publique' => 'nullable|string|max:2000',
             'mis_en_avant' => 'sometimes|boolean',
         ]);
+
+        $this->refuserDoublon($validated['name'], $product->type, $product->id);
 
         $data = $this->prepareData($validated);
         // Vitrine : les champs absents conservent la valeur existante.

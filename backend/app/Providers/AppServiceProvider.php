@@ -3,13 +3,19 @@
 namespace App\Providers;
 
 use App\Models\AuditLog;
+use App\Models\BonLivraison;
 use App\Models\Category;
+use App\Models\Client;
+use App\Models\Commande;
+use App\Models\CommandeAnnotation;
+use App\Models\Facture;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\Price;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
+use App\Models\Quote;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\Tax;
@@ -18,6 +24,7 @@ use App\Models\User;
 use App\Models\Zone;
 use App\Services\LogNotificationService;
 use App\Services\NotificationService;
+use App\Services\TempsReel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -32,6 +39,7 @@ class AppServiceProvider extends ServiceProvider
         // Notifications boutique : journalisation par défaut, un fournisseur
         // SMS/WhatsApp se branche ici en remplaçant l'implémentation.
         $this->app->bind(NotificationService::class, LogNotificationService::class);
+        $this->app->singleton(TempsReel::class);
     }
 
     /**
@@ -41,6 +49,40 @@ class AppServiceProvider extends ServiceProvider
     {
         Schema::defaultStringLength(191);
         $this->bootAuditLogs();
+        $this->bootTempsReel();
+    }
+
+    /**
+     * Temps réel : toute création, modification ou suppression de ces données
+     * prévient les écrans ouverts (websocket), qui rechargent aussitôt.
+     */
+    private function bootTempsReel(): void
+    {
+        $ressources = [
+            Product::class => 'products',
+            Category::class => 'categories',
+            Unit::class => 'units',
+            Price::class => 'prices',
+            Zone::class => 'zones',
+            Tax::class => 'taxes',
+            Supplier::class => 'suppliers',
+            Purchase::class => 'purchases',
+            PosSale::class => 'pos-sales',
+            StockMovement::class => 'stock',
+            User::class => 'users',
+            Commande::class => 'commandes',
+            CommandeAnnotation::class => 'commandes',
+            Facture::class => 'factures',
+            BonLivraison::class => 'commandes',
+            Quote::class => 'quotes',
+            Client::class => 'clients',
+        ];
+
+        foreach ($ressources as $class => $ressource) {
+            $signaler = fn () => app(TempsReel::class)->signaler($ressource);
+            $class::saved($signaler);
+            $class::deleted($signaler);
+        }
     }
 
     private function bootAuditLogs(): void
