@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Price;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -59,7 +60,9 @@ class PriceController extends Controller
             $direction = $request->input('dir') === 'desc' ? 'desc' : 'asc';
             $query->orderBy($sort, $direction);
         } else {
-            $query->orderBy('id');
+            $query->orderBy(Product::select('name')->whereColumn('products.id', 'prices.product_id'))
+                ->orderBy('zone_id')
+                ->orderBy('id');
         }
 
         $perPage = (int) $request->input('per_page', 20);

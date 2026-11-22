@@ -57,7 +57,7 @@ class CategoryController extends Controller
             $direction = $request->input('dir') === 'desc' ? 'desc' : 'asc';
             $query->orderBy($sort, $direction);
         } else {
-            $query->orderBy('id');
+            $query->orderBy('name')->orderBy('id');
         }
 
         $perPage = (int) $request->input('per_page', 20);

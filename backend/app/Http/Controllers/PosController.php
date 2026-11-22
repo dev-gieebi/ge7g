@@ -93,6 +93,8 @@ class PosController extends Controller
             });
         }
 
+        $query->orderBy('products.name')->orderBy('products.id');
+
         $perPage = (int) $request->input('per_page', 200);
         $paginator = $query->paginate($perPage);
 
