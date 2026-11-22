@@ -18,6 +18,11 @@ export default defineConfig(({ mode }) => {
           //target: "http://127.0.0.1:8000",
           changeOrigin: true,
         },
+        "/storage": {
+          target: "https://api-ge7g.com",
+          //target: "http://127.0.0.1:8000",
+          changeOrigin: true,
+        },
       },
     },
   };
