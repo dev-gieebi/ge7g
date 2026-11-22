@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Check, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { Loading } from "@/components/ui";
 import { ImageOuInitiales, initiales } from "@/components/ui/ImageOuInitiales";
 import { shopApi } from "./api";
@@ -36,61 +36,68 @@ export function fusionner(lignes: LigneLocale[], ajout: LigneLocale): LigneLocal
     : [...lignes, ajout];
 }
 
-function Vignette({ image, designation }: { image?: string | null; designation: string }) {
+/**
+ * Carte produit du catalogue client (comme à la caisse) : un clic ajoute
+ * 1 à la demande ; la quantité se règle ensuite dans « Ma demande ».
+ */
+function CarteProduit({ p, onAjouter }: { p: ProduitClient; onAjouter: (l: LigneLocale) => void }) {
+  const [ajoute, setAjoute] = useState(false);
+  useEffect(() => {
+    if (!ajoute) return;
+    const t = setTimeout(() => setAjoute(false), 1200);
+    return () => clearTimeout(t);
+  }, [ajoute]);
+
   return (
-    <ImageOuInitiales
-      src={image}
-      loading="lazy"
-      className="size-14 shrink-0 rounded-xl object-cover"
-      fallback={<span className="grid size-14 shrink-0 place-items-center rounded-xl bg-ge7-black/[0.04] font-display text-sm font-extrabold text-ge7-black/25">{initiales(designation)}</span>}
-    />
+    <li className="min-w-0">
+      <button
+        type="button"
+        onClick={() => {
+          onAjouter({ cle: `p${p.id}`, produit_id: p.id, designation: p.designation, quantite: 1, unite: p.unite, image: p.image });
+          setAjoute(true);
+        }}
+        title="Ajouter à ma demande"
+        className="flex h-full w-full flex-col rounded-3xl border border-ge7-black/5 bg-white p-3 text-left shadow-soft transition hover:-translate-y-0.5 hover:border-ge7-gold"
+      >
+      <div className="relative mb-3 grid h-28 w-full place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-ge7-gold-soft to-ge7-pearl">
+        <ImageOuInitiales
+          src={p.image}
+          alt={p.designation}
+          loading="lazy"
+          className="h-full w-full object-cover"
+          fallback={<span className="font-display text-3xl font-extrabold text-ge7-bronze/60">{initiales(p.designation)}</span>}
+        />
+        {ajoute && (
+          <span className="absolute inset-0 grid place-items-center bg-ge7-black/45 text-sm font-bold text-white">
+            <span className="flex items-center gap-1.5"><Check size={16} /> Ajouté</span>
+          </span>
+        )}
+      </div>
+      <p className="font-bold leading-tight">{p.designation}</p>
+      {p.reference && <p className="font-mono text-[11px] font-semibold text-ge7-black/40">{p.reference}</p>}
+      {p.categorie && <p className="text-xs text-ge7-black/50">{p.categorie}</p>}
+      </button>
+    </li>
   );
 }
 
-function CarteProduit({ p, onAjouter }: { p: ProduitClient; onAjouter: (l: LigneLocale) => void }) {
-  const [quantite, setQuantite] = useState("1");
-  const valeur = Number(quantite.replace(",", "."));
-
+/** Pagination du catalogue client (Précédent · Page x / y · Suivant). */
+function Pagination({ page, derniere, onPage }: { page: number; derniere: number; onPage: (p: number) => void }) {
+  if (derniere <= 1) return null;
+  const bouton = "rounded-full border border-ge7-black/15 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-40";
   return (
-    <li className="flex items-center gap-3 rounded-2xl border border-ge7-black/10 bg-white p-3">
-      <Vignette image={p.image} designation={p.designation} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold">{p.designation}</p>
-        <p className="truncate text-xs text-ge7-black/50">{[p.reference, p.categorie].filter(Boolean).join(" · ")}</p>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <input
-          type="number"
-          min={0.01}
-          step="any"
-          inputMode="decimal"
-          aria-label={`Quantité de ${p.designation}`}
-          className="w-20 rounded-xl border border-ge7-black/15 px-2.5 py-2 text-right text-sm focus:border-ge7-gold focus:outline-none"
-          value={quantite}
-          onChange={(e) => setQuantite(e.target.value)}
-        />
-        {p.unite && <span className="w-6 text-xs text-ge7-black/50">{p.unite}</span>}
-        <button
-          type="button"
-          disabled={!(valeur > 0)}
-          onClick={() => {
-            onAjouter({ cle: `p${p.id}`, produit_id: p.id, designation: p.designation, quantite: valeur, unite: p.unite, image: p.image });
-            setQuantite("1");
-          }}
-          className="grid size-9 place-items-center rounded-full bg-ge7-gold text-ge7-black transition hover:brightness-110 disabled:opacity-40"
-          title="Ajouter à ma demande"
-        >
-          <Plus size={17} />
-        </button>
-      </div>
-    </li>
+    <div className="flex items-center justify-center gap-3">
+      <button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)} className={bouton}>Précédent</button>
+      <span className="text-sm text-ge7-black/60">Page {page} / {derniere}</span>
+      <button type="button" disabled={page >= derniere} onClick={() => onPage(page + 1)} className={bouton}>Suivant</button>
+    </div>
   );
 }
 
 /** Produit absent du catalogue : une ligne nom + quantité, ajoutée d'un clic sur « + ». */
 function AjoutProduitLibre({ onAjouter }: { onAjouter: (l: LigneLocale) => void }) {
   const [designation, setDesignation] = useState("");
-  const [quantite, setQuantite] = useState("1");
+  const [quantite, setQuantite] = useState("");
   const valeur = Number(quantite.replace(",", "."));
   const valide = designation.trim().length >= 2 && valeur > 0;
 
@@ -98,7 +105,7 @@ function AjoutProduitLibre({ onAjouter }: { onAjouter: (l: LigneLocale) => void 
     if (!valide) return;
     onAjouter({ cle: `i${Date.now()}`, designation: designation.trim(), quantite: valeur });
     setDesignation("");
-    setQuantite("1");
+    setQuantite("");
   };
 
   return (
@@ -180,18 +187,12 @@ export function CatalogueClient({ onAjouter }: { onAjouter: (l: LigneLocale) => 
           Aucun produit trouvé. Ajoutez-le avec son nom et sa quantité dans la ligne ci-dessus.
         </p>
       ) : (
-        <>
-          <ul className="mt-4 space-y-2">
+        <div className="mt-4 space-y-4">
+          <Pagination page={data.meta.current_page} derniere={data.meta.last_page} onPage={setPage} />
+          <ul className="grid grid-cols-2 gap-3">
             {data.data.map((p) => <CarteProduit key={p.id} p={p} onAjouter={onAjouter} />)}
           </ul>
-          {data.meta.last_page > 1 && (
-            <div className="mt-4 flex items-center justify-center gap-3">
-              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-full border border-ge7-black/15 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-40">Précédent</button>
-              <span className="text-sm text-ge7-black/60">Page {data.meta.current_page} / {data.meta.last_page}</span>
-              <button type="button" disabled={page >= data.meta.last_page} onClick={() => setPage((p) => p + 1)} className="rounded-full border border-ge7-black/15 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-40">Suivant</button>
-            </div>
-          )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -236,7 +237,11 @@ export function ListeDemande({ lignes, onQuantite, onRetirer }: { lignes: LigneL
             {!l.produit_id && <p className="text-[11px] font-bold uppercase tracking-wide text-ge7-bronze">Hors catalogue</p>}
             {l.precision && <p className="truncate text-xs text-ge7-black/50">{l.precision}</p>}
           </div>
-          <QuantiteLigne valeur={l.quantite} libelle={l.designation} onChange={(q) => onQuantite(l.cle, q)} />
+          <div className="flex shrink-0 items-center gap-1">
+            <button type="button" disabled={l.quantite <= 1} onClick={() => onQuantite(l.cle, l.quantite - 1)} className="grid size-7 place-items-center rounded-full border border-ge7-black/15 bg-white disabled:opacity-40" aria-label={`Diminuer ${l.designation}`}><Minus size={14} /></button>
+            <QuantiteLigne valeur={l.quantite} libelle={l.designation} onChange={(q) => onQuantite(l.cle, q)} />
+            <button type="button" onClick={() => onQuantite(l.cle, l.quantite + 1)} className="grid size-7 place-items-center rounded-full bg-ge7-gold text-ge7-black" aria-label={`Augmenter ${l.designation}`}><Plus size={14} /></button>
+          </div>
           {l.unite && <span className="w-6 text-xs text-ge7-black/50">{l.unite}</span>}
           <button type="button" onClick={() => onRetirer(l.cle)} className="text-ge7-black/35 hover:text-rose-600" aria-label={`Retirer ${l.designation}`}><Trash2 size={16} /></button>
         </li>

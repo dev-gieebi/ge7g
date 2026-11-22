@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { hasRole } from "@/lib/rbac";
 import { AjoutProduitsModal, type LigneAjout } from "@/features/shared/AjoutProduitsModal";
 import { qty, numeroDocument } from "@/lib/format";
-import { Badge, Button, Card, ErrorState, Input, Loading, Modal, PageHeader, StatusBadge } from "@/components/ui";
+import { Badge, Button, Card, ErrorState, Input, Loading, Modal, NumberField, PageHeader, StatusBadge } from "@/components/ui";
 import { PrintableDocument } from "@/features/invoices/PrintableDocument";
 import { Facture, type Transport } from "./Facture";
 
@@ -195,13 +195,13 @@ export function PosSaleDetailPage() {
       {!isCashier && canDiscount && (
         <div className="no-print mx-auto mb-4 flex max-w-3xl items-center justify-end gap-2 text-sm">
           <label className="font-semibold">Remise %</label>
-          <input
-            type="number"
+          <NumberField
             min={0}
             max={100}
             step="any"
             value={discountRate ?? Number(s.discount_rate ?? 0)}
-            onChange={(e) => setDiscountRate(e.target.value === "" ? 0 : Number(e.target.value))}
+            onValue={setDiscountRate}
+            valide={(n) => n >= 0 && n <= 100}
             className="w-24 rounded-lg border border-ge7-black/10 px-2 py-1.5 text-center"
           />
           <Button

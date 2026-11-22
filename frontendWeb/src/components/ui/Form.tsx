@@ -1,5 +1,5 @@
 import { Children, Fragment, isValidElement, useMemo, useRef, useState } from "react";
-import type { ChangeEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ChangeEvent, FocusEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 
@@ -37,11 +37,30 @@ export function Input({
   className = "",
   ...rest
 }: InputHTMLAttributes<HTMLInputElement> & { label?: string; error?: string | string[]; hint?: string }) {
+  // Champ numérique : un 0 s'affiche vide. Pendant la saisie, on montre
+  // exactement ce qui est tapé (« 0,5 » reste possible).
+  const [saisie, setSaisie] = useState<string | null>(null);
+  const numerique = rest.type === "number" && rest.value !== undefined;
+  const props = numerique
+    ? {
+        ...rest,
+        value: saisie ?? (estZero(rest.value) ? "" : rest.value),
+        onFocus: (e: FocusEvent<HTMLInputElement>) => { setSaisie(estZero(rest.value) ? "" : String(rest.value ?? "")); rest.onFocus?.(e); },
+        onChange: (e: ChangeEvent<HTMLInputElement>) => { setSaisie(e.target.value); rest.onChange?.(e); },
+        onBlur: (e: FocusEvent<HTMLInputElement>) => { setSaisie(null); rest.onBlur?.(e); },
+      }
+    : rest;
+
   return (
     <Wrap label={label} error={error} hint={hint} className={className}>
-      <input className={`ge7-input ${error ? "border-rose-400" : ""}`} {...rest} />
+      <input className={`ge7-input ${error ? "border-rose-400" : ""}`} {...props} />
     </Wrap>
   );
+}
+
+/** Valeur numérique nulle (0, "0", "0.00"…) : affichée vide. */
+export function estZero(v: unknown): boolean {
+  return v !== null && v !== undefined && v !== "" && Number(v) === 0;
 }
 
 /**

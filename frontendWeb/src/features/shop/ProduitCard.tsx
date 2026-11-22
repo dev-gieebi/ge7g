@@ -21,23 +21,24 @@ export function ProduitCard({ p }: { p: ShopProduit }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group flex flex-col overflow-hidden rounded-2xl border border-ge7-black/10 bg-white text-left transition hover:-translate-y-0.5 hover:border-ge7-gold/60 hover:shadow-soft"
+        className="group flex flex-col rounded-3xl border border-ge7-black/5 bg-white p-3 text-left shadow-soft transition hover:-translate-y-0.5 hover:border-ge7-gold"
       >
-        <div className="relative aspect-[4/2] w-full bg-ge7-black/[0.03]">
+        <div className="relative mb-3 grid h-28 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-ge7-gold-soft to-ge7-pearl">
           <ImageOuInitiales
             src={p.image}
             alt={p.designation}
             loading="lazy"
             className="h-full w-full object-cover"
-            fallback={<span className="grid h-full place-items-center font-display text-3xl font-extrabold text-ge7-black/15">{initiales(p.designation)}</span>}
+            fallback={<span className="font-display text-3xl font-extrabold text-ge7-bronze/60">{initiales(p.designation)}</span>}
           />
           {/* Le compte client ne voit pas le stock : il commande quoi qu'il arrive. */}
           {!estClient && <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${dispo.className}`}>{dispo.label}</span>}
         </div>
-        <div className="flex flex-1 flex-col p-3">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-ge7-black/40">{p.categorie ?? p.reference}</p>
-          <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug">{p.designation}</p>
-          <p className="mt-auto pt-2 text-base font-extrabold text-ge7-bronze">
+        <div className="flex flex-1 flex-col">
+          <p className="font-bold leading-tight">{p.designation}</p>
+          <p className="font-mono text-[11px] font-semibold text-ge7-black/40">{p.reference}</p>
+          {p.categorie && <p className="text-xs text-ge7-black/50">{p.categorie}</p>}
+          <p className="mt-auto pt-2 font-extrabold text-ge7-bronze">
             {money(p.prix)} <span className="text-xs font-medium text-ge7-black/40">{p.unite ? `/ ${p.unite}` : ""}</span>
           </p>
         </div>

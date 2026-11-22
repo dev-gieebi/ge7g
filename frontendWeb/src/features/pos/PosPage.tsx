@@ -177,40 +177,44 @@ export function PosPage() {
           )}
         </div>
 
-        <Card className="xl:sticky xl:top-20 xl:self-start">
-          <h3 className="flex items-center gap-2 text-lg font-extrabold"><ShoppingBag size={18} className="text-ge7-bronze" /> Panier{zone ? <Badge tone="purple"><MapPin size={11} /> {zone.name}</Badge> : null}</h3>
-          <div className="mt-4 max-h-[max(64vh,36rem)] space-y-2 overflow-y-auto pr-1">
-            {cart.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-ge7-black/15 p-8 text-center text-sm text-ge7-black/50">Panier vide</p>
-            ) : (
-              cart.map((l) => (
-                <div key={l.product.id} className="rounded-2xl bg-ge7-cream p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0"><p className="truncate font-semibold">{l.product.name}{l.product.type ? <span className="text-ge7-black/50"> · {l.product.type}</span> : null}</p><p className="font-mono text-[11px] text-ge7-black/40">{l.product.reference}</p><p className="text-xs text-ge7-black/50">{money(l.product.sale_price)} / {l.product.unit?.symbol}</p></div>
-                    <button onClick={() => removeLine(l.product.id)} className="text-rose-600" title="Retirer du panier"><Trash2 size={15} /></button>
+        <Card className="xl:self-start">
+          <h3 className="flex items-center gap-2 text-lg font-extrabold"><ShoppingBag size={18} className="text-ge7-bronze" /> Panier ({cart.length}){zone ? <Badge tone="purple"><MapPin size={11} /> {zone.name}</Badge> : null}</h3>
+          {/* Liste simple, sans défilement interne : nom, prix, quantité, total. */}
+          {cart.length === 0 ? (
+            <p className="mt-4 rounded-2xl border border-dashed border-ge7-black/15 p-8 text-center text-sm text-ge7-black/50">Panier vide</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-ge7-black/5">
+              {cart.map((l) => (
+                <li key={l.product.id} className="py-2.5">
+                  <div className="flex items-start gap-2">
+                    <p className="min-w-0 flex-1 truncate text-sm font-semibold">{l.product.name}{l.product.type ? <span className="text-ge7-black/50"> · {l.product.type}</span> : null}</p>
+                    <span className="shrink-0 text-sm font-bold">{money(l.unit_price * l.quantity)}</span>
+                    <button onClick={() => removeLine(l.product.id)} className="shrink-0 text-ge7-black/35 hover:text-rose-600" title="Retirer du panier"><Trash2 size={15} /></button>
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <button onClick={() => setQty(l.product.id, l.quantity - 1)} className="grid size-10 shrink-0 place-items-center rounded-lg bg-white"><Minus size={14} /></button>
-                    <NumberField min={0} step="any" value={l.quantity} onValue={(q) => setQty(l.product.id, q)} aria-label="Quantité" className="min-w-0 flex-1 rounded-lg border border-ge7-black/15 bg-white px-2.5 py-2 text-center text-base font-semibold focus:border-ge7-gold focus:outline-none" />
-                    <button onClick={() => setQty(l.product.id, l.quantity + 1)} className="grid size-10 shrink-0 place-items-center rounded-lg bg-white"><Plus size={14} /></button>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-ge7-black/5 pt-2">
-                    <NumberField min={l.product.sale_price} step="any" value={l.unit_price} valide={(p) => p >= l.product.sale_price} onValue={(p) => setPrice(l.product.id, p)} aria-label="Prix unitaire" title={`Prix unitaire (minimum ${money(l.product.sale_price)})`} className="w-[6.5rem] rounded-lg border border-ge7-black/15 bg-white px-2 py-1.5 text-right text-sm font-semibold focus:border-ge7-gold focus:outline-none" />
-                    <span className="font-bold">{money(l.unit_price * l.quantity)}</span>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1 text-xs text-ge7-black/50">
+                      <NumberField min={l.product.sale_price} step="any" value={l.unit_price} valide={(p) => p >= l.product.sale_price} onValue={(p) => setPrice(l.product.id, p)} aria-label="Prix unitaire" title={`Prix unitaire (minimum ${money(l.product.sale_price)})`} className="w-24 rounded-lg border border-ge7-black/15 px-2 py-1 text-right text-sm font-semibold text-ge7-black focus:border-ge7-gold focus:outline-none" />
+                      / {l.product.unit?.symbol}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <button onClick={() => setQty(l.product.id, l.quantity - 1)} className="grid size-7 place-items-center rounded-full border border-ge7-black/15 bg-white" aria-label="Diminuer"><Minus size={14} /></button>
+                      <NumberField min={0} step="any" value={l.quantity} onValue={(q) => setQty(l.product.id, q)} aria-label="Quantité" className="w-16 rounded-lg border border-ge7-black/15 px-2 py-1 text-center text-sm font-semibold focus:border-ge7-gold focus:outline-none" />
+                      <button onClick={() => setQty(l.product.id, l.quantity + 1)} className="grid size-7 place-items-center rounded-full bg-ge7-gold text-ge7-black" aria-label="Augmenter"><Plus size={14} /></button>
+                    </span>
                   </div>
                   {partial && (
-                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-ge7-black/5 pt-2 text-xs">
+                    <div className="mt-1.5 flex items-center justify-between gap-2 text-xs">
                       <span className="text-ge7-black/60">Livrée maintenant</span>
                       <span className="flex items-center gap-1.5">
-                        <NumberField min={0} step="any" value={l.delivered} valide={(d) => d >= 0} onValue={(d) => setDelivered(l.product.id, d)} className="w-24 rounded-lg border border-ge7-black/15 bg-white px-2.5 py-2 text-center text-base font-semibold focus:border-ge7-gold focus:outline-none" />
+                        <NumberField min={0} step="any" value={l.delivered} valide={(d) => d >= 0} onValue={(d) => setDelivered(l.product.id, d)} aria-label="Quantité livrée" className="w-16 rounded-lg border border-ge7-black/15 px-2 py-1 text-center text-sm font-semibold focus:border-ge7-gold focus:outline-none" />
                         <span className="text-ge7-black/50">reste {qty(l.quantity - l.delivered, l.product.unit?.symbol)}</span>
                       </span>
                     </div>
                   )}
-                </div>
-              ))
-            )}
-          </div>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <div className="mt-4 space-y-3 border-t border-ge7-black/5 pt-4">
             {!isCashier && (

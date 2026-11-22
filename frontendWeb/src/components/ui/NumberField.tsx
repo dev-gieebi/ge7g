@@ -15,11 +15,13 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | 
  * le champ vide ou invalide, la dernière valeur retenue réapparaît.
  */
 export function NumberField({ value, onValue, valide = (n) => n > 0, onBlur, ...props }: Props) {
-  const [saisie, setSaisie] = useState(String(value));
+  // Un 0 s'affiche vide.
+  const affiche = (n: number) => (n === 0 ? "" : String(n));
+  const [saisie, setSaisie] = useState(affiche(value));
 
   // Valeur changée ailleurs (boutons + / −) : on l'affiche, sans écraser une saisie équivalente (« 1. »).
   useEffect(() => {
-    setSaisie((s) => (s !== "" && Number(s.replace(",", ".")) === value ? s : String(value)));
+    setSaisie((s) => (s !== "" && Number(s.replace(",", ".")) === value ? s : affiche(value)));
   }, [value]);
 
   return (
@@ -34,7 +36,7 @@ export function NumberField({ value, onValue, valide = (n) => n > 0, onBlur, ...
         if (e.target.value.trim() !== "" && Number.isFinite(n) && valide(n)) onValue(n);
       }}
       onBlur={(e) => {
-        setSaisie(String(value));
+        setSaisie(affiche(value));
         onBlur?.(e);
       }}
     />
