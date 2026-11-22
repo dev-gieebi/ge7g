@@ -35,6 +35,7 @@ class Product extends Model
         ];
     }
 
+    
     protected function availableQuantity(): Attribute
     {
         return Attribute::make(
