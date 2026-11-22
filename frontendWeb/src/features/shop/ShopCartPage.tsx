@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { money } from "@/lib/format";
+import { ImageOuInitiales, initiales } from "@/components/ui/ImageOuInitiales";
 import { useCart } from "./cart";
 
 export function ShopCartPage() {
@@ -27,7 +28,7 @@ export function ShopCartPage() {
         {cart.items.map((i) => (
           <div key={i.produit_id} className="flex items-center gap-3 p-4">
             <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-ge7-black/[0.04] text-sm font-bold text-ge7-black/30">
-              {i.image ? <img src={i.image} alt="" className="h-full w-full object-cover" /> : i.designation.slice(0, 2).toUpperCase()}
+              <ImageOuInitiales src={i.image} className="h-full w-full object-cover" fallback={initiales(i.designation)} />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{i.designation}</p>

@@ -9,6 +9,7 @@ import type { PosProduct, Quote } from "@/types";
 import { useTaxes, useZones } from "@/features/shared/refData";
 import { useAction } from "@/lib/hooks";
 import { money, qty } from "@/lib/format";
+import { ImageOuInitiales, initiales } from "@/components/ui/ImageOuInitiales";
 import { Badge, Button, Card, ErrorState, Input, Loading, NumberField, PageHeader, SearchInput, Select, Textarea } from "@/components/ui";
 
 interface Line { product: PosProduct; quantity: number; unit_price: number }
@@ -150,7 +151,7 @@ export function QuoteNewPage() {
                 return (
                   <button key={key} onClick={() => (single ? add(p) : setFamily(list))} className="group rounded-3xl border border-ge7-black/5 bg-white p-3 text-left shadow-soft transition hover:-translate-y-0.5 hover:border-ge7-gold">
                     <div className="mb-3 grid h-28 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-ge7-gold-soft to-ge7-pearl">
-                      {p.image_url ? <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" /> : <span className="font-display text-3xl font-extrabold text-ge7-bronze/60">{p.name.slice(0, 2).toUpperCase()}</span>}
+                      <ImageOuInitiales src={p.image_url} alt={p.name} className="h-full w-full object-cover" fallback={<span className="font-display text-3xl font-extrabold text-ge7-bronze/60">{initiales(p.name)}</span>} />
                     </div>
                     <p className="font-bold leading-tight">{p.name}</p>
                     <p className="font-mono text-[11px] font-semibold text-ge7-black/40">{p.reference}</p>

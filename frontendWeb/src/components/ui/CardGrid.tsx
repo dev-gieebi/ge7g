@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AlertCircle, ChevronLeft, ChevronRight, Inbox, Loader2 } from "lucide-react";
 import type { Paginated } from "@/types";
 import { Button } from "./Button";
+import { ImageOuInitiales } from "./ImageOuInitiales";
 
 /** Contenu d'une carte : image (ou première lettre), titre, détails, valeur et actions. */
 export interface CarteContenu {
@@ -75,11 +76,12 @@ function Carte({ contenu, onClick, sansImage }: { contenu: CarteContenu; onClick
     >
       {!sansImage && (
         <div className="relative h-36 w-full shrink-0 overflow-hidden bg-gradient-to-br from-ge7-cream to-ge7-gold-soft/60">
-          {contenu.image ? (
-            <img src={contenu.image} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
-          ) : (
-            <span className="grid h-full place-items-center font-display text-5xl font-extrabold text-ge7-bronze/50">{lettre}</span>
-          )}
+          <ImageOuInitiales
+            src={contenu.image}
+            loading="lazy"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            fallback={<span className="grid h-full place-items-center font-display text-5xl font-extrabold text-ge7-bronze/50">{lettre}</span>}
+          />
           {contenu.badge && <div className="absolute right-2.5 top-2.5">{contenu.badge}</div>}
         </div>
       )}

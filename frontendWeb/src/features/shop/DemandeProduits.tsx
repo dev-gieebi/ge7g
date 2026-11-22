@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { Loading } from "@/components/ui";
+import { ImageOuInitiales, initiales } from "@/components/ui/ImageOuInitiales";
 import { shopApi } from "./api";
 import { clientApi, type LigneDemandee, type ProduitClient } from "./espaceClient";
 
@@ -36,12 +37,13 @@ export function fusionner(lignes: LigneLocale[], ajout: LigneLocale): LigneLocal
 }
 
 function Vignette({ image, designation }: { image?: string | null; designation: string }) {
-  return image ? (
-    <img src={image} alt="" loading="lazy" className="size-14 shrink-0 rounded-xl object-cover" />
-  ) : (
-    <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-ge7-black/[0.04] font-display text-sm font-extrabold text-ge7-black/25">
-      {designation.slice(0, 2).toUpperCase()}
-    </span>
+  return (
+    <ImageOuInitiales
+      src={image}
+      loading="lazy"
+      className="size-14 shrink-0 rounded-xl object-cover"
+      fallback={<span className="grid size-14 shrink-0 place-items-center rounded-xl bg-ge7-black/[0.04] font-display text-sm font-extrabold text-ge7-black/25">{initiales(designation)}</span>}
+    />
   );
 }
 

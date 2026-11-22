@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { money } from "@/lib/format";
+import { ImageOuInitiales, initiales } from "@/components/ui/ImageOuInitiales";
 import { Loading, ErrorState } from "@/components/ui";
 import { shopApi } from "./api";
 import { useCart } from "./cart";
@@ -56,13 +57,12 @@ export function ProduitModal({ produitId, onClose }: { produitId: number; onClos
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="overflow-hidden rounded-2xl border border-ge7-black/10">
               <div className="relative aspect-[5/3] bg-ge7-black/[0.03]">
-                {p.image ? (
-                  <img src={p.image} alt={p.designation} className="h-full w-full object-cover" />
-                ) : (
-                  <span className="grid h-full place-items-center font-display text-5xl font-extrabold text-ge7-black/15">
-                    {p.designation.slice(0, 2).toUpperCase()}
-                  </span>
-                )}
+                <ImageOuInitiales
+                  src={p.image}
+                  alt={p.designation}
+                  className="h-full w-full object-cover"
+                  fallback={<span className="grid h-full place-items-center font-display text-5xl font-extrabold text-ge7-black/15">{initiales(p.designation)}</span>}
+                />
                 {!estClient && <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ${dispo!.className}`}>{dispo!.label}</span>}
               </div>
             </div>

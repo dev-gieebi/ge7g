@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { money } from "@/lib/format";
+import { ImageOuInitiales, initiales } from "@/components/ui/ImageOuInitiales";
 import type { ShopProduit } from "./api";
 import { ProduitModal } from "./ProduitModal";
 import { useEstClient } from "./espaceClient";
@@ -23,13 +24,13 @@ export function ProduitCard({ p }: { p: ShopProduit }) {
         className="group flex flex-col overflow-hidden rounded-2xl border border-ge7-black/10 bg-white text-left transition hover:-translate-y-0.5 hover:border-ge7-gold/60 hover:shadow-soft"
       >
         <div className="relative aspect-[4/2] w-full bg-ge7-black/[0.03]">
-          {p.image ? (
-            <img src={p.image} alt={p.designation} loading="lazy" className="h-full w-full object-cover" />
-          ) : (
-            <span className="grid h-full place-items-center font-display text-3xl font-extrabold text-ge7-black/15">
-              {p.designation.slice(0, 2).toUpperCase()}
-            </span>
-          )}
+          <ImageOuInitiales
+            src={p.image}
+            alt={p.designation}
+            loading="lazy"
+            className="h-full w-full object-cover"
+            fallback={<span className="grid h-full place-items-center font-display text-3xl font-extrabold text-ge7-black/15">{initiales(p.designation)}</span>}
+          />
           {/* Le compte client ne voit pas le stock : il commande quoi qu'il arrive. */}
           {!estClient && <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${dispo.className}`}>{dispo.label}</span>}
         </div>

@@ -247,7 +247,11 @@ class ProductController extends Controller
         $imageUrl = (string) $imageUrl;
 
         if (! Str::startsWith($imageUrl, 'data:image')) {
-            return $imageUrl;
+            // URL déjà servie par l'API (…/storage/x) : on garde le chemin
+            // relatif pour ne pas figer le domaine dans la base.
+            return Str::contains($imageUrl, '/storage/')
+                ? Str::after($imageUrl, '/storage/')
+                : $imageUrl;
         }
 
         $this->deleteImage($product->image_url);
@@ -282,6 +286,8 @@ class ProductController extends Controller
                 'image_url' => "Impossible d'enregistrer l'image sur le serveur.",
             ]);
         }
+
+        Product::forgetImageFolders();
 
         // Chemin relatif uniquement : l'URL absolue est générée à la lecture
         // (accessor image_url) pour suivre l'environnement qui sert l'API.
