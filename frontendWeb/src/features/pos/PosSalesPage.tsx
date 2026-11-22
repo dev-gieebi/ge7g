@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { PosSale } from "@/types";
+import { BrouillonsBandeau } from "@/features/shared/BrouillonsBandeau";
 import { useListState, usePaginated } from "@/lib/hooks";
 import { useZones } from "@/features/shared/refData";
 import { datetime, money, numeroDocument } from "@/lib/format";
@@ -14,6 +15,7 @@ export function PosSalesPage() {
   return (
     <>
       <PageHeader title="Historique des ventes" subtitle="Tickets de caisse et ventes de la boutique en ligne." breadcrumb="Caisse" />
+      <BrouillonsBandeau type="vente" chemin="/admin/caisse" />
       <div className="mb-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <SearchInput value={list.search} onChange={list.setSearch} placeholder="N° ticket, client…" />
         <Select value={String(list.filters.source ?? "")} onChange={(e) => list.setFilter("source", e.target.value)}>

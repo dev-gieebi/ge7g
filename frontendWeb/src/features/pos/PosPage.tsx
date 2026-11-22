@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { lireBrouillon, useBrouillonAuto } from "@/lib/brouillons";
+import { BrouillonsBandeau } from "@/features/shared/BrouillonsBandeau";
 import { MapPin, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { getList, toApiError } from "@/lib/api";
 import type { PaymentMethod, PosProduct, PosSale } from "@/types";
@@ -33,22 +35,43 @@ const METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "AUTRE", label: "Autre" },
 ];
 
+/** Saisie de la caisse conservée dans un brouillon. */
+interface DonneesVente {
+  cart: Line[];
+  taxIds: number[];
+  method: PaymentMethod;
+  customer: string;
+  customerPhone: string;
+  customerAddress: string;
+  received: number | "";
+  zoneId: number | "";
+  partial: boolean;
+}
+
+/** `?brouillon=…` : reprend un brouillon (la page repart de zéro à chaque brouillon choisi). */
 export function PosPage() {
+  const [params] = useSearchParams();
+  const brouillonId = params.get("brouillon");
+  return <PosPageContenu key={brouillonId ?? "nouvelle"} brouillonId={brouillonId} />;
+}
+
+function PosPageContenu({ brouillonId }: { brouillonId: string | null }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [repris] = useState(() => (user ? lireBrouillon<DonneesVente>(user.id, brouillonId)?.donnees : undefined));
   // La caissière vend au comptoir sans fiche client ; les autres rôles doivent la renseigner.
   const isCashier = user?.role === "CAISSIER";
   const [search, setSearch] = useState("");
   const [family, setFamily] = useState<PosProduct[] | null>(null);
-  const [cart, setCart] = useState<Line[]>([]);
-  const [taxIds, setTaxIds] = useState<number[]>([]);
-  const [method, setMethod] = useState<PaymentMethod>("ESPECES");
-  const [customer, setCustomer] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
-  const [received, setReceived] = useState<number | "">("");
-  const [zoneId, setZoneId] = useState<number | "">("");
-  const [partial, setPartial] = useState(false);
+  const [cart, setCart] = useState<Line[]>(repris?.cart ?? []);
+  const [taxIds, setTaxIds] = useState<number[]>(repris?.taxIds ?? []);
+  const [method, setMethod] = useState<PaymentMethod>(repris?.method ?? "ESPECES");
+  const [customer, setCustomer] = useState(repris?.customer ?? "");
+  const [customerPhone, setCustomerPhone] = useState(repris?.customerPhone ?? "");
+  const [customerAddress, setCustomerAddress] = useState(repris?.customerAddress ?? "");
+  const [received, setReceived] = useState<number | "">(repris?.received ?? "");
+  const [zoneId, setZoneId] = useState<number | "">(repris?.zoneId ?? "");
+  const [partial, setPartial] = useState(repris?.partial ?? false);
 
   const { data: taxes } = useTaxes();
   const { data: zones } = useZones();
@@ -66,8 +89,12 @@ export function PosPage() {
     }
   }, [taxes]);
 
-  // Changer de ville change les prix : le panier est reparti à zéro.
+  // Changer de ville change les prix : le panier est reparti à zéro
+  // (pas à l'ouverture : un brouillon repris garde son panier).
+  const zoneAffichee = useRef(zoneId);
   useEffect(() => {
+    if (zoneAffichee.current === zoneId) return;
+    zoneAffichee.current = zoneId;
     setCart([]);
     setFamily(null);
   }, [zoneId]);
@@ -95,6 +122,16 @@ export function PosPage() {
   const total = netSubtotal + taxAmount;
   const change = received !== "" && method === "ESPECES" ? Number(received) - total : null;
 
+  // Brouillon automatique tant que la vente n'est pas encaissée.
+  const brouillon = useBrouillonAuto<DonneesVente>("vente", brouillonId, {
+    vide: cart.length === 0 && !customer.trim(),
+    titre: customer.trim() || "Sans client",
+    ville: zone?.name ?? null,
+    lignes: cart.length,
+    total,
+    donnees: { cart, taxIds, method, customer, customerPhone, customerAddress, received, zoneId, partial },
+  });
+
   const add = (p: PosProduct) => {
     if (p.available_quantity <= 0) return;
     setCart((c) => {
@@ -118,13 +155,14 @@ export function PosPage() {
     if (zoneId === "") return;
     pay
       .mutateAsync({ items: cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity, delivered_quantity: partial ? Math.min(l.delivered, l.quantity, l.product.available_quantity) : l.quantity, unit_price: l.unit_price })), tax_ids: taxIds, payment_method: isCashier ? method : "AUTRE", customer_name: customer || null, customer_phone: customerPhone || null, customer_address: customerAddress || null, discount_rate: null, amount_received: received === "" ? null : Number(received), zone_id: zoneId })
-      .then((s) => { setCart([]); setReceived(""); setCustomer(""); setCustomerPhone(""); setCustomerAddress(""); setTaxIds([]); setPartial(false); navigate(`/admin/caisse/ventes/${s.id}`); })
+      .then((s) => { brouillon.terminer(); setCart([]); setReceived(""); setCustomer(""); setCustomerPhone(""); setCustomerAddress(""); setTaxIds([]); setPartial(false); navigate(`/admin/caisse/ventes/${s.id}`); })
       .catch(() => {});
   };
 
   return (
     <>
       <PageHeader title="Point de vente" subtitle="Vente par ville. Prix selon le barème de la zone sélectionnée." breadcrumb="Caisse" />
+      <BrouillonsBandeau type="vente" chemin="/admin/caisse" sauf={brouillon.id} />
       <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
         <div>
           <div className="mb-4 flex flex-wrap items-center gap-2">

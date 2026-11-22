@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { ModuleTabs } from "@/components/ui";
 import { DEVIS_TABS } from "@/app/moduleTabs";
 import { numeroProforma } from "./numero";
+import { BrouillonsBandeau } from "@/features/shared/BrouillonsBandeau";
 import type { Quote } from "@/types";
 import { useListState, usePaginated } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
@@ -27,6 +28,7 @@ export function QuotesPage() {
         breadcrumb="Commercial"
         action={canCreate ? <Button onClick={() => navigate("/admin/devis/nouveau")}><Plus size={15} /> Nouvelle proforma</Button> : undefined}
       />
+      {canCreate && <BrouillonsBandeau type="proforma" chemin="/admin/devis/nouveau" />}
       <div className="mb-4 grid gap-3 sm:grid-cols-4">
         <SearchInput value={list.search} onChange={list.setSearch} placeholder="N° proforma, client…" />
         <Select value={String(list.filters.status ?? "")} onChange={(e) => list.setFilter("status", e.target.value)}>

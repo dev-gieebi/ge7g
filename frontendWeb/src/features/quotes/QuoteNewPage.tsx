@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
+import { lireBrouillon, useBrouillonAuto } from "@/lib/brouillons";
+import { BrouillonsBandeau } from "@/features/shared/BrouillonsBandeau";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, FileSignature, MapPin, Minus, Plus, Trash2 } from "lucide-react";
 import { ModuleTabs } from "@/components/ui";
@@ -26,17 +29,37 @@ interface Payload {
   extras: { label: string; amount: number }[];
 }
 
+/** Saisie de la proforma conservée dans un brouillon. */
+interface DonneesProforma {
+  cart: Line[];
+  zoneId: number | "";
+  taxIds: number[];
+  customer: string;
+  customerPhone: string;
+  customerAddress: string;
+  notes: string;
+}
+
+/** `?brouillon=…` : reprend un brouillon (la page repart de zéro à chaque brouillon choisi). */
 export function QuoteNewPage() {
+  const [params] = useSearchParams();
+  const brouillonId = params.get("brouillon");
+  return <QuoteNewContenu key={brouillonId ?? "nouvelle"} brouillonId={brouillonId} />;
+}
+
+function QuoteNewContenu({ brouillonId }: { brouillonId: string | null }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [repris] = useState(() => (user ? lireBrouillon<DonneesProforma>(user.id, brouillonId)?.donnees : undefined));
   const [search, setSearch] = useState("");
   const [family, setFamily] = useState<PosProduct[] | null>(null);
-  const [cart, setCart] = useState<Line[]>([]);
-  const [zoneId, setZoneId] = useState<number | "">("");
-  const [taxIds, setTaxIds] = useState<number[]>([]);
-  const [customer, setCustomer] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
-  const [notes, setNotes] = useState("");
+  const [cart, setCart] = useState<Line[]>(repris?.cart ?? []);
+  const [zoneId, setZoneId] = useState<number | "">(repris?.zoneId ?? "");
+  const [taxIds, setTaxIds] = useState<number[]>(repris?.taxIds ?? []);
+  const [customer, setCustomer] = useState(repris?.customer ?? "");
+  const [customerPhone, setCustomerPhone] = useState(repris?.customerPhone ?? "");
+  const [customerAddress, setCustomerAddress] = useState(repris?.customerAddress ?? "");
+  const [notes, setNotes] = useState(repris?.notes ?? "");
 
   const { data: taxes } = useTaxes();
   const { data: zones } = useZones();
@@ -54,8 +77,12 @@ export function QuoteNewPage() {
     }
   }, [taxes]);
 
-  // Changer de ville change les prix : le panier repart à zéro.
+  // Changer de ville change les prix : le panier repart à zéro
+  // (pas à l'ouverture : un brouillon repris garde ses lignes).
+  const zoneAffichee = useRef(zoneId);
   useEffect(() => {
+    if (zoneAffichee.current === zoneId) return;
+    zoneAffichee.current = zoneId;
     setCart([]);
     setFamily(null);
   }, [zoneId]);
@@ -78,6 +105,16 @@ export function QuoteNewPage() {
   const rate = selectedTaxes.reduce((s, t) => s + (t.type === "AUCUNE" ? 0 : (t.type === "TPS" ? -Number(t.rate) : Number(t.rate))), 0) / 100;
   const taxAmount = Math.round(netSubtotal * rate);
   const total = netSubtotal + taxAmount;
+
+  // Brouillon automatique tant que la proforma n'est pas enregistrée.
+  const brouillon = useBrouillonAuto<DonneesProforma>("proforma", brouillonId, {
+    vide: cart.length === 0 && !customer.trim(),
+    titre: customer.trim() || "Sans client",
+    ville: zone?.name ?? null,
+    lignes: cart.length,
+    total,
+    donnees: { cart, zoneId, taxIds, customer, customerPhone, customerAddress, notes },
+  });
 
   const add = (p: PosProduct) => {
     setCart((c) => {
@@ -109,7 +146,7 @@ export function QuoteNewPage() {
         notes: notes || null,
         extras: [],
       })
-      .then((q) => navigate(`/admin/devis/${q.id}`))
+      .then((q) => { brouillon.terminer(); navigate(`/admin/devis/${q.id}`); })
       .catch(() => {});
   };
 
@@ -121,6 +158,7 @@ export function QuoteNewPage() {
         subtitle="Proposition commerciale  n'affecte ni le stock ni les ventes."
         breadcrumb={<button onClick={() => navigate("/admin/devis")} className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Proforma</button>}
       />
+      <BrouillonsBandeau type="proforma" chemin="/admin/devis/nouveau" sauf={brouillon.id} />
       <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
         <div>
           <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -172,32 +210,35 @@ export function QuoteNewPage() {
           )}
         </div>
 
-        <Card className="xl:sticky xl:top-20 xl:self-start">
-          <h3 className="flex items-center gap-2 text-lg font-extrabold"><FileSignature size={18} className="text-ge7-bronze" /> Proforma{zone ? <Badge tone="purple"><MapPin size={11} /> {zone.name}</Badge> : null}</h3>
-          <div className="mt-4 max-h-[max(60vh,32rem)] space-y-2 overflow-y-auto pr-1">
-            {cart.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-ge7-black/15 p-8 text-center text-sm text-ge7-black/50">Aucune ligne</p>
-            ) : (
-              cart.map((l) => (
-                <div key={l.product.id} className="rounded-2xl bg-ge7-cream p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0"><p className="truncate font-semibold">{l.product.name}{l.product.type ? <span className="text-ge7-black/50"> · {l.product.type}</span> : null}</p></div>
-                    <button onClick={() => removeLine(l.product.id)} className="text-rose-600" title="Retirer la ligne"><Trash2 size={15} /></button>
+        <Card className="xl:self-start">
+          <h3 className="flex items-center gap-2 text-lg font-extrabold"><FileSignature size={18} className="text-ge7-bronze" /> Proforma ({cart.length}){zone ? <Badge tone="purple"><MapPin size={11} /> {zone.name}</Badge> : null}</h3>
+          {/* Liste simple, sans défilement interne : nom, prix, quantité, total (comme à la caisse). */}
+          {cart.length === 0 ? (
+            <p className="mt-4 rounded-2xl border border-dashed border-ge7-black/15 p-8 text-center text-sm text-ge7-black/50">Aucune ligne</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-ge7-black/5">
+              {cart.map((l) => (
+                <li key={l.product.id} className="py-2.5">
+                  <div className="flex items-start gap-2">
+                    <p className="min-w-0 flex-1 truncate text-sm font-semibold">{l.product.name}{l.product.type ? <span className="text-ge7-black/50"> · {l.product.type}</span> : null}</p>
+                    <span className="shrink-0 text-sm font-bold">{money(l.unit_price * l.quantity)}</span>
+                    <button onClick={() => removeLine(l.product.id)} className="shrink-0 text-ge7-black/35 hover:text-rose-600" title="Retirer la ligne"><Trash2 size={15} /></button>
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <button onClick={() => setQty(l.product.id, l.quantity - 1)} className="grid size-10 shrink-0 place-items-center rounded-lg bg-white"><Minus size={14} /></button>
-                    <NumberField min={0} step="any" value={l.quantity} onValue={(q) => setQty(l.product.id, q)} aria-label="Quantité" className="min-w-0 flex-1 rounded-lg border border-ge7-black/15 bg-white px-2.5 py-2 text-center text-base font-semibold focus:border-ge7-gold focus:outline-none" />
-                    <button onClick={() => setQty(l.product.id, l.quantity + 1)} className="grid size-10 shrink-0 place-items-center rounded-lg bg-white"><Plus size={14} /></button>
-                    {l.product.unit?.symbol && <span className="shrink-0 text-xs text-ge7-black/50">{l.product.unit.symbol}</span>}
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1 text-xs text-ge7-black/50">
+                      <NumberField min={l.product.sale_price} step="any" value={l.unit_price} valide={(p) => p >= l.product.sale_price} onValue={(p) => setPrice(l.product.id, p)} aria-label="Prix unitaire" title={`Prix unitaire (minimum ${money(l.product.sale_price)})`} className="w-24 rounded-lg border border-ge7-black/15 px-2 py-1 text-right text-sm font-semibold text-ge7-black focus:border-ge7-gold focus:outline-none" />
+                      / {l.product.unit?.symbol}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <button onClick={() => setQty(l.product.id, l.quantity - 1)} className="grid size-7 place-items-center rounded-full border border-ge7-black/15 bg-white" aria-label="Diminuer"><Minus size={14} /></button>
+                      <NumberField min={0} step="any" value={l.quantity} onValue={(q) => setQty(l.product.id, q)} aria-label="Quantité" className="w-16 rounded-lg border border-ge7-black/15 px-2 py-1 text-center text-sm font-semibold focus:border-ge7-gold focus:outline-none" />
+                      <button onClick={() => setQty(l.product.id, l.quantity + 1)} className="grid size-7 place-items-center rounded-full bg-ge7-gold text-ge7-black" aria-label="Augmenter"><Plus size={14} /></button>
+                    </span>
                   </div>
-                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-ge7-black/5 pt-2">
-                    <NumberField min={l.product.sale_price} step="any" value={l.unit_price} valide={(p) => p >= l.product.sale_price} onValue={(p) => setPrice(l.product.id, p)} aria-label="Prix unitaire" title={`Prix unitaire (minimum ${money(l.product.sale_price)})`} className="w-[6.5rem] rounded-lg border border-ge7-black/15 bg-white px-2 py-1.5 text-right text-sm font-semibold focus:border-ge7-gold focus:outline-none" />
-                    <span className="font-bold">{money(l.unit_price * l.quantity)}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <div className="mt-4 space-y-3 border-t border-ge7-black/5 pt-4">
             <Input placeholder="Nom du client *" required value={customer} onChange={(e) => setCustomer(e.target.value)} />
