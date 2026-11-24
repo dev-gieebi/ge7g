@@ -120,9 +120,10 @@ class SupplierController extends Controller
         return response()->json(['data' => $supplier]);
     }
 
+    /** Suppression : Super admin uniquement (le fournisseur reste lié à ses achats passés). */
     public function destroy(Request $request, Supplier $supplier): Response
     {
-        $this->authorizeUser($request);
+        abort_unless($request->user()->role === 'SUPERADMIN', 403, 'Suppression réservée au Super admin.');
 
         $supplier->delete();
 

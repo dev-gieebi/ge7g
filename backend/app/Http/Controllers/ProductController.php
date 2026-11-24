@@ -3,11 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\CommandeLigne;
+use App\Models\PosSaleItem;
+use App\Models\Price;
 use App\Models\Product;
+use App\Models\PurchaseItem;
+use App\Models\QuoteItem;
+use App\Models\StockMovement;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -173,12 +180,35 @@ class ProductController extends Controller
         return response()->json(['data' => $product]);
     }
 
+    /**
+     * Suppression : Super admin uniquement. Un produit présent dans
+     * l'historique (ventes, achats, proformas, commandes, mouvements de
+     * stock) ne peut pas être supprimé ; ses prix partent avec lui.
+     */
     public function destroy(Request $request, Product $product): Response
     {
-        $this->authorizeUser($request);
+        abort_unless($request->user()->role === 'SUPERADMIN', 403, 'Suppression réservée au Super admin.');
 
-        $this->deleteImage($product->image_url);
-        $product->delete();
+        $utilisations = array_filter([
+            'ventes' => PosSaleItem::where('product_id', $product->id)->exists(),
+            'achats' => PurchaseItem::where('product_id', $product->id)->exists(),
+            'proformas' => QuoteItem::where('product_id', $product->id)->exists(),
+            'commandes' => CommandeLigne::where('produit_id', $product->id)->exists(),
+            'mouvements de stock' => StockMovement::where('product_id', $product->id)->exists(),
+        ]);
+
+        if ($utilisations !== []) {
+            throw ValidationException::withMessages([
+                'product' => "Impossible de supprimer : le produit « {$product->name} » est utilisé dans des ".implode(', ', array_keys($utilisations)).'.',
+            ]);
+        }
+
+        DB::transaction(function () use ($product) {
+            Price::withTrashed()->where('product_id', $product->id)->forceDelete();
+            $product->delete();
+        });
+
+        $this->deleteImage($product->getRawOriginal('image_url'));
 
         return response()->noContent();
     }

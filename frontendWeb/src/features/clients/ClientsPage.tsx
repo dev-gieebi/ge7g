@@ -6,6 +6,7 @@ import { Plus, UserX, Pencil } from "lucide-react";
 import type { Client, Zone } from "@/types";
 import { useCrud, useListState, usePaginated, fieldErrors } from "@/lib/hooks";
 import { useZones } from "@/features/shared/refData";
+import { useConfirmer } from "@/lib/confirmation";
 import {
   Button,
   DataTable,
@@ -38,6 +39,7 @@ export function ClientsPage() {
   const list = useListState({ per_page: 15 });
   const { data, isLoading, errorMessage } = usePaginated<Client>("clients", "/clients", list.params);
   const crud = useCrud<Client, ClientForm>("clients", "/clients");
+  const confirmer = useConfirmer();
   const { data: zones } = useZones();
   const [editing, setEditing] = useState<ClientForm | null>(null);
   const [editId, setEditId] = useState<number | null>(null);
@@ -83,7 +85,9 @@ export function ClientsPage() {
               size="sm"
               variant="ghost"
               title="Désactiver"
-              onClick={() => crud.update.mutate({ id: c.id, body: { status: "INACTIF" } })}
+              onClick={async () => {
+                if (await confirmer({ titre: "Désactiver le client ?", message: <>Voulez-vous vraiment désactiver <b>« {c.company_name} »</b> ?</>, bouton: "Désactiver" })) crud.update.mutate({ id: c.id, body: { status: "INACTIF" } });
+              }}
             >
               <UserX size={14} className="text-rose-600" />
             </Button>

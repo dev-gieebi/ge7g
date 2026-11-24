@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { ModuleTabs } from "@/components/ui";
 import { CATALOGUE_TABS } from "@/app/moduleTabs";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import type { Category, Product, Unit } from "@/types";
 import { fieldErrors, useCrud, useListState, usePaginated } from "@/lib/hooks";
+import { useAuth } from "@/lib/auth";
+import { useConfirmer } from "@/lib/confirmation";
 import { useCategories, useUnits } from "@/features/shared/refData";
 import { qty } from "@/lib/format";
 import {
@@ -43,6 +45,9 @@ export function ProductsPage() {
   const list = useListState({ per_page: 20 });
   const { data, isLoading, errorMessage } = usePaginated<Product>("products", "/products", list.params);
   const crud = useCrud<Product, ProductForm>("products", "/products");
+  const { user } = useAuth();
+  const estSuperAdmin = user?.role === "SUPERADMIN";
+  const confirmer = useConfirmer();
   const { data: categories } = useCategories();
   const { data: units } = useUnits();
   const [editing, setEditing] = useState<ProductForm | null>(null);
@@ -113,6 +118,19 @@ export function ProductsPage() {
               { label: "Stock minimum", valeur: qty(p.min_stock, p.unit?.symbol) },
             ],
             pied: p.category?.name ? <Badge>{p.category.name}</Badge> : undefined,
+            // Suppression : Super admin uniquement ; refusée si le produit a un historique (ventes, achats…).
+            actions: estSuperAdmin ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                title="Supprimer"
+                onClick={async () => {
+                  if (await confirmer({ titre: "Supprimer le produit ?", message: <>Voulez-vous vraiment supprimer le produit <b>« {p.name} »</b> ? Ses prix seront supprimés aussi.</>, bouton: "Supprimer" })) crud.remove.mutate(p.id);
+                }}
+              >
+                <Trash2 size={14} className="text-rose-600" />
+              </Button>
+            ) : undefined,
           };
         }}
       />

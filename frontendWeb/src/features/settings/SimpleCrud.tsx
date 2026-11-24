@@ -86,8 +86,8 @@ export function SimpleCrud<T extends { id: number }>({
         <DataTable columns={cols} data={data} isLoading={isLoading} error={errorMessage} rowKey={(r) => r.id} page={list.page} onPageChange={list.setPage} dense />
       )}
       {deleteTarget && (
-        <Modal title={`Supprimer  ${title}`} size="sm" onClose={() => setDeleteTarget(null)} footer={<><Button variant="secondary" onClick={() => setDeleteTarget(null)}>Annuler</Button><Button variant="danger" loading={crud.remove.isPending} onClick={() => crud.remove.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })}>Supprimer</Button></>}>
-          <p className="text-sm text-ge7-black/80">Confirmer la suppression de <span className="font-semibold">{String((deleteTarget as any).name ?? deleteTarget.id)}</span> ?</p>
+        <Modal title={`Supprimer  ${title}`} size="sm" onClose={() => setDeleteTarget(null)} footer={<><Button variant="secondary" onClick={() => setDeleteTarget(null)}>Annuler</Button><Button variant="danger" loading={crud.remove.isPending} onClick={() => crud.remove.mutate(deleteTarget.id, { onSettled: () => setDeleteTarget(null) })}>Supprimer</Button></>}>
+          <p className="text-sm text-ge7-black/80">Voulez-vous vraiment supprimer <span className="font-semibold">{String((deleteTarget as any).name ?? deleteTarget.id)}</span> ?</p>
         </Modal>
       )}
       {form && (

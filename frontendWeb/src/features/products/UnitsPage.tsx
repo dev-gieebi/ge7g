@@ -1,10 +1,12 @@
 import type { Unit } from "@/types";
+import { useAuth } from "@/lib/auth";
 import { ModuleTabs } from "@/components/ui";
 import { CATALOGUE_TABS } from "@/app/moduleTabs";
 import { PageHeader } from "@/components/ui";
 import { SimpleCrud } from "@/features/settings/SimpleCrud";
 
 export function UnitsPage() {
+  const { user } = useAuth();
   return (
     <>
       <ModuleTabs tabs={CATALOGUE_TABS} />
@@ -26,6 +28,8 @@ export function UnitsPage() {
           { name: "symbol", label: "Symbole", required: true },
         ]}
         empty={{ name: "", symbol: "" }}
+        // Suppression : Super admin uniquement ; refusée si l'unité est liée à un produit.
+        allowDelete={() => user?.role === "SUPERADMIN"}
         carte={(u) => ({ initiale: u.name, titre: u.name, sousTitre: "Unité de mesure", valeur: <span className="font-mono text-ge7-bronze">{u.symbol}</span> })}
       />
     </>

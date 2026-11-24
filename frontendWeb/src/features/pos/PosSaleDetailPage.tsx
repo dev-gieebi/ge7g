@@ -4,6 +4,7 @@ import { ArrowLeft, BadgeCheck, Package, Plus, Printer, Truck, X } from "lucide-
 import type { PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
+import { useConfirmer } from "@/lib/confirmation";
 import { hasRole } from "@/lib/rbac";
 import { AjoutProduitsModal, type LigneAjout } from "@/features/shared/AjoutProduitsModal";
 import { qty, numeroDocument } from "@/lib/format";
@@ -14,6 +15,7 @@ import { Facture, type Transport } from "./Facture";
 export function PosSaleDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
+  const confirmer = useConfirmer();
   const sale = useOne<PosSale>("pos-sale", id ? `/pos/sales/${id}` : null);
   const navigate = useNavigate();
   // Le ticket papier caisse est réservé au caissier ; l'agent voit la facture A4.
@@ -131,9 +133,9 @@ export function PosSaleDetailPage() {
                     variant={solde ? "secondary" : "purple"}
                     loading={solder.isPending}
                     title={solde ? "Cliquer pour retirer le tampon « Soldé »" : "Marquer la vente comme soldée"}
-                    onClick={() => {
+                    onClick={async () => {
                       if (!solde) solder.mutate({ soldee: true });
-                      else if (window.confirm("Retirer le tampon « Soldé » de cette facture ?")) solder.mutate({ soldee: false });
+                      else if (await confirmer({ titre: "Retirer le tampon ?", message: "Retirer le tampon « Soldé » de cette facture ?", bouton: "Retirer" })) solder.mutate({ soldee: false });
                     }}
                   >
                     <BadgeCheck size={15} /> {solde ? "Soldée" : "Soldé"}

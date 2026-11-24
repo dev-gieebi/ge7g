@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Product;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\Doublon;
@@ -10,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class UnitController extends Controller
 {
@@ -122,9 +124,17 @@ class UnitController extends Controller
         return response()->json(['data' => $unit]);
     }
 
+    /** Suppression : Super admin uniquement, et jamais une unité encore utilisée par un produit. */
     public function destroy(Request $request, Unit $unit): Response
     {
-        $this->authorizeUser($request);
+        abort_unless($request->user()->role === 'SUPERADMIN', 403, 'Suppression réservée au Super admin.');
+
+        $nombre = Product::where('unit_id', $unit->id)->count();
+        if ($nombre > 0) {
+            throw ValidationException::withMessages([
+                'unit' => "Impossible de supprimer : l'unité « {$unit->name} » est liée à {$nombre} produit(s).",
+            ]);
+        }
 
         $unit->delete();
 

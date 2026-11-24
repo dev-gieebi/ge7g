@@ -4,6 +4,8 @@ import { CATALOGUE_TABS } from "@/app/moduleTabs";
 import { Plus, Trash2 } from "lucide-react";
 import type { Category } from "@/types";
 import { fieldErrors, useCrud, useListState, usePaginated } from "@/lib/hooks";
+import { useAuth } from "@/lib/auth";
+import { useConfirmer } from "@/lib/confirmation";
 import { Button, CardGrid, FormGrid, Input, Modal, PageHeader, SearchInput } from "@/components/ui";
 
 type Form = Partial<Omit<Category, "id" | "products_count">>;
@@ -12,6 +14,9 @@ export function CategoriesPage() {
   const list = useListState({ per_page: 30 });
   const { data, isLoading, errorMessage } = usePaginated<Category>("categories", "/categories", list.params);
   const crud = useCrud<Category, Form>("categories", "/categories");
+  const { user } = useAuth();
+  const estSuperAdmin = user?.role === "SUPERADMIN";
+  const confirmer = useConfirmer();
   const [editing, setEditing] = useState<Form | null>(null);
   const [editId, setEditId] = useState<number | null>(null);
 
@@ -56,19 +61,24 @@ export function CategoriesPage() {
           initiale: c.name,
           titre: c.name,
           valeur: <span className="text-ge7-bronze">{c.products_count ?? 0} produit{(c.products_count ?? 0) > 1 ? "s" : ""}</span>,
-          actions: (
-            <>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={(c.products_count ?? 0) > 0}
-                title={(c.products_count ?? 0) > 0 ? "Catégorie utilisée" : "Supprimer"}
-                onClick={() => confirm(`Supprimer « ${c.name} » ?`) && crud.remove.mutate(c.id)}
-              >
-                <Trash2 size={14} className="text-rose-600" />
-              </Button>
-            </>
-          ),
+          // Suppression : Super admin uniquement, jamais une catégorie liée à des produits.
+          actions: estSuperAdmin ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              title="Supprimer"
+              onClick={async () => {
+                const n = c.products_count ?? 0;
+                if (n > 0) {
+                  await confirmer({ titre: "Impossible de supprimer", message: <>La catégorie <b>« {c.name} »</b> est liée à <b>{n} produit{n > 1 ? "s" : ""}</b>. Changez d'abord la catégorie de ces produits.</>, seulementOk: true });
+                  return;
+                }
+                if (await confirmer({ titre: "Supprimer la catégorie ?", message: <>Voulez-vous vraiment supprimer la catégorie <b>« {c.name} »</b> ?</>, bouton: "Supprimer" })) crud.remove.mutate(c.id);
+              }}
+            >
+              <Trash2 size={14} className="text-rose-600" />
+            </Button>
+          ) : undefined,
         })}
       />
 

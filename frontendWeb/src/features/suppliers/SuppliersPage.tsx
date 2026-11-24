@@ -4,6 +4,8 @@ import { APPRO_TABS } from "@/app/moduleTabs";
 import { Plus, Power, Trash2 } from "lucide-react";
 import type { Supplier } from "@/types";
 import { fieldErrors, useCrud, useListState, usePaginated } from "@/lib/hooks";
+import { useAuth } from "@/lib/auth";
+import { useConfirmer } from "@/lib/confirmation";
 import { Button, CardGrid, FormGrid, Input, Modal, PageHeader, SearchInput, Select, StatusBadge } from "@/components/ui";
 
 type Form = Partial<Omit<Supplier, "id" | "purchases_count">>;
@@ -13,6 +15,9 @@ export function SuppliersPage() {
   const list = useListState({ per_page: 15 });
   const { data, isLoading, errorMessage } = usePaginated<Supplier>("suppliers", "/suppliers", list.params);
   const crud = useCrud<Supplier, Form>("suppliers", "/suppliers");
+  const { user } = useAuth();
+  const estSuperAdmin = user?.role === "SUPERADMIN";
+  const confirmer = useConfirmer();
   const [editing, setEditing] = useState<Form | null>(null);
   const [editId, setEditId] = useState<number | null>(null);
 
@@ -63,16 +68,31 @@ export function SuppliersPage() {
                 size="sm"
                 variant="ghost"
                 title={s.status === "ACTIF" ? "Désactiver" : "Activer"}
-                onClick={() => {
+                onClick={async () => {
+                  const desactiver = s.status === "ACTIF";
+                  const ok = await confirmer(desactiver
+                    ? { titre: "Désactiver le fournisseur ?", message: <>Voulez-vous vraiment désactiver <b>« {s.name} »</b> ? Vous pourrez le réactiver plus tard.</>, bouton: "Désactiver" }
+                    : { titre: "Activer le fournisseur ?", message: <>Voulez-vous réactiver <b>« {s.name} »</b> ?</>, bouton: "Activer", danger: false });
+                  if (!ok) return;
                   const { id: _, purchases_count: __, ...body } = s;
-                  crud.update.mutate({ id: s.id, body: { ...body, status: s.status === "ACTIF" ? "INACTIF" : "ACTIF" } });
+                  crud.update.mutate({ id: s.id, body: { ...body, status: desactiver ? "INACTIF" : "ACTIF" } });
                 }}
               >
                 <Power size={14} className={s.status === "ACTIF" ? "text-rose-600" : "text-emerald-600"} />
               </Button>
-              <Button size="sm" variant="ghost" title="Supprimer" onClick={() => confirm(`Supprimer « ${s.name} » ?`) && crud.remove.mutate(s.id)}>
-                <Trash2 size={14} className="text-rose-600" />
-              </Button>
+              {/* Suppression : Super admin uniquement. */}
+              {estSuperAdmin && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  title="Supprimer"
+                  onClick={async () => {
+                    if (await confirmer({ titre: "Supprimer le fournisseur ?", message: <>Voulez-vous vraiment supprimer <b>« {s.name} »</b> ? Ses achats passés restent dans l'historique.</>, bouton: "Supprimer" })) crud.remove.mutate(s.id);
+                  }}
+                >
+                  <Trash2 size={14} className="text-rose-600" />
+                </Button>
+              )}
             </>
           ),
         })}

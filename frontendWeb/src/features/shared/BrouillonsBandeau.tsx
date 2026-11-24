@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { FilePen, MapPin, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useConfirmer } from "@/lib/confirmation";
 import { datetime, money } from "@/lib/format";
 import { supprimerBrouillon, useBrouillons, type TypeBrouillon } from "@/lib/brouillons";
 
@@ -11,6 +12,7 @@ import { supprimerBrouillon, useBrouillons, type TypeBrouillon } from "@/lib/bro
 export function BrouillonsBandeau({ type, chemin, sauf }: { type: TypeBrouillon; chemin: string; sauf?: string }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const confirmer = useConfirmer();
   const brouillons = useBrouillons(type).filter((b) => b.id !== sauf);
 
   if (!user || brouillons.length === 0) return null;
@@ -35,7 +37,9 @@ export function BrouillonsBandeau({ type, chemin, sauf }: { type: TypeBrouillon;
             </button>
             <button
               type="button"
-              onClick={() => { if (window.confirm("Supprimer ce brouillon ?")) supprimerBrouillon(user.id, b.id); }}
+              onClick={async () => {
+                if (await confirmer({ titre: "Supprimer le brouillon ?", message: <>Voulez-vous vraiment supprimer le brouillon <b>« {b.titre} »</b> ? La saisie sera perdue.</>, bouton: "Supprimer" })) supprimerBrouillon(user.id, b.id);
+              }}
               className="border-l border-ge7-black/5 px-2 text-ge7-black/35 hover:bg-rose-50 hover:text-rose-600"
               title="Supprimer le brouillon"
             >

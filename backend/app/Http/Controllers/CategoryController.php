@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Product;
 use App\Models\User;
 use App\Support\Doublon;
 use Illuminate\Http\JsonResponse;
@@ -10,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class CategoryController extends Controller
 {
@@ -132,9 +134,17 @@ class CategoryController extends Controller
         return response()->json(['data' => $category]);
     }
 
+    /** Suppression : Super admin uniquement, et jamais une catégorie encore utilisée par un produit. */
     public function destroy(Request $request, Category $category): Response
     {
-        $this->authorizeUser($request);
+        abort_unless($request->user()->role === 'SUPERADMIN', 403, 'Suppression réservée au Super admin.');
+
+        $nombre = Product::where('category_id', $category->id)->count();
+        if ($nombre > 0) {
+            throw ValidationException::withMessages([
+                'category' => "Impossible de supprimer : la catégorie « {$category->name} » est liée à {$nombre} produit(s).",
+            ]);
+        }
 
         $category->delete();
 

@@ -27,6 +27,7 @@ import { useProductsRef } from "@/features/shared/refData";
 import { api } from "@/lib/api";
 import { datetime, money } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
+import { useConfirmer } from "@/lib/confirmation";
 import { hasRole } from "@/lib/rbac";
 import { Badge, Button, Card, CardHeader, ErrorState, Input, Loading, Modal, PageHeader, Select, StatusBadge, Textarea } from "@/components/ui";
 // [CHAUFFEUR] import { SignaturePad, type SignaturePadRef } from "./SignaturePad";
@@ -78,6 +79,7 @@ function saleDepuisCommande(c: CommandeDetail, numero: string): PosSale {
 export function OrderDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
+  const confirmer = useConfirmer();
   const peutGerer = hasRole(user, "LG_ADMIN", "DG_ADMIN");
   // Seul le DG accorde ou refuse une remise demandée par le client.
   const peutDeciderRemise = hasRole(user, "DG_ADMIN");
@@ -225,8 +227,8 @@ export function OrderDetailPage() {
                 <Button
                   variant="purple"
                   loading={solder.isPending}
-                  onClick={() => {
-                    if (window.confirm("Marquer cette facture comme soldée ? Le tampon « Soldé » sera définitif, visible aussi par le client.")) solder.mutate();
+                  onClick={async () => {
+                    if (await confirmer({ titre: "Facture soldée ?", message: "Marquer cette facture comme soldée ? Le tampon « Soldé » sera définitif, visible aussi par le client.", bouton: "Marquer soldée", danger: false })) solder.mutate();
                   }}
                 >
                   <BadgeCheck size={16} /> Soldé
@@ -349,8 +351,8 @@ export function OrderDetailPage() {
                 {/* [CHAUFFEUR] <Button onClick={() => setLivrer({ receptionnaire: "", montant: String(c.facture?.montant_total ?? c.total), mode: "ESPECES" })}><PackageCheck size={16} /> Confirmer la livraison</Button> */}
                 <Button
                   loading={doLivrer.isPending}
-                  onClick={() => {
-                    if (window.confirm(`Marquer la commande ${c.numero} comme livrée ? Le bon de livraison sera créé.`)) doLivrer.mutate();
+                  onClick={async () => {
+                    if (await confirmer({ titre: "Commande livrée ?", message: `Marquer la commande ${c.numero} comme livrée ? Le bon de livraison sera créé.`, bouton: "Marquer livrée", danger: false })) doLivrer.mutate();
                   }}
                 >
                   <PackageCheck size={16} /> Livrée
