@@ -1,13 +1,13 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, BadgeCheck, Package, Plus, Printer, Truck, X } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Package, Plus, Printer, Trash2, Truck, X } from "lucide-react";
 import type { PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
 import { useConfirmer } from "@/lib/confirmation";
 import { hasRole } from "@/lib/rbac";
 import { AjoutProduitsModal, type LigneAjout } from "@/features/shared/AjoutProduitsModal";
-import { qty, numeroDocument } from "@/lib/format";
+import { money, qty, numeroDocument } from "@/lib/format";
 import { Badge, Button, Card, ErrorState, Input, Loading, Modal, NumberField, PageHeader, StatusBadge } from "@/components/ui";
 import { PrintableDocument } from "@/features/invoices/PrintableDocument";
 import { Facture, type Transport } from "./Facture";
@@ -83,6 +83,12 @@ export function PosSaleDetailPage() {
     { keys: ["pos-sale", "pos-sales", "pos-products", "products", "stock-movements"], success: "Produits ajoutés à la vente", body: (v) => v },
   );
 
+  // Produit vendu par erreur : retiré de la facture, la quantité livrée revient en stock.
+  const retirerProduit = useAction<number, void>(
+    (itemId) => `/pos/sales/${id}/items/${itemId}`,
+    { method: "delete", keys: ["pos-sale", "pos-sales", "pos-products", "products", "stock-movements", "dashboard"], success: "Produit retiré de la facture, stock remis à jour" },
+  );
+
   // Soldé enregistré : reste sur la facture ; retiré seulement par un clic explicite.
   const solder = useAction<{ soldee: boolean }, PosSale>(
     () => `/pos/sales/${id}/solde`,
@@ -153,6 +159,46 @@ export function PosSaleDetailPage() {
           }
         />
       </div>
+      {/* Produits de la facture : retrait d'un produit vendu par erreur (mêmes droits que l'ajout). */}
+      {!isCashier && canAddItems && !s.annulee && !solde && s.source !== "boutique_en_ligne" && (s.items ?? []).length > 0 && (
+        <Card className="no-print mx-auto mb-6 max-w-2xl">
+          <h3 className="font-extrabold">Produits de la facture</h3>
+          <p className="text-xs text-ge7-black/50">Un produit vendu par erreur peut être retiré : la quantité déjà livrée revient en stock et le total est recalculé.</p>
+          <ul className="mt-3 divide-y divide-ge7-black/5">
+            {(s.items ?? []).map((it) => {
+              const unit = it.product?.unit?.symbol;
+              return (
+                <li key={it.id} className="flex items-center gap-3 py-2 text-sm">
+                  <span className="min-w-0 flex-1 truncate font-semibold">{it.product?.name}{it.product?.type ? ` · ${it.product.type}` : ""}</span>
+                  <span className="shrink-0 text-xs text-ge7-black/60">{qty(Number(it.quantity), unit)} × {money(it.unit_price)}</span>
+                  <span className="w-28 shrink-0 text-right font-bold">{money(it.total)}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Retirer ce produit de la facture"
+                    loading={retirerProduit.isPending && retirerProduit.variables === it.id}
+                    onClick={async () => {
+                      if ((s.items ?? []).length <= 1) {
+                        await confirmer({ titre: "Impossible de retirer", message: "C'est le dernier produit de la facture : il ne peut pas être retiré.", seulementOk: true });
+                        return;
+                      }
+                      const livre = Number(it.delivered_quantity);
+                      const ok = await confirmer({
+                        titre: "Retirer le produit ?",
+                        message: <>Voulez-vous vraiment retirer <b>« {it.product?.name} »</b> de la facture ?{livre > 0 ? <> {qty(livre, unit)} seront remis en stock.</> : null} Le total sera recalculé.</>,
+                        bouton: "Retirer",
+                      });
+                      if (ok) retirerProduit.mutate(it.id);
+                    }}
+                  >
+                    <Trash2 size={14} className="text-rose-600" />
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
       {canDeliver && (s.items ?? []).length > 0 && s.delivery_status !== "LIVREE" && (
         <Card className="no-print mx-auto mb-6 max-w-2xl">
           <h3 className="flex items-center gap-2 font-extrabold"><Truck size={16} className="text-ge7-bronze" /> Livraison <StatusBadge status={s.delivery_status} /></h3>
@@ -194,7 +240,8 @@ export function PosSaleDetailPage() {
           </div>
         </Card>
       )}
-      {!isCashier && canDiscount && (
+      {/* Facture soldée : la remise est figée. */}
+      {!isCashier && canDiscount && !solde && !s.annulee && (
         <div className="no-print mx-auto mb-4 flex max-w-3xl items-center justify-end gap-2 text-sm">
           <label className="font-semibold">Remise %</label>
           <NumberField

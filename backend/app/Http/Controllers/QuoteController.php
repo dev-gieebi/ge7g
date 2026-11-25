@@ -262,6 +262,36 @@ class QuoteController extends Controller
         return response()->json(['data' => $quote]);
     }
 
+    /**
+     * Produit retiré d'une proforma (ajouté par erreur), tant qu'elle n'est
+     * pas validée. La dernière ligne ne peut pas être retirée ; les totaux
+     * sont recalculés.
+     */
+    public function removeItem(Request $request, Quote $quote, QuoteItem $item): JsonResponse
+    {
+        $this->authorizeUser($request, self::MANAGE_ROLES);
+
+        abort_unless((int) $item->quote_id === (int) $quote->id, 404);
+
+        if ($quote->status !== 'BROUILLON') {
+            abort(422, 'Des produits ne peuvent être retirés que d\'une proforma non validée.');
+        }
+        if ($quote->items()->count() <= 1) {
+            throw ValidationException::withMessages([
+                'item' => 'Impossible de retirer le dernier produit de la proforma.',
+            ]);
+        }
+
+        DB::transaction(function () use ($quote, $item) {
+            $item->delete();
+            $this->recalculerTotaux($quote);
+        });
+
+        $quote->load(['creator', 'zone', 'items.product.unit', 'extras']);
+
+        return response()->json(['data' => $quote]);
+    }
+
     /** Totaux depuis les lignes, avec la remise et les taux de taxe figés de la proforma. */
     private function recalculerTotaux(Quote $quote): void
     {

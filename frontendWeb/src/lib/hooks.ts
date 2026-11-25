@@ -90,12 +90,12 @@ export function useCrud<T, B = Partial<T>>(key: string, url: string) {
 
 export function useAction<TVars = void, TRes = unknown>(
   urlFn: (vars: TVars) => string,
-  opts: { keys?: string[]; success?: string; body?: (vars: TVars) => unknown } = {},
+  opts: { keys?: string[]; success?: string; body?: (vars: TVars) => unknown; method?: "post" | "delete" } = {},
 ) {
   const qc = useQueryClient();
   const notify = useToast();
   return useMutation<TRes, ApiError, TVars>({
-    mutationFn: (vars) => post<TRes>(urlFn(vars), opts.body?.(vars)),
+    mutationFn: (vars) => (opts.method === "delete" ? del(urlFn(vars)).then(() => undefined as TRes) : post<TRes>(urlFn(vars), opts.body?.(vars))),
     onSuccess: () => {
       opts.keys?.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
       if (opts.success) notify(opts.success);

@@ -12,10 +12,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseController extends Controller
 {
     private const MANAGE_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CDG_ADMIN'];
+
+    /** Suppression d'un achat : Super admin et approvisionneur (CDG_ADMIN). */
+    private const DELETE_ROLES = ['SUPERADMIN', 'CDG_ADMIN'];
 
     private function authorizeUser(Request $request): User
     {
@@ -166,13 +170,67 @@ class PurchaseController extends Controller
         return response()->json(['data' => $purchase]);
     }
 
+    /**
+     * Suppression d'un achat (Super admin et approvisionneur) : les quantités déjà réceptionnées
+     * sont retirées du stock (mouvement SORTIE). Refusée si une partie de ce
+     * stock n'existe plus (déjà vendue ou réservée) : le stock ne devient
+     * jamais négatif.
+     */
     public function destroy(Request $request, Purchase $purchase): Response
     {
-        $this->authorizeUser($request);
+        abort_unless(in_array($request->user()->role, self::DELETE_ROLES, true), 403, 'Suppression réservée au Super admin et à l\'approvisionneur.');
 
-        $purchase->delete();
+        DB::transaction(function () use ($request, $purchase) {
+            $items = $purchase->items()->with('product')->get()->filter(fn (PurchaseItem $i) => (float) $i->received_quantity > 0);
+            $products = Product::whereIn('id', $items->pluck('product_id'))->lockForUpdate()->get()->keyBy('id');
+
+            // Quantité reçue par produit (un produit peut figurer sur plusieurs lignes).
+            $recuParProduit = $items->groupBy('product_id')->map(fn ($lignes) => (float) $lignes->sum('received_quantity'));
+
+            $manques = [];
+            foreach ($recuParProduit as $productId => $recu) {
+                $product = $products->get($productId);
+                $disponible = (float) $product->stock_quantity - (float) $product->reserved_quantity;
+                if ($recu > $disponible + 0.0001) {
+                    $manques[] = '« '.$product->name.' » : '.$this->nombre($recu).' reçu(s), seulement '.$this->nombre(max(0, $disponible)).' encore en stock';
+                }
+            }
+
+            if ($manques !== []) {
+                throw ValidationException::withMessages([
+                    'purchase' => 'Impossible de supprimer l\'achat : le stock réapprovisionné n\'existe plus en totalité ('.implode(' ; ', $manques).').',
+                ]);
+            }
+
+            foreach ($recuParProduit as $productId => $recu) {
+                $product = $products->get($productId);
+                $newStock = (float) $product->stock_quantity - $recu;
+                $product->stock_quantity = $newStock;
+                $product->save();
+
+                StockMovement::create([
+                    'product_id' => $product->id,
+                    'type' => 'SORTIE',
+                    'quantity' => -$recu,
+                    'balance_after' => $newStock,
+                    'reference_type' => 'Purchase',
+                    'reference_id' => $purchase->id,
+                    'reference_number' => $purchase->number,
+                    'note' => 'Suppression de l\'achat '.$purchase->number,
+                    'user_id' => $request->user()->id,
+                ]);
+            }
+
+            $purchase->delete();
+        });
 
         return response()->noContent();
+    }
+
+    /** 12.5 → « 12,5 », 3 → « 3 ». */
+    private function nombre(float $n): string
+    {
+        return rtrim(rtrim(number_format($n, 2, ',', ' '), '0'), ',');
     }
 
     public function receive(Request $request, Purchase $purchase): JsonResponse

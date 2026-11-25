@@ -45,17 +45,33 @@ class AjoutProduitsTest extends TestCase
             'items' => [['product_id' => $a->id, 'quantity' => 2]],
         ])->assertCreated()->json('data.id');
 
-        $this->actingAs($admin, 'api')->postJson("/api/quotes/{$id}/items", [
+        $items = $this->actingAs($admin, 'api')->postJson("/api/quotes/{$id}/items", [
             'items' => [['product_id' => $a->id, 'quantity' => 1], ['product_id' => $b->id, 'quantity' => 4]],
         ])->assertOk()
             ->assertJsonCount(2, 'data.items')
-            ->assertJsonPath('data.total', fn ($t) => (float) $t === 5000.0);
+            ->assertJsonPath('data.total', fn ($t) => (float) $t === 5000.0)
+            ->json('data.items');
+        $ligneA = collect($items)->firstWhere('product_id', $a->id)['id'];
+        $ligneB = collect($items)->firstWhere('product_id', $b->id)['id'];
 
-        // Validée : plus d'ajout possible.
+        // Produit ajouté par erreur : retiré, total recalculé ; le dernier reste.
+        $this->actingAs($admin, 'api')->deleteJson("/api/quotes/{$id}/items/{$ligneB}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.total', fn ($t) => (float) $t === 3000.0);
+        $this->actingAs($admin, 'api')->deleteJson("/api/quotes/{$id}/items/{$ligneA}")
+            ->assertUnprocessable()->assertJsonValidationErrors('item');
+
+        // Validée : plus d'ajout ni de retrait possible.
+        $this->actingAs($admin, 'api')->postJson("/api/quotes/{$id}/items", [
+            'items' => [['product_id' => $b->id, 'quantity' => 1]],
+        ])->assertOk();
+        $ligneB2 = collect($this->actingAs($admin, 'api')->getJson("/api/quotes/{$id}")->json('data.items'))->firstWhere('product_id', $b->id)['id'];
         $this->actingAs($admin, 'api')->postJson("/api/quotes/{$id}/status", ['status' => 'VALIDE'])->assertOk();
         $this->actingAs($admin, 'api')->postJson("/api/quotes/{$id}/items", [
             'items' => [['product_id' => $b->id, 'quantity' => 1]],
         ])->assertStatus(422);
+        $this->actingAs($admin, 'api')->deleteJson("/api/quotes/{$id}/items/{$ligneB2}")->assertStatus(422);
     }
 
     public function test_produits_ajoutes_a_une_vente_par_la_logistique_pas_la_caissiere(): void
@@ -110,5 +126,50 @@ class AjoutProduitsTest extends TestCase
         $this->actingAs($admin, 'api')->postJson("/api/pos/sales/{$id}/items", [
             'items' => [['product_id' => $b->id, 'quantity' => 1]],
         ])->assertUnprocessable();
+    }
+
+    public function test_produit_vendu_par_erreur_retire_de_la_facture_et_remis_en_stock(): void
+    {
+        $admin = User::factory()->create(['role' => 'LG_ADMIN']);
+        $caissiere = User::factory()->create(['role' => 'CAISSIER']);
+        $zone = Zone::create(['name' => 'Libreville', 'code' => 'LBV']);
+        $a = $this->produit();
+        $b = $this->produit(['name' => 'Autre', 'sale_price' => 500]);
+
+        $vente = $this->actingAs($admin, 'api')->postJson('/api/pos/sales', [
+            'zone_id' => $zone->id,
+            'customer_name' => 'Client',
+            'customer_phone' => '+24107000000',
+            'customer_address' => 'Glass',
+            'payment_method' => 'AUTRE',
+            'items' => [['product_id' => $a->id, 'quantity' => 2], ['product_id' => $b->id, 'quantity' => 4]],
+        ])->assertCreated()->json('data');
+        $ligneB = collect($vente['items'])->firstWhere('product_id', $b->id)['id'];
+        $ligneA = collect($vente['items'])->firstWhere('product_id', $a->id)['id'];
+        $this->assertEquals(6, (float) $b->fresh()->stock_quantity);
+
+        $this->actingAs($caissiere, 'api')->deleteJson("/api/pos/sales/{$vente['id']}/items/{$ligneB}")->assertForbidden();
+
+        // Retiré : les 4 reviennent en stock, le total ne compte plus que A.
+        $this->actingAs($admin, 'api')->deleteJson("/api/pos/sales/{$vente['id']}/items/{$ligneB}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.total', fn ($t) => (float) $t === 2000.0);
+        $this->assertEquals(10, (float) $b->fresh()->stock_quantity);
+        $this->assertDatabaseHas('stock_movements', ['product_id' => $b->id, 'type' => 'RETOUR_ANNULATION', 'reference_id' => $vente['id']]);
+
+        // Le dernier produit de la facture ne peut pas être retiré.
+        $this->actingAs($admin, 'api')->deleteJson("/api/pos/sales/{$vente['id']}/items/{$ligneA}")
+            ->assertUnprocessable()->assertJsonValidationErrors('item');
+
+        // Facture soldée : plus de retrait.
+        $this->actingAs($admin, 'api')->postJson("/api/pos/sales/{$vente['id']}/items", [
+            'items' => [['product_id' => $b->id, 'quantity' => 1]],
+        ])->assertOk();
+        $ligneB2 = $this->actingAs($admin, 'api')->getJson("/api/pos/sales/{$vente['id']}")->json('data.items.1.id');
+        $this->actingAs($admin, 'api')->postJson("/api/pos/sales/{$vente['id']}/solde", ['soldee' => true])->assertOk();
+        $this->actingAs($admin, 'api')->deleteJson("/api/pos/sales/{$vente['id']}/items/{$ligneB2}")->assertStatus(422);
+        // Soldée : plus de remise.
+        $this->actingAs($admin, 'api')->postJson("/api/pos/sales/{$vente['id']}/discount", ['discount_rate' => 10])->assertStatus(422);
     }
 }

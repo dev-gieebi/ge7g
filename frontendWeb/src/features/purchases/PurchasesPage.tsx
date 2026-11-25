@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ModuleTabs } from "@/components/ui";
 import { APPRO_TABS } from "@/app/moduleTabs";
-import { ArrowLeft, PackageCheck, Plus, Printer } from "lucide-react";
+import { ArrowLeft, PackageCheck, Plus, Printer, Trash2 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { useConfirmer } from "@/lib/confirmation";
 import type { Purchase, PurchaseItem } from "@/types";
 import { fieldErrors, useAction, useCrud, useListState, useOne, usePaginated } from "@/lib/hooks";
 import { useProductsRef, useSuppliersRef } from "@/features/shared/refData";
@@ -33,6 +35,10 @@ export function PurchasesPage() {
   const [impressionAuto, setImpressionAuto] = useState(false);
   const ouvrirBon = (p: Purchase, imprimer: boolean) => { setImpressionAuto(imprimer); setPrintDoc(p); };
   const notify = useToast();
+  const { user } = useAuth();
+  // Suppression d'un achat : Super admin et approvisionneur.
+  const peutSupprimer = user?.role === "SUPERADMIN" || user?.role === "CDG_ADMIN";
+  const confirmer = useConfirmer();
 
   useEffect(() => {
     if (!printDoc || !impressionAuto) return;
@@ -118,11 +124,42 @@ export function PurchasesPage() {
           details: [{ label: "Date", valeur: date(p.date) }],
           valeur: money(p.total),
           actions:
-            // Bon entièrement reçu : plus rien à imprimer ni à réceptionner.
-            p.status !== "RECU" ? (
+            // Bon entièrement reçu : plus rien à imprimer ni à réceptionner (seule la suppression reste).
+            p.status !== "RECU" || peutSupprimer ? (
               <>
-                <Button size="sm" variant="secondary" onClick={() => ouvrirBon(p, true)}><Printer size={14} /> Imprimer</Button>
+                {p.status !== "RECU" && <Button size="sm" variant="secondary" onClick={() => ouvrirBon(p, true)}><Printer size={14} /> Imprimer</Button>}
                 {(p.status === "COMMANDE" || p.status === "RECU_PARTIEL") && <Button size="sm" variant="purple" onClick={() => openReceive(p)}><PackageCheck size={14} /> Réceptionner</Button>}
+                {/* Suppression : Super admin et approvisionneur ; le stock déjà réceptionné est retiré (refusé s'il n'existe plus). */}
+                {peutSupprimer && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Supprimer l'achat"
+                    onClick={async () => {
+                      const recu = p.status === "RECU" || p.status === "RECU_PARTIEL";
+                      const ok = await confirmer({
+                        titre: "Supprimer l'achat ?",
+                        message: (
+                          <>
+                            Voulez-vous vraiment supprimer l'achat <b>{numeroDocument(p.number)}</b>
+                            {p.supplier?.name ? <> ({p.supplier.name})</> : null} ?
+                            {recu && (
+                              <ul className="mt-2 list-disc pl-5">
+                                {(p.items ?? []).filter((it) => Number(it.received_quantity) > 0).map((it) => (
+                                  <li key={it.id}>{qty(Number(it.received_quantity), it.product?.unit?.symbol)} de « {it.product?.name} » seront retirés du stock</li>
+                                ))}
+                              </ul>
+                            )}
+                          </>
+                        ),
+                        bouton: "Supprimer",
+                      });
+                      if (ok) crud.remove.mutate(p.id);
+                    }}
+                  >
+                    <Trash2 size={14} className="text-rose-600" />
+                  </Button>
+                )}
               </>
             ) : undefined,
         })}

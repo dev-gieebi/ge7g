@@ -74,10 +74,12 @@ Route::middleware('auth:api')->group(function () {
     Route::post('pos/sales/{sale}/extras', [PosController::class, 'saveExtras']);
     Route::post('pos/sales/{sale}/deliver', [PosController::class, 'deliver']);
     Route::post('pos/sales/{sale}/items', [PosController::class, 'addItems']);
+    Route::delete('pos/sales/{sale}/items/{item}', [PosController::class, 'removeItem']);
     Route::post('pos/sales/{sale}/solde', [PosController::class, 'solder']);
 
     Route::post('quotes/{quote}/status', [QuoteController::class, 'updateStatus']);
     Route::post('quotes/{quote}/items', [QuoteController::class, 'addItems']);
+    Route::delete('quotes/{quote}/items/{item}', [QuoteController::class, 'removeItem']);
     Route::post('quotes/{quote}/extras', [QuoteController::class, 'saveExtras']);
     Route::apiResource('quotes', QuoteController::class);
 

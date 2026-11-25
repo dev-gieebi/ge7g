@@ -417,6 +417,64 @@ class PosController extends Controller
     }
 
     /**
+     * Produit retiré d'une vente déjà enregistrée (vendu par erreur) : la
+     * quantité déjà livrée revient en stock (mouvement RETOUR_ANNULATION)
+     * et les totaux de la facture sont recalculés. Mêmes conditions que
+     * l'ajout de produits ; la dernière ligne ne peut pas être retirée.
+     */
+    public function removeItem(Request $request, PosSale $sale, PosSaleItem $item): JsonResponse
+    {
+        $user = $this->authorizeUser($request, self::ADD_ITEMS_ROLES);
+
+        abort_unless((int) $item->pos_sale_id === (int) $sale->id, 404);
+
+        if ($sale->annulee) {
+            abort(422, 'Une vente annulée ne peut plus être modifiée.');
+        }
+        if ($sale->source === 'boutique_en_ligne') {
+            abort(422, 'Une vente de la boutique en ligne se modifie depuis sa commande.');
+        }
+        if ($sale->soldee_le) {
+            abort(422, 'Une facture soldée ne peut plus être modifiée.');
+        }
+        if ($sale->items()->count() <= 1) {
+            throw ValidationException::withMessages([
+                'item' => 'Impossible de retirer le dernier produit de la facture.',
+            ]);
+        }
+
+        DB::transaction(function () use ($sale, $item, $user) {
+            $livre = (float) $item->delivered_quantity;
+
+            if ($livre > 0) {
+                $product = Product::lockForUpdate()->findOrFail($item->product_id);
+                $newStock = (float) $product->stock_quantity + $livre;
+                $product->stock_quantity = $newStock;
+                $product->save();
+
+                StockMovement::create([
+                    'product_id' => $product->id,
+                    'type' => 'RETOUR_ANNULATION',
+                    'quantity' => $livre,
+                    'balance_after' => $newStock,
+                    'reference_type' => 'PosSale',
+                    'reference_id' => $sale->id,
+                    'reference_number' => $sale->number,
+                    'note' => 'Produit retiré de la vente '.$sale->number,
+                    'user_id' => $user->id,
+                ]);
+            }
+
+            $item->delete();
+            $this->recalculerTotaux($sale);
+        });
+
+        $sale->load(['cashier', 'zone', 'items.product.unit', 'extras']);
+
+        return response()->json(['data' => $sale]);
+    }
+
+    /**
      * Vente soldée : enregistrée, elle passe en « Payée » et le tampon
      * « Soldé » reste sur la facture. Elle ne se retire que sur demande
      * explicite (`soldee` = false).
@@ -476,6 +534,14 @@ class PosController extends Controller
         $validated = $request->validate([
             'discount_rate' => 'required|numeric|min:0|max:100',
         ]);
+
+        // Facture soldée (ou vente annulée) : la remise est figée.
+        if ($sale->soldee_le) {
+            abort(422, 'Une facture soldée ne peut plus recevoir de remise.');
+        }
+        if ($sale->annulee) {
+            abort(422, 'Une vente annulée ne peut plus être modifiée.');
+        }
 
         $subtotal = (float) $sale->subtotal;
         $discountAmount = round($subtotal * (float) $validated['discount_rate'] / 100);
