@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\InventaireLigne;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\Price;
@@ -14,6 +15,7 @@ use App\Services\NumerotationService;
 use App\Support\Xlsx;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -139,13 +141,14 @@ class ReportController extends Controller
     public function pilotage(Request $request): JsonResponse
     {
         $user = $this->authorizeUser($request, self::ETAT_STOCK_ROLES);
-        $data = $this->buildPilotage();
+        $data = $this->buildPilotage(...$this->periodeStock($request));
 
         // Approvisionneur : état du stock seulement, sans chiffres financiers
         // (CA, marge…) ni valeur du stock (Direction et Super admin).
         if (! in_array($user->role, self::VIEW_ROLES, true)) {
             $data = [
                 'indicateurs' => null,
+                'periode' => $data['periode'],
                 'etat_stock' => collect($data['etat_stock'])->map(fn (array $l) => array_merge($l, ['valeur_stock' => null]))->values(),
             ];
         }
@@ -163,10 +166,11 @@ class ReportController extends Controller
         // Chiffres financiers et valeur du stock : Direction et Super admin seulement.
         $finance = in_array($user->role, self::VIEW_ROLES, true);
 
-        $data = $this->buildPilotage();
+        [$debut, $fin] = $this->periodeStock($request);
+        $data = $this->buildPilotage($debut, $fin);
         $i = $data['indicateurs'];
-        $largeur = $finance ? 12 : 11;
-        $derniere = $finance ? 'L' : 'K';
+        $largeur = $finance ? 10 : 9;
+        $derniere = $finance ? 'J' : 'I';
 
         $rows = [];
         $merges = [];
@@ -175,15 +179,19 @@ class ReportController extends Controller
             $merges[] = 'A'.count($rows).':'.$derniere.count($rows);
         };
 
-        $wide('ETAT DU STOCK AU '.now()->format('d/m/Y'), 1);
+        $wide(match (true) {
+            $debut !== null && $fin !== null => 'ETAT DU STOCK DU '.$debut->format('d/m/Y').' AU '.$fin->format('d/m/Y'),
+            $debut !== null => 'ETAT DU STOCK DU '.$debut->format('d/m/Y').' AU '.now()->format('d/m/Y'),
+            $fin !== null => 'ETAT DU STOCK AU '.$fin->format('d/m/Y'),
+            default => 'ETAT DU STOCK AU '.now()->format('d/m/Y'),
+        }, 1);
         if ($finance) {
             $wide("CA facturé : {$i['ca_facture']} FCFA · Valeur stock : {$i['valeur_stock']} FCFA · Achats : {$i['achats']} FCFA · Marge livrée : {$i['marge_livree']} FCFA", 2);
         }
         $rows[] = array_fill(0, $largeur, [null, 0]);
         $rows[] = array_map(fn ($h) => [$h, 2], array_merge([
-            'Code article', 'Désignation', 'Unité', 'Stock initial', 'Entrées cumulées',
-            'Sorties (vendues)', 'Stock réel', 'Stock minimum',
-            'Alerte', 'Prix de vente (FCFA)', 'Prix par ville',
+            'Code article', 'Désignation', 'Unité', 'Stock initial', 'Entrées',
+            'Sorties', 'Stock physique', 'Stock réel', 'Écart',
         ], $finance ? ['Valeur stock estimée (FCFA)'] : []));
 
         foreach ($data['etat_stock'] as $l) {
@@ -195,10 +203,8 @@ class ReportController extends Controller
                 [$l['entrees'], 4],
                 [$l['sorties'], 4],
                 [$l['stock_theorique'], 4],
-                [$l['stock_minimum'], 4],
-                [$l['alerte'], 3],
-                [$l['prix_vente'], 4],
-                [collect($l['prix_zones'])->map(fn ($z) => "{$z['zone']} : {$z['amount']}")->implode(' · '), 3],
+                [$l['stock_reel'], 4],
+                [$l['ecart'], 4],
             ];
             if ($finance) {
                 $ligne[] = [$l['valeur_stock'], 4];
@@ -210,38 +216,83 @@ class ReportController extends Controller
             'name' => 'État du stock',
             'rows' => $rows,
             'merges' => $merges,
-        ]], 'etat-stock-'.now()->format('Y-m-d').'.xlsx');
+        ]], 'etat-stock'
+            .($debut ? '-du-'.$debut->format('Y-m-d') : '')
+            .'-au-'.($fin ?? now())->format('Y-m-d').'.xlsx');
+    }
+
+    /**
+     * Période de l'état du stock (from/to optionnels, dates incluses).
+     *
+     * @return array{0: Carbon|null, 1: Carbon|null}
+     */
+    private function periodeStock(Request $request): array
+    {
+        $request->validate([
+            'from' => 'nullable|date',
+            'to' => 'nullable|date|after_or_equal:from',
+        ], [
+            'to.after_or_equal' => 'La date de fin doit être postérieure à la date de début.',
+        ]);
+
+        return [
+            $request->filled('from') ? Carbon::parse($request->input('from'))->startOfDay() : null,
+            $request->filled('to') ? Carbon::parse($request->input('to'))->endOfDay() : null,
+        ];
     }
 
     /**
      * Calcul du tableau de bord pilotage : indicateurs clés + état du
      * stock détaillé par article (reprend le classeur de suivi papier).
      *
-     * @return array{indicateurs: array<string, mixed>, etat_stock: Collection<int, array<string, mixed>>}
+     * Période (optionnelle, dates incluses) : stock initial = stock au début
+     * de la période, entrées / sorties = mouvements de la période, stock
+     * physique = stock à la fin ; stock réel = dernier inventaire validé
+     * avant la fin de la période, suivi des mouvements jusqu'à cette date.
+     *
+     * @return array{indicateurs: array<string, mixed>, periode: array{from: string|null, to: string|null}, etat_stock: Collection<int, array<string, mixed>>}
      */
-    private function buildPilotage(): array
+    private function buildPilotage(?Carbon $debut = null, ?Carbon $fin = null): array
     {
         $products = Product::query()->with(['unit', 'prices.zone'])->orderBy('reference')->get();
 
-        // Mouvements de stock agrégés par produit et par type.
+        // Mouvements de la période agrégés par produit et par type.
         $mouvements = StockMovement::query()
+            ->when($debut, fn ($q) => $q->where('created_at', '>=', $debut))
+            ->when($fin, fn ($q) => $q->where('created_at', '<=', $fin))
             ->selectRaw('product_id, type, SUM(quantity) as total')
             ->groupBy('product_id', 'type')
             ->get()
             ->groupBy('product_id');
 
-        $etatStock = $products->map(function (Product $p) use ($mouvements) {
-            $mvmts = $mouvements->get($p->id, collect());
-            $parType = $mvmts->keyBy('type');
-            $entrees = round((float) ($parType->get('ENTREE')?->total ?? 0), 2);
+        // Mouvements postérieurs à la fin de la période : retirés du stock
+        // actuel pour retrouver le stock à la date de fin.
+        $apresFin = $fin
+            ? StockMovement::query()
+                ->where('created_at', '>', $fin)
+                ->groupBy('product_id')
+                ->selectRaw('product_id, SUM(quantity) as total')
+                ->pluck('total', 'product_id')
+            : collect();
+
+        $comptages = $this->derniersComptages($products, $fin);
+
+        $etatStock = $products->map(function (Product $p) use ($mouvements, $apresFin, $comptages) {
+            $parType = $mouvements->get($p->id, collect())->keyBy('type');
+            $total = fn (string $type) => (float) ($parType->get($type)?->total ?? 0);
+            // Entrées = achats reçus, moins les réceptions annulées (achat
+            // supprimé), plus les ajustements.
+            $entrees = round($total('ENTREE') + $total('SORTIE') + $total('AJUSTEMENT'), 2);
             // Sorties = quantité vendue sortie du stock (caisse + commandes en
             // ligne, stockées en négatif), moins les retours (produit retiré
             // d'une vente, commande annulée) remis en stock.
-            $sorties = round(abs((float) ($parType->get('VENTE')?->total ?? 0)
-                + (float) ($parType->get('SORTIE_VENTE')?->total ?? 0))
-                - (float) ($parType->get('RETOUR_ANNULATION')?->total ?? 0), 2);
-            $theorique = round((float) $p->stock_quantity, 2);
-            $physique = $p->physical_stock !== null ? round((float) $p->physical_stock, 2) : null;
+            $sorties = round(abs($total('VENTE') + $total('SORTIE_VENTE')) - $total('RETOUR_ANNULATION'), 2);
+            $theorique = round((float) $p->stock_quantity - (float) ($apresFin->get($p->id) ?? 0), 2);
+            $comptage = $comptages->get($p->id);
+            $physique = $comptage ? round($comptage['compte'], 2) : null;
+            // Stock réel = dernier comptage + mouvements survenus depuis,
+            // jusqu'à la fin de la période.
+            $stockReel = $comptage ? round($comptage['compte'] + $comptage['mouvements'], 2) : null;
             // Prix de vente : barème caisse (for_pos) sinon « Toutes villes »
             // sinon le prix de base du produit.
             $prixVente = round((float) (
@@ -275,8 +326,9 @@ class ReportController extends Controller
                     ])
                     ->values(),
                 'stock_physique' => $physique,
-                'physical_stock_at' => $p->physical_stock_at?->toIso8601String(),
-                'ecart' => $physique !== null ? round($physique - $theorique, 2) : null,
+                'physical_stock_at' => $comptage ? $comptage['date']->toIso8601String() : null,
+                'stock_reel' => $stockReel,
+                'ecart' => $stockReel !== null ? round($stockReel - $theorique, 2) : null,
             ];
         })->values();
 
@@ -303,8 +355,73 @@ class ReportController extends Controller
                 'articles_alerte' => $etatStock->filter(fn ($l) => $l['alerte'] !== 'OK')->count(),
                 'ecarts_physiques' => $etatStock->filter(fn ($l) => $l['ecart'] !== null && $l['ecart'] != 0)->count(),
             ],
+            'periode' => [
+                'from' => $debut?->toDateString(),
+                'to' => $fin?->toDateString(),
+            ],
             'etat_stock' => $etatStock,
         ];
+    }
+
+    /**
+     * Dernier comptage de chaque article fait avant la date de fin (ou à ce
+     * jour) : inventaire validé, à défaut l'ancien comptage enregistré sur
+     * l'article ; avec la somme des mouvements survenus entre ce comptage et
+     * la date de fin.
+     *
+     * @param  Collection<int, Product>  $products
+     * @return Collection<int, array{compte: float, date: Carbon, mouvements: float}>
+     */
+    private function derniersComptages(Collection $products, ?Carbon $fin): Collection
+    {
+        $lignes = InventaireLigne::query()
+            ->join('inventaires', 'inventaires.id', '=', 'inventaire_lignes.inventaire_id')
+            ->where('inventaires.statut', 'VALIDE')
+            ->when($fin, fn ($q) => $q->where('inventaires.valide_le', '<=', $fin))
+            ->orderByDesc('inventaires.valide_le')
+            ->orderByDesc('inventaires.id')
+            ->get(['inventaire_lignes.product_id', 'inventaire_lignes.stock_compte', 'inventaires.valide_le'])
+            ->unique('product_id')
+            ->keyBy('product_id');
+
+        $comptages = collect();
+        foreach ($products as $p) {
+            $ligne = $lignes->get($p->id);
+            $comptage = $ligne
+                ? ['compte' => (float) $ligne->stock_compte, 'date' => Carbon::parse($ligne->valide_le)]
+                : null;
+
+            // Comptage saisi directement sur l'article (ancien écran) plus récent.
+            if ($p->physical_stock !== null && $p->physical_stock_at !== null
+                && ($fin === null || $p->physical_stock_at->lte($fin))
+                && ($comptage === null || $p->physical_stock_at->gt($comptage['date']))) {
+                $comptage = ['compte' => (float) $p->physical_stock, 'date' => $p->physical_stock_at];
+            }
+
+            if ($comptage !== null) {
+                $comptages->put($p->id, $comptage + ['mouvements' => 0.0]);
+            }
+        }
+
+        if ($comptages->isEmpty()) {
+            return $comptages;
+        }
+
+        // Mouvements entre chaque comptage et la fin de la période.
+        StockMovement::query()
+            ->whereIn('product_id', $comptages->keys())
+            ->where('created_at', '>', $comptages->min(fn (array $c) => $c['date']))
+            ->when($fin, fn ($q) => $q->where('created_at', '<=', $fin))
+            ->get(['product_id', 'quantity', 'created_at'])
+            ->each(function (StockMovement $m) use ($comptages) {
+                $c = $comptages->get($m->product_id);
+                if ($m->created_at->gt($c['date'])) {
+                    $c['mouvements'] += (float) $m->quantity;
+                    $comptages->put($m->product_id, $c);
+                }
+            });
+
+        return $comptages;
     }
 
     /**

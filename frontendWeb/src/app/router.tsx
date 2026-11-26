@@ -25,6 +25,8 @@ import { CategoriesPage } from "@/features/products/CategoriesPage";
 import { UnitsPage } from "@/features/products/UnitsPage";
 import { PricesPage } from "@/features/prices/PricesPage";
 import { StockPage } from "@/features/stock/StockPage";
+import { InventairesPage } from "@/features/stock/InventairesPage";
+import { InventaireDetailPage } from "@/features/stock/InventaireDetailPage";
 import { SuppliersPage } from "@/features/suppliers/SuppliersPage";
 import { PurchasesPage } from "@/features/purchases/PurchasesPage";
 import { OrdersPage } from "@/features/orders/OrdersPage";
@@ -161,6 +163,15 @@ export const router = createBrowserRouter([
               { path: "/admin/unites", element: <UnitsPage /> },
               { path: "/admin/fournisseurs", element: <SuppliersPage /> },
               // [CHAUFFEUR] { path: "/admin/chauffeurs", element: <DriversPage /> },
+            ],
+          },
+          {
+            // Inventaires physiques : Direction, Super admin et approvisionneur.
+            element: <RequireRole roles={["DG_ADMIN", "CDG_ADMIN"]} />,
+            children: [
+              { path: "/admin/inventaires", element: <InventairesPage /> },
+              { path: "/admin/inventaires/nouveau", element: <InventaireDetailPage /> },
+              { path: "/admin/inventaires/:id", element: <InventaireDetailPage /> },
             ],
           },
           {

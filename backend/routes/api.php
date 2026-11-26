@@ -8,6 +8,7 @@ use App\Http\Controllers\CommandeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EspaceClientController;
 use App\Http\Controllers\FactureController;
+use App\Http\Controllers\InventaireController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PriceController;
 use App\Http\Controllers\ProductController;
@@ -88,6 +89,10 @@ Route::middleware('auth:api')->group(function () {
     Route::get('reports/pilotage/export', [ReportController::class, 'exportPilotage']);
     Route::get('reports/pilotage', [ReportController::class, 'pilotage']);
     Route::post('reports/inventaire', [ReportController::class, 'saveInventaire']);
+
+    // Inventaires physiques : comptage (brouillon) puis validation des écarts.
+    Route::post('inventaires/{inventaire}/valider', [InventaireController::class, 'valider']);
+    Route::apiResource('inventaires', InventaireController::class);
 
     // Commandes de la boutique en ligne (validation → facture + vente + stock).
     Route::get('commandes/stats', [CommandeController::class, 'stats']);

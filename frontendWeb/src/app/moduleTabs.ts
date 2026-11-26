@@ -24,6 +24,8 @@ export const APPRO_TABS: ModuleTab[] = [
   { label: "Stock", to: "/admin/stock", roles: ADMINS },
   { label: "Fournisseurs", to: "/admin/fournisseurs", roles: ADMINS },
   { label: "Achats", to: "/admin/achats", roles: ADMINS },
+  // Inventaires physiques : Direction, Super admin et approvisionneur.
+  { label: "Inventaires", to: "/admin/inventaires", roles: ["DG_ADMIN", "CDG_ADMIN"], end: false },
 ];
 
 export const LOGISTIQUE_TABS: ModuleTab[] = [

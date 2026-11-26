@@ -57,7 +57,7 @@ export const NAVIGATION: NavGroup[] = [
     title: "Gestion",
     items: [
       { label: "Catalogue", to: "/admin/produits", icon: Package, roles: GESTION, paths: ["/admin/produits", "/admin/categories", "/admin/unites", "/admin/prix"] },
-      { label: "Approvisionnement", to: "/admin/stock", icon: Warehouse, roles: GESTION, paths: ["/admin/stock", "/admin/fournisseurs", "/admin/achats"] },
+      { label: "Approvisionnement", to: "/admin/stock", icon: Warehouse, roles: GESTION, paths: ["/admin/stock", "/admin/fournisseurs", "/admin/achats", "/admin/inventaires"] },
     ],
   },
   // [LOGISTIQUE] Section mise en pause : décommenter pour la réafficher.

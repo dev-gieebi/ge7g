@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
  */
 class NumerotationService
 {
-    private const FORMATS = ['CMD' => 5, 'FAC' => 5, 'AV' => 5, 'BL' => 5];
+    private const FORMATS = ['CMD' => 5, 'FAC' => 5, 'AV' => 5, 'BL' => 5, 'INV' => 5];
 
     /**
      * Table et colonne où chaque type de numéro est enregistré : un numéro
@@ -31,6 +31,7 @@ class NumerotationService
         'FAC' => ['factures', 'numero'],
         'AV' => ['avoirs', 'numero'],
         'BL' => ['bons_livraison', 'numero'],
+        'INV' => ['inventaires', 'numero'],
     ];
 
     /** Prochaine valeur de la séquence annuelle du type (1 au premier document de l'année). */

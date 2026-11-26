@@ -548,9 +548,45 @@ export interface EtatStockLigne {
   prix_vente: number;
   /** Barème boutique par ville (« Toutes villes » si zone nulle). */
   prix_zones: { zone: string; amount: number }[];
+  /** Quantité comptée au dernier inventaire validé (null : jamais compté). */
   stock_physique: number | null;
   physical_stock_at: string | null;
+  /** Dernier comptage + mouvements survenus depuis (null : jamais compté). */
+  stock_reel: number | null;
+  /** Stock réel − stock théorique (null : jamais compté). */
   ecart: number | null;
+}
+
+export type InventaireStatut = "BROUILLON" | "VALIDE";
+
+/** Inventaire physique (liste). */
+export interface Inventaire {
+  id: number;
+  numero: string;
+  statut: InventaireStatut;
+  notes: string | null;
+  user: Pick<User, "id" | "name"> | null;
+  valide_par: Pick<User, "id" | "name"> | null;
+  valide_le: string | null;
+  created_at: string;
+  updated_at: string;
+  lignes_count?: number;
+  ecarts_count?: number;
+}
+
+/** Article compté : en brouillon, `stock_theorique` est le stock actuel ; validé, celui figé au comptage. */
+export interface InventaireLigne {
+  product_id: number;
+  reference: string;
+  designation: string;
+  unit: string | null;
+  stock_compte: number;
+  stock_theorique: number;
+  ecart: number;
+}
+
+export interface InventaireDetail extends Inventaire {
+  lignes: InventaireLigne[];
 }
 
 export interface PilotageReport {
@@ -563,6 +599,8 @@ export interface PilotageReport {
     articles_alerte: number;
     ecarts_physiques: number;
   };
+  /** Période de l'état du stock (dates incluses, null : sans borne). */
+  periode?: { from: string | null; to: string | null };
   etat_stock: EtatStockLigne[];
 }
 
