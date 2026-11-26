@@ -32,10 +32,10 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         "/api": {
-         //target: "https://api-ge7g.com",
+         target: "https://api-ge7g.com",
           // Backend GE7Stock local (php artisan serve --port=8001) : le port 8000
           // est occupé par un autre projet (AppPointage).
-          target: "http://127.0.0.1:8001",
+          //target: "http://127.0.0.1:8001",
           changeOrigin: true,
         },
         "/storage": {
