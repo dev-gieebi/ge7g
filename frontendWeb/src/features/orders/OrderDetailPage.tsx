@@ -222,6 +222,11 @@ export function OrderDetailPage() {
   // Prix laissés vides (commande sans ville tarifaire) : saisis par l'équipe avant validation.
   const prixASaisir = c.lignes.filter((l) => l.produit_id !== null && l.prix_unitaire <= 0).length;
   const solde = !!c.facture?.soldee_le;
+  // Livraison : une quantité au-delà du reste à livrer ou du stock bloque l'enregistrement.
+  const envoiInvalide = !!envoi && c.lignes.some((l) => {
+    const q = Number((envoi[l.id] ?? "").replace(",", ".")) || 0;
+    return q > l.reste || q > l.stock_disponible;
+  });
   // Suivi des envois (livré / reste) une fois la commande validée.
   const suiviLivraison = !['en_attente', 'refusee'].includes(c.statut);
   // Le bon de livraison accompagne la commande dès sa validation.
@@ -516,9 +521,11 @@ export function OrderDetailPage() {
               footer={
                 <>
                   <Button variant="secondary" onClick={() => setEnvoi(null)}>Annuler</Button>
+                  {envoiInvalide && <span className="mr-auto text-xs font-semibold text-rose-600">Corrigez les quantités en rouge (au-delà du reste à livrer ou du stock).</span>}
                   <Button
                     loading={livraisonPartielle.isPending}
-                    disabled={!Object.values(envoi).some((v) => Number(v.replace(",", ".")) > 0)}
+                    // Rien à livrer, ou une quantité au-delà du reste / du stock : enregistrement impossible.
+                    disabled={!Object.values(envoi).some((v) => Number(v.replace(",", ".")) > 0) || envoiInvalide}
                     onClick={async () => {
                       const lignes = c.lignes
                         .map((l) => ({ id: l.id, quantite: Number((envoi[l.id] ?? "").replace(",", ".")) || 0, l }))

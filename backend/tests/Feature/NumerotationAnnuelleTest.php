@@ -2,12 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Models\Client;
+use App\Models\Commande;
 use App\Models\Compteur;
+use App\Models\PosSale;
 use App\Models\Purchase;
 use App\Models\Supplier;
+use App\Models\User;
 use App\Services\NumerotationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /** Chaque type de document repart à 00001 au 1er janvier, séquence par type. */
@@ -34,6 +39,31 @@ class NumerotationAnnuelleTest extends TestCase
         $this->assertSame('CMD-00001-2027', $service->next('CMD'));
 
         Carbon::setTestNow();
+    }
+
+    public function test_factures_en_ligne_existantes_prennent_le_numero_de_leur_vente(): void
+    {
+        $client = Client::create(['nom' => 'Client', 'telephone' => '+241066000000', 'source' => 'boutique_en_ligne']);
+        $admin = User::factory()->create(['role' => 'LG_ADMIN']);
+        $facture = function (string $numero, ?string $vente) use ($client, $admin): int {
+            $commande = Commande::create(['numero' => 'CMD-'.fake()->unique()->numberBetween(10000, 99999).'-2026', 'client_id' => $client->id, 'nom_livraison' => 'X', 'telephone_livraison' => 'X', 'ville' => 'X', 'quartier' => 'X', 'point_repere' => 'X', 'total' => 0, 'statut' => 'validee']);
+            $id = DB::table('factures')->insertGetId(['numero' => $numero, 'commande_id' => $commande->id, 'client_id' => $client->id, 'montant_total' => 0, 'statut_paiement' => 'non_payee', 'emise_le' => now(), 'created_at' => now(), 'updated_at' => now()]);
+            if ($vente) {
+                PosSale::create(['number' => $vente, 'user_id' => $admin->id, 'facture_id' => $id, 'subtotal' => 0, 'tax_amount' => 0, 'total' => 0, 'payment_method' => 'LIVRAISON', 'status' => 'EMISE', 'source' => 'boutique_en_ligne']);
+            }
+
+            return $id;
+        };
+
+        // Ancien compteur séparé : FAC-00001 pour la vente n° 12 ; FAC-00002 pour
+        // la vente n° 1 (échange de numéros : la contrainte d'unicité doit tenir).
+        $a = $facture('FAC-00001-2026', 'VNT-2026-00012');
+        $b = $facture('FAC-00002-2026', 'VNT-2026-00001');
+
+        (require database_path('migrations/2026_11_26_103930_aligner_numeros_factures_en_ligne.php'))->up();
+
+        $this->assertSame('FAC-00012-2026', DB::table('factures')->where('id', $a)->value('numero'));
+        $this->assertSame('FAC-00001-2026', DB::table('factures')->where('id', $b)->value('numero'));
     }
 
     public function test_un_numero_deja_utilise_est_saute_quand_le_compteur_est_en_retard(): void
