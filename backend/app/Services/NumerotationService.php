@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Compteur;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Numérotation annuelle des documents : CMD-00045-2026, FAC-00123-2026,
@@ -14,6 +15,23 @@ use App\Models\Compteur;
 class NumerotationService
 {
     private const FORMATS = ['CMD' => 5, 'FAC' => 5, 'AV' => 5, 'BL' => 5];
+
+    /**
+     * Table et colonne où chaque type de numéro est enregistré : un numéro
+     * déjà présent (compteur en retard, données importées ou restaurées) est
+     * sauté, au lieu de provoquer une erreur de doublon.
+     *
+     * @var array<string, array{0: string, 1: string}>
+     */
+    private const DOCUMENTS = [
+        'VNT' => ['pos_sales', 'number'],
+        'ACH' => ['purchases', 'number'],
+        'DEV' => ['quotes', 'number'],
+        'CMD' => ['commandes', 'numero'],
+        'FAC' => ['factures', 'numero'],
+        'AV' => ['avoirs', 'numero'],
+        'BL' => ['bons_livraison', 'numero'],
+    ];
 
     /** Prochaine valeur de la séquence annuelle du type (1 au premier document de l'année). */
     public function sequence(string $type, ?int $annee = null): int
@@ -35,7 +53,22 @@ class NumerotationService
         $annee ??= (int) now()->format('Y');
         $longueur = self::FORMATS[$type] ?? 6;
 
-        return $type.'-'.str_pad((string) $this->sequence($type, $annee), $longueur, '0', STR_PAD_LEFT).'-'.$annee;
+        return $this->libre($type, fn (int $n) => $type.'-'.str_pad((string) $n, $longueur, '0', STR_PAD_LEFT).'-'.$annee, $annee);
+    }
+
+    /** Premier numéro de la séquence qui n'est pas déjà utilisé par un document. */
+    private function libre(string $type, \Closure $format, int $annee): string
+    {
+        [$table, $colonne] = self::DOCUMENTS[$type] ?? [null, null];
+
+        for ($essai = 0; $essai < 10000; $essai++) {
+            $numero = $format($this->sequence($type, $annee));
+            if (! $table || ! DB::table($table)->where($colonne, $numero)->exists()) {
+                return $numero;
+            }
+        }
+
+        throw new \RuntimeException("Aucun numéro libre trouvé pour le type {$type}.");
     }
 
     /**
@@ -62,6 +95,6 @@ class NumerotationService
     {
         $annee ??= (int) now()->format('Y');
 
-        return $type.'-'.$annee.'-'.str_pad((string) $this->sequence($type, $annee), 5, '0', STR_PAD_LEFT);
+        return $this->libre($type, fn (int $n) => $type.'-'.$annee.'-'.str_pad((string) $n, 5, '0', STR_PAD_LEFT), $annee);
     }
 }

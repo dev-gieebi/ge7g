@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Compteur;
+use App\Models\Purchase;
+use App\Models\Supplier;
 use App\Services\NumerotationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -29,6 +32,21 @@ class NumerotationAnnuelleTest extends TestCase
         $this->assertSame('ACH-2027-00001', $service->nextAnneeDabord('ACH'));
         $this->assertSame('FAC-00001-2027', $service->next('FAC'));
         $this->assertSame('CMD-00001-2027', $service->next('CMD'));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_un_numero_deja_utilise_est_saute_quand_le_compteur_est_en_retard(): void
+    {
+        Carbon::setTestNow('2026-11-26 10:00:00');
+        $fournisseur = Supplier::create(['name' => 'Fournisseur']);
+
+        // Compteur à 12 alors que l'achat n° 13 existe déjà (données restaurées).
+        Compteur::create(['type' => 'ACH', 'annee' => 2026, 'valeur' => 12]);
+        Purchase::create(['number' => 'ACH-2026-00013', 'supplier_id' => $fournisseur->id, 'date' => '2026-11-20', 'status' => 'COMMANDE', 'total' => 0]);
+
+        $this->assertSame('ACH-2026-00014', app(NumerotationService::class)->nextAnneeDabord('ACH'));
+        $this->assertSame(14, (int) Compteur::where('type', 'ACH')->where('annee', 2026)->value('valeur'));
 
         Carbon::setTestNow();
     }
