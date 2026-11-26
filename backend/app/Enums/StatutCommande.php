@@ -38,7 +38,8 @@ enum StatutCommande: string
         return match ($this) {
             self::EnAttente => in_array($cible, [self::Validee, self::Refusee], true),
             self::Validee => in_array($cible, [self::EnPreparation, self::EnLivraison, self::Annulee], true),
-            self::EnPreparation => in_array($cible, [self::EnLivraison, self::Annulee], true),
+            // Livrée directement depuis la préparation : dernier envoi partiel.
+            self::EnPreparation => in_array($cible, [self::EnLivraison, self::Livree, self::Annulee], true),
             self::EnLivraison => in_array($cible, [self::Livree, self::EchecLivraison], true),
             self::EchecLivraison => in_array($cible, [self::EnLivraison, self::Annulee], true),
             self::Refusee, self::Livree, self::Annulee => false,

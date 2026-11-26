@@ -15,15 +15,15 @@ use Illuminate\Validation\ValidationException;
  */
 class StockService
 {
-    /** Déduit le stock d'une ligne de commande validée. */
-    public function deduire(int $produitId, float $quantite, Commande $commande, ?User $user): void
+    /** Déduit le stock d'une ligne de commande livrée (stock réel obligatoire). */
+    public function deduire(int $produitId, float $quantite, Commande $commande, ?User $user, ?string $note = null): void
     {
         $produit = Product::lockForUpdate()->findOrFail($produitId);
 
         $disponible = (float) $produit->stock_quantity - (float) $produit->reserved_quantity;
-        if ($disponible < $quantite) {
+        if ($disponible + 0.0001 < $quantite) {
             throw ValidationException::withMessages([
-                'stock' => "Stock insuffisant pour « {$produit->name} » : {$disponible} disponible(s), {$quantite} demandée(s).",
+                'stock' => 'Stock insuffisant pour « '.$produit->name.' » : '.self::nombre(max(0, $disponible)).' en stock, '.self::nombre($quantite).' demandé(s).',
             ]);
         }
 
@@ -38,12 +38,31 @@ class StockService
             'reference_type' => 'Commande',
             'reference_id' => $commande->id,
             'reference_number' => $commande->numero,
-            'note' => 'Vente boutique en ligne '.$commande->numero,
+            'note' => $note ?? 'Vente boutique en ligne '.$commande->numero,
             'user_id' => $user?->id,
         ]);
     }
 
-    /** Remet en stock les quantités d'une commande annulée après validation. */
+    /** Vérifie, sans rien déduire, que le stock disponible couvre la quantité. */
+    public function verifier(int $produitId, float $quantite): void
+    {
+        $produit = Product::findOrFail($produitId);
+        $disponible = (float) $produit->stock_quantity - (float) $produit->reserved_quantity;
+
+        if ($disponible + 0.0001 < $quantite) {
+            throw ValidationException::withMessages([
+                'stock' => 'Stock insuffisant pour « '.$produit->name.' » : '.self::nombre(max(0, $disponible)).' en stock, '.self::nombre($quantite).' commandé(s).',
+            ]);
+        }
+    }
+
+    /** 12.5 → « 12,5 », 3 → « 3 ». */
+    public static function nombre(float $n): string
+    {
+        return rtrim(rtrim(number_format($n, 2, ',', ' '), '0'), ',');
+    }
+
+    /** Remet en stock les quantités sorties d'une commande annulée. */
     public function remettre(int $produitId, float $quantite, Commande $commande, ?User $user): void
     {
         $produit = Product::lockForUpdate()->findOrFail($produitId);

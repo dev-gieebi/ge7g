@@ -20,7 +20,7 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
-import type { CommandeDetail, PosSale } from "@/types";
+import type { BonLivraisonCommande, CommandeDetail, PosSale } from "@/types";
 import { useAction, useOne } from "@/lib/hooks";
 // [CHAUFFEUR] import { useChauffeurs } from "@/features/shared/refData";
 import { useProductsRef } from "@/features/shared/refData";
@@ -76,6 +76,27 @@ function saleDepuisCommande(c: CommandeDetail, numero: string): PosSale {
   };
 }
 
+/** Bon de livraison d'un envoi (livraison partielle) : seulement les quantités envoyées. */
+function saleDepuisBon(c: CommandeDetail, bon: BonLivraisonCommande): PosSale {
+  const sale = saleDepuisCommande(c, bon.numero);
+  return {
+    ...sale,
+    created_at: bon.livre_le ?? sale.created_at,
+    items: bon.lignes.map((l, i) => ({
+      id: i,
+      product: { name: l.designation, type: null, unit: c.lignes.find((x) => x.designation === l.designation)?.unite ? { symbol: c.lignes.find((x) => x.designation === l.designation)!.unite! } : undefined },
+      quantity: l.quantite,
+      delivered_quantity: l.quantite,
+      remaining_quantity: 0,
+      unit_price: l.prix_unitaire,
+      total: l.total_ligne,
+    })) as PosSale["items"],
+    subtotal: bon.montant_total,
+    discount_rate: 0,
+    total: bon.montant_total,
+  };
+}
+
 export function OrderDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -96,7 +117,10 @@ export function OrderDetailPage() {
   // [CHAUFFEUR] const [expedier, setExpedier] = useState<{ chauffeur_id?: number } | null>(null);
   // [CHAUFFEUR] Livraison avec réceptionnaire, encaissement et signature (voir CHAUFFEUR.md).
   // const [livrer, setLivrer] = useState<{ receptionnaire: string; montant: string; mode: string } | null>(null);
-  const [impression, setImpression] = useState<"facture" | "bl" | null>(null);
+  // Impression : facture, bon de livraison (aperçu) ou bon d'un envoi précis (id).
+  const [impression, setImpression] = useState<"facture" | "bl" | number | null>(null);
+  // Livraison partielle : quantité saisie par ligne (vide = rien pour cette ligne).
+  const [envoi, setEnvoi] = useState<Record<number, string> | null>(null);
   // Ligne à référencer (produit demandé hors catalogue) ou prix à ajuster, avant validation.
   const [ligneEdit, setLigneEdit] = useState<{ id: number; designation: string; precision?: string | null; inconnu: boolean; produit_id: string; prix: string; filtre: string } | null>(null);
   // Fenêtre « Commentaires » : annotations, remise et données complètes de la commande.
@@ -111,6 +135,10 @@ export function OrderDetailPage() {
 
   const valider = useAction(() => `/commandes/${id}/valider`, { keys: KEYS, success: "Commande validée facture et vente créées" });
   const preparer = useAction(() => `/commandes/${id}/preparer`, { keys: KEYS, success: "Commande passée en préparation" });
+  const livraisonPartielle = useAction<{ lignes: { id: number; quantite: number }[] }>(
+    () => `/commandes/${id}/livraison-partielle`,
+    { keys: [...KEYS, "products", "stock-movements", "pos-products"], success: "Livraison enregistrée stock mis à jour", body: (v) => v },
+  );
   const actionMotif = useAction<{ action: MotifAction; valeur: string }>(
     (v) => `/commandes/${id}/${v.action}`,
     { keys: KEYS, success: "Statut mis à jour", body: (v) => ({ motif: v.valeur }) },
@@ -194,6 +222,8 @@ export function OrderDetailPage() {
   // Prix laissés vides (commande sans ville tarifaire) : saisis par l'équipe avant validation.
   const prixASaisir = c.lignes.filter((l) => l.produit_id !== null && l.prix_unitaire <= 0).length;
   const solde = !!c.facture?.soldee_le;
+  // Suivi des envois (livré / reste) une fois la commande validée.
+  const suiviLivraison = !['en_attente', 'refusee'].includes(c.statut);
   // Le bon de livraison accompagne la commande dès sa validation.
   const imprimable = ["validee", "en_preparation", "en_livraison", "livree"].includes(c.statut);
 
@@ -210,10 +240,12 @@ export function OrderDetailPage() {
   // Aperçu d'impression : même modèle A4 que la facture d'achat caisse,
   // avec la mention « Commande en ligne » pour distinguer la provenance.
   if (impression) {
-    const estBl = impression === "bl";
-    // Le BL généré à la livraison porte son propre numéro (BL-xxxxx-AAAA) ; avant, aperçu au n° de commande.
-    const sale = saleDepuisCommande(c, estBl ? (c.bon_livraison?.numero ?? c.numero) : (c.facture?.numero ?? c.numero));
-    if (estBl && c.bon_livraison?.livre_le) sale.created_at = c.bon_livraison.livre_le;
+    const bonChoisi = typeof impression === "number" ? c.bons_livraison?.find((b) => b.id === impression) : undefined;
+    const estBl = impression === "bl" || !!bonChoisi;
+    // Bon d'un envoi précis : ses quantités. Sinon le BL généré à la livraison
+    // porte son propre numéro (BL-xxxxx-AAAA) ; avant, aperçu au n° de commande.
+    const sale = bonChoisi ? saleDepuisBon(c, bonChoisi) : saleDepuisCommande(c, estBl ? (c.bon_livraison?.numero ?? c.numero) : (c.facture?.numero ?? c.numero));
+    if (!bonChoisi && estBl && c.bon_livraison?.livre_le) sale.created_at = c.bon_livraison.livre_le;
 
     return (
       <>
@@ -338,9 +370,14 @@ export function OrderDetailPage() {
               <Button onClick={demarrerMission} loading={doDemarrer.isPending}><MapPin size={16} /> Démarrer la mission</Button>
             )}
             */}
-            {/* [CHAUFFEUR] En attendant la partie chauffeur : le gestionnaire met lui-même la commande en livraison. */}
-            {peutGerer && ["validee", "en_preparation", "echec_livraison"].includes(c.statut) && (
-              <Button variant="purple" onClick={() => doDemarrer.mutate({})} loading={doDemarrer.isPending}><Truck size={16} /> Mettre en livraison</Button>
+            {/* Mettre en livraison : uniquement en préparation. On saisit la quantité envoyée
+                par produit (livraisons partielles) ; seule cette quantité sort du stock. */}
+            {peutGerer && c.statut === "en_preparation" && (
+              <Button variant="purple" onClick={() => setEnvoi({})}><Truck size={16} /> Mettre en livraison</Button>
+            )}
+            {/* Ancien circuit (après un échec de livraison) : remise en route de la livraison. */}
+            {peutGerer && c.statut === "echec_livraison" && (
+              <Button variant="purple" onClick={() => doDemarrer.mutate({})} loading={doDemarrer.isPending}><Truck size={16} /> Remettre en livraison</Button>
             )}
             {peutGerer && (c.statut === "en_preparation" || c.statut === "echec_livraison") && (
               <Button variant="danger" onClick={() => setMotif({ action: "annuler", valeur: "" })}><Ban size={16} /> Annuler</Button>
@@ -400,6 +437,8 @@ export function OrderDetailPage() {
                 <tr>
                   <th className="px-5 py-3">Désignation</th>
                   <th className="px-5 py-3 text-right">Qté</th>
+                  {suiviLivraison && <th className="px-5 py-3 text-right">Livré</th>}
+                  {suiviLivraison && <th className="px-5 py-3 text-right">Reste</th>}
                   <th className="px-5 py-3 text-right">PU (figé)</th>
                   <th className="px-5 py-3 text-right">Total</th>
                   <th className="px-5 py-3 text-right">Stock dispo</th>
@@ -417,6 +456,8 @@ export function OrderDetailPage() {
                         {l.precision && <p className="text-xs text-ge7-black/50">{l.precision}</p>}
                       </td>
                       <td className="px-5 py-3 text-right">{l.quantite} {l.unite ?? ""}</td>
+                      {suiviLivraison && <td className="px-5 py-3 text-right font-semibold text-emerald-700">{l.quantite_livree}</td>}
+                      {suiviLivraison && <td className={`px-5 py-3 text-right font-semibold ${l.reste > 0 ? "text-amber-700" : "text-ge7-black/40"}`}>{l.reste}</td>}
                       <td className="px-5 py-3 text-right">
                         {l.prix_unitaire > 0 ? money(l.prix_unitaire) : <Badge tone="amber">à saisir</Badge>}
                         {peutGerer && c.statut === "en_attente" && (
@@ -438,16 +479,112 @@ export function OrderDetailPage() {
               <tfoot className="bg-ge7-cream text-sm">
                 {c.remise.montant > 0 && (
                   <tr>
-                    <td colSpan={3} className="px-5 pt-3 text-right text-ge7-black/60">Sous-total {money(c.sous_total)} · Remise {c.remise.taux} %</td>
+                    <td colSpan={suiviLivraison ? 5 : 3} className="px-5 pt-3 text-right text-ge7-black/60">Sous-total {money(c.sous_total)} · Remise {c.remise.taux} %</td>
                     <td className="px-5 pt-3 text-right font-semibold text-emerald-700">− {money(c.remise.montant)}</td>
                     <td />
                   </tr>
                 )}
-                <tr><td colSpan={3} className="px-5 py-3 text-right font-bold">TOTAL</td><td className="px-5 py-3 text-right text-lg font-extrabold text-ge7-bronze">{money(c.total)}</td><td /></tr>
+                <tr><td colSpan={suiviLivraison ? 5 : 3} className="px-5 py-3 text-right font-bold">TOTAL</td><td className="px-5 py-3 text-right text-lg font-extrabold text-ge7-bronze">{money(c.total)}</td><td /></tr>
               </tfoot>
             </table>
           </Card>
           {c.note && <Card><CardHeader title="Note du client" /><p className="text-sm">{c.note}</p></Card>}
+
+          {/* Un bon de livraison par envoi : imprimable séparément. */}
+          {(c.bons_livraison?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader title={`Livraisons (${c.bons_livraison!.length})`} />
+              <ul className="divide-y divide-ge7-black/5">
+                {c.bons_livraison!.map((b) => (
+                  <li key={b.id} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
+                    <span className="font-semibold">{b.numero}</span>
+                    <span className="text-xs text-ge7-black/50">{b.livre_le ? datetime(b.livre_le) : ""}</span>
+                    <span className="min-w-0 flex-1 text-xs text-ge7-black/70">{b.lignes.map((x) => `${x.quantite} × ${x.designation}`).join(" · ")}</span>
+                    <Button size="sm" variant="secondary" onClick={() => setImpression(b.id)}><Printer size={14} /> Imprimer</Button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {envoi && (
+            <Modal
+              title="Mettre en livraison"
+              subtitle="Quantité à envoyer maintenant pour chaque produit. Seule cette quantité sort du stock ; le reste sera livré plus tard."
+              size="lg"
+              onClose={() => setEnvoi(null)}
+              footer={
+                <>
+                  <Button variant="secondary" onClick={() => setEnvoi(null)}>Annuler</Button>
+                  <Button
+                    loading={livraisonPartielle.isPending}
+                    disabled={!Object.values(envoi).some((v) => Number(v.replace(",", ".")) > 0)}
+                    onClick={async () => {
+                      const lignes = c.lignes
+                        .map((l) => ({ id: l.id, quantite: Number((envoi[l.id] ?? "").replace(",", ".")) || 0, l }))
+                        .filter((x) => x.quantite > 0);
+                      const ok = await confirmer({
+                        titre: "Enregistrer la livraison ?",
+                        message: (
+                          <>
+                            Ces quantités sortent du stock et un bon de livraison est créé :
+                            <ul className="mt-2 list-disc pl-5">
+                              {lignes.map((x) => <li key={x.id}>{x.quantite} {x.l.unite ?? ""} de « {x.l.designation} » (reste ensuite {Math.max(0, x.l.reste - x.quantite)})</li>)}
+                            </ul>
+                          </>
+                        ),
+                        bouton: "Livrer",
+                        danger: false,
+                      });
+                      if (ok) livraisonPartielle.mutateAsync({ lignes: lignes.map(({ id, quantite }) => ({ id, quantite })) }).then(() => setEnvoi(null)).catch(() => {});
+                    }}
+                  >
+                    <PackageCheck size={16} /> Enregistrer la livraison
+                  </Button>
+                </>
+              }
+            >
+              <div className="space-y-2">
+                {c.lignes.map((l) => {
+                  const saisie = envoi[l.id] ?? "";
+                  const q = Number(saisie.replace(",", ".")) || 0;
+                  const tropReste = q > l.reste;
+                  const tropStock = q > l.stock_disponible;
+                  return (
+                    <div key={l.id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-ge7-cream px-3 py-2.5 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">{l.designation}</p>
+                        <p className="text-xs text-ge7-black/60">
+                          commandé {l.quantite} · livré {l.quantite_livree} · <strong>reste {l.reste}</strong> · stock {l.stock_disponible} {l.unite ?? ""}
+                        </p>
+                        {tropReste && <p className="text-xs font-semibold text-rose-600">Plus que le reste à livrer ({l.reste}).</p>}
+                        {!tropReste && tropStock && <p className="text-xs font-semibold text-rose-600">Stock insuffisant : il n'y a que {l.stock_disponible} en stock.</p>}
+                      </div>
+                      {l.reste > 0 ? (
+                        <span className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            min={0}
+                            max={l.reste}
+                            step="any"
+                            inputMode="decimal"
+                            placeholder="Qté"
+                            aria-label={`Quantité à livrer de ${l.designation}`}
+                            value={saisie}
+                            onChange={(e) => setEnvoi({ ...envoi, [l.id]: e.target.value })}
+                            className={`w-24 rounded-lg border px-2 py-1.5 text-right text-sm font-semibold focus:border-ge7-gold focus:outline-none ${tropReste || tropStock ? "border-rose-400" : "border-ge7-black/15"}`}
+                          />
+                          <button type="button" onClick={() => setEnvoi({ ...envoi, [l.id]: String(Math.min(l.reste, Math.max(0, l.stock_disponible))) })} className="text-xs font-semibold text-ge7-purple hover:underline">Tout</button>
+                        </span>
+                      ) : (
+                        <Badge tone="green">livré</Badge>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Modal>
+          )}
 
           {c.statut === "en_livraison" && (
             <Card padded={false}>

@@ -63,9 +63,16 @@ class NumerotationService
 
         for ($essai = 0; $essai < 10000; $essai++) {
             $numero = $format($this->sequence($type, $annee));
-            if (! $table || ! DB::table($table)->where($colonne, $numero)->exists()) {
-                return $numero;
+            if ($table && DB::table($table)->where($colonne, $numero)->exists()) {
+                continue;
             }
+            // Ventes : la facture porte le même n° (VNT-2026-00012 → FAC-00012-2026),
+            // série commune caisse / commandes en ligne : ce n° de facture doit être libre.
+            if ($type === 'VNT' && DB::table('factures')->where('numero', self::affichage($numero, ['VNT' => 'FAC']))->exists()) {
+                continue;
+            }
+
+            return $numero;
         }
 
         throw new \RuntimeException("Aucun numéro libre trouvé pour le type {$type}.");
@@ -91,6 +98,20 @@ class NumerotationService
      * Numéro des ventes, proformas et bons d'achat, enregistré « année d'abord »
      * (VNT-2026-00028) et affiché VNT-00028-2026. Repart à 1 chaque année.
      */
+    /**
+     * N° de vente et n° de facture d'une commande en ligne, pris dans la même
+     * série que les factures de la caisse : après la vente VNT-2026-00011
+     * (facture FAC-00011-2026), la commande validée reçoit FAC-00012-2026.
+     *
+     * @return array{vente: string, facture: string}
+     */
+    public function venteEtFacture(?int $annee = null): array
+    {
+        $vente = $this->nextAnneeDabord('VNT', $annee);
+
+        return ['vente' => $vente, 'facture' => self::affichage($vente, ['VNT' => 'FAC'])];
+    }
+
     public function nextAnneeDabord(string $type, ?int $annee = null): string
     {
         $annee ??= (int) now()->format('Y');

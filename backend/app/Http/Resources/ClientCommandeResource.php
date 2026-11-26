@@ -57,6 +57,9 @@ class ClientCommandeResource extends JsonResource
                 'inconnu' => $l->produit_id === null,
                 'prix_unitaire' => $prix ? (int) $l->prix_unitaire : null,
                 'quantite' => (float) $l->quantite,
+                // Suivi des envois : déjà livré et reste à livrer.
+                'quantite_livree' => (float) $l->quantite_livree,
+                'reste' => $l->reste(),
                 'total_ligne' => $prix ? (int) $l->total_ligne : null,
                 'unite' => $l->produit?->unit?->symbol,
             ]),
@@ -101,6 +104,12 @@ class ClientCommandeResource extends JsonResource
                 'livre_le' => $this->bonLivraison->livre_le?->toIso8601String(),
                 'receptionnaire' => $this->bonLivraison->receptionnaire,
             ] : null,
+            // Tous les bons de livraison (un par envoi), avec les quantités envoyées.
+            'bons_livraison' => $this->whenLoaded('bonsLivraison', fn () => $this->bonsLivraison->map(fn ($b) => [
+                'numero' => $b->numero,
+                'livre_le' => $b->livre_le?->toIso8601String(),
+                'lignes' => $b->lignes->map(fn ($x) => ['designation' => $x->designation, 'quantite' => (float) $x->quantite])->values(),
+            ])->values(), []),
             'annotations' => $this->annotations->map(fn ($a) => [
                 'id' => $a->id,
                 'auteur' => $a->auteur,

@@ -243,7 +243,7 @@ class EspaceClientController extends Controller
 
     private function charger(Commande $commande): Commande
     {
-        return $commande->refresh()->load(['lignes.produit.unit', 'historique', 'annotations', 'chauffeur', 'livraison', 'facture.paiements', 'extras', 'bonLivraison']);
+        return $commande->refresh()->load(['lignes.produit.unit', 'historique', 'annotations', 'chauffeur', 'livraison', 'facture.paiements', 'extras', 'bonLivraison', 'bonsLivraison.lignes']);
     }
 
     /**

@@ -101,6 +101,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('commandes/{commande}/solder', [CommandeController::class, 'solder']);
     Route::post('commandes/{commande}/refuser', [CommandeController::class, 'refuser']);
     Route::post('commandes/{commande}/preparer', [CommandeController::class, 'preparer']);
+    Route::post('commandes/{commande}/livraison-partielle', [CommandeController::class, 'livrerPartiel']);
     Route::post('commandes/{commande}/affecter', [CommandeController::class, 'affecter']);
     Route::post('commandes/{commande}/demarrer', [CommandeController::class, 'demarrer']);
     Route::post('commandes/{commande}/position', [CommandeController::class, 'position']);

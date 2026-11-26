@@ -7,6 +7,16 @@ import { GE7_COMPANY } from "@/features/shared/companyInfo";
 import { useCart } from "./cart";
 import { useEstClient, useProfilClient } from "./espaceClient";
 
+/** Pastille de notification rouge avec le nombre (rien à zéro). */
+function Pastille({ n }: { n?: number }) {
+  if (!n) return null;
+  return (
+    <span className="grid min-w-5 place-items-center rounded-full bg-rose-600 px-1.5 text-[11px] font-bold leading-5 text-white shadow" aria-label={`${n} commande(s) en cours`}>
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
+
 /**
  * Layout de la boutique publique, visible par tous, sans compte.
  * L'espace personnel reste derrière le bouton « Connexion ».
@@ -29,10 +39,11 @@ export function ShopLayout() {
 
   // Compte client connecté : espace commande sans prix + ses commandes (avec
   // nouveautés) à la place de la boutique publique et du suivi par numéro.
-  const links = estClient
+  // Pastille rouge : nombre de commandes en cours (pas encore entièrement livrées).
+  const links: { to: string; label: string; end: boolean; pastille?: number }[] = estClient
     ? [
         { to: "/mon-compte/commander", label: "Commander", end: true },
-        { to: "/mon-compte/commandes", label: `Mes commandes${enCours ? ` (${enCours})` : ""}`, end: false },
+        { to: "/mon-compte/commandes", label: "Mes commandes", end: false, pastille: enCours },
         { to: "/mon-compte/documents", label: "Mes documents", end: false },
       ]
     : [
@@ -83,10 +94,11 @@ export function ShopLayout() {
                 to={l.to}
                 end={l.end}
                 className={({ isActive }) =>
-                  `rounded-full px-3.5 py-2 text-sm font-semibold transition ${isActive ? "bg-ge7-gold/20 text-ge7-gold-light" : "text-white/70 hover:text-white"}`
+                  `relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition ${isActive ? "bg-ge7-gold/20 text-ge7-gold-light" : "text-white/70 hover:text-white"}`
                 }
               >
                 {l.label}
+                <Pastille n={l.pastille} />
               </NavLink>
             ))}
           </nav>
@@ -102,8 +114,10 @@ export function ShopLayout() {
 
           {compte}
 
-          <button onClick={() => setMenu((m) => !m)} className="rounded-full p-2.5 text-white/80 hover:bg-white/10 md:hidden">
+          <button onClick={() => setMenu((m) => !m)} className="relative rounded-full p-2.5 text-white/80 hover:bg-white/10 md:hidden">
             {menu ? <X size={21} /> : <Menu size={21} />}
+            {/* Menu replié (mobile) : la pastille reste visible sur le bouton. */}
+            {!menu && estClient && enCours > 0 && <span className="absolute right-1 top-1 size-2.5 rounded-full bg-rose-600 ring-2 ring-[#151515]" />}
           </button>
         </div>
 
@@ -127,10 +141,11 @@ export function ShopLayout() {
                   end={l.end}
                   onClick={() => setMenu(false)}
                   className={({ isActive }) =>
-                    `rounded-xl px-3.5 py-2.5 text-sm font-semibold ${isActive ? "bg-ge7-gold/20 text-ge7-gold-light" : "text-white/75"}`
+                    `flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold ${isActive ? "bg-ge7-gold/20 text-ge7-gold-light" : "text-white/75"}`
                   }
                 >
                   {l.label}
+                  <Pastille n={l.pastille} />
                 </NavLink>
               ))}
               {estClient ? (

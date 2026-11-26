@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-#[Fillable(['numero', 'client_id', 'user_id', 'zone_id', 'nom_livraison', 'telephone_livraison', 'ville', 'quartier', 'point_repere', 'note', 'total', 'statut', 'motif', 'validee_par', 'validee_le', 'chauffeur_id', 'remise_taux_demande', 'remise_motif', 'remise_statut', 'remise_taux', 'remise_montant', 'client_vu_le'])]
+#[Fillable(['numero', 'client_id', 'user_id', 'zone_id', 'nom_livraison', 'telephone_livraison', 'ville', 'quartier', 'point_repere', 'note', 'total', 'statut', 'stock_a_la_livraison', 'motif', 'validee_par', 'validee_le', 'chauffeur_id', 'remise_taux_demande', 'remise_motif', 'remise_statut', 'remise_taux', 'remise_montant', 'client_vu_le'])]
 class Commande extends Model
 {
     /** @use HasFactory<CommandeFactory> */
@@ -22,6 +22,7 @@ class Commande extends Model
     {
         return [
             'statut' => StatutCommande::class,
+            'stock_a_la_livraison' => 'boolean',
             'validee_le' => 'datetime',
             'client_vu_le' => 'datetime',
             'remise_taux_demande' => 'float',
@@ -72,10 +73,16 @@ class Commande extends Model
         return $this->hasOne(Facture::class);
     }
 
-    /** Bon de livraison créé à la confirmation de la livraison. */
+    /** Dernier bon de livraison émis (un par envoi). */
     public function bonLivraison(): HasOne
     {
-        return $this->hasOne(BonLivraison::class);
+        return $this->hasOne(BonLivraison::class)->latestOfMany();
+    }
+
+    /** Tous les bons de livraison, un par envoi (livraisons partielles). */
+    public function bonsLivraison(): HasMany
+    {
+        return $this->hasMany(BonLivraison::class)->orderBy('id');
     }
 
     public function livraison(): HasOne

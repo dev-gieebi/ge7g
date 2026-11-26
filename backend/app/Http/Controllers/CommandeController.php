@@ -34,7 +34,7 @@ class CommandeController extends Controller
     private const DELIVER_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CHAUFFEUR'];
 
     /** Relations de la fiche commande complète (détail, frais, annotations). */
-    private const DETAIL = ['lignes.produit.unit', 'historique.user', 'chauffeur', 'valideur', 'facture.paiements', 'facture.avoir', 'livraison', 'extras', 'annotations.user', 'compte', 'bonLivraison'];
+    private const DETAIL = ['lignes.produit.unit', 'historique.user', 'chauffeur', 'valideur', 'facture.paiements', 'facture.avoir', 'livraison', 'extras', 'annotations.user', 'compte', 'bonLivraison', 'bonsLivraison.lignes'];
 
     public function __construct(private readonly CommandeService $service) {}
 
@@ -239,6 +239,27 @@ class CommandeController extends Controller
         $this->authorizeUser($request, self::MANAGE_ROLES);
 
         return new CommandeResource($this->service->preparer($commande, $request->user())->load('historique.user'));
+    }
+
+    /**
+     * Livraison partielle d'une commande en préparation : quantité envoyée
+     * par ligne, déduite du stock réel (refusée si le stock manque).
+     */
+    public function livrerPartiel(Request $request, Commande $commande): CommandeResource
+    {
+        $this->authorizeUser($request, self::MANAGE_ROLES);
+
+        $validated = $request->validate([
+            'lignes' => 'required|array|min:1|max:100',
+            'lignes.*.id' => 'required|integer',
+            'lignes.*.quantite' => 'required|numeric|min:0',
+        ]);
+
+        $quantites = collect($validated['lignes'])->mapWithKeys(fn (array $l) => [(int) $l['id'] => (float) $l['quantite']])->all();
+
+        $commande = $this->service->livrerPartiel($commande, $quantites, $request->user());
+
+        return new CommandeResource($commande->refresh()->load(self::DETAIL));
     }
 
     /** Affectation d'un chauffeur, uniquement après validation de la commande. */

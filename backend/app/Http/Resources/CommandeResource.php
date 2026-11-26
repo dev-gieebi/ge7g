@@ -62,6 +62,9 @@ class CommandeResource extends JsonResource
                 'precision' => $l->precision,
                 'prix_unitaire' => (int) $l->prix_unitaire,
                 'quantite' => (float) $l->quantite,
+                // Livraisons partielles : déjà livré et reste à livrer.
+                'quantite_livree' => (float) $l->quantite_livree,
+                'reste' => $l->reste(),
                 'total_ligne' => (int) $l->total_ligne,
                 'unite' => $l->produit?->unit?->symbol,
                 'stock_disponible' => $l->produit ? (float) $l->produit->stock_quantity - (float) $l->produit->reserved_quantity : 0,
@@ -83,6 +86,19 @@ class CommandeResource extends JsonResource
                 'numero' => $this->bonLivraison->numero,
                 'livre_le' => $this->bonLivraison->livre_le?->toIso8601String(),
             ] : null,
+            // Un bon de livraison par envoi (livraisons partielles).
+            'bons_livraison' => $this->whenLoaded('bonsLivraison', fn () => $this->bonsLivraison->map(fn ($b) => [
+                'id' => $b->id,
+                'numero' => $b->numero,
+                'livre_le' => $b->livre_le?->toIso8601String(),
+                'montant_total' => (int) $b->montant_total,
+                'lignes' => $b->lignes->map(fn ($x) => [
+                    'designation' => $x->designation,
+                    'quantite' => (float) $x->quantite,
+                    'prix_unitaire' => (int) $x->prix_unitaire,
+                    'total_ligne' => (int) $x->total_ligne,
+                ])->values(),
+            ])->values(), []),
             'livraison' => $this->livraison ? [
                 'depart_le' => $this->livraison->depart_le?->toIso8601String(),
                 'livree_le' => $this->livraison->livree_le?->toIso8601String(),

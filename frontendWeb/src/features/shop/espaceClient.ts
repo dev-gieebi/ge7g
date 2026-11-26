@@ -69,9 +69,14 @@ export interface CommandeClient {
     inconnu: boolean;
     prix_unitaire: number | null;
     quantite: number;
+    /** Livraisons partielles : quantité déjà livrée et reste à livrer. */
+    quantite_livree: number;
+    reste: number;
     total_ligne: number | null;
     unite: string | null;
   }[];
+  /** Un bon de livraison par envoi, avec les quantités envoyées. */
+  bons_livraison: { numero: string; livre_le: string | null; lignes: { designation: string; quantite: number }[] }[];
   sous_total: number | null;
   remise: Remise;
   total: number | null;
@@ -146,5 +151,5 @@ export function useEstClient() {
 /** Profil du client connecté (ville d'accès, nouveautés), rafraîchi chaque minute. */
 export function useProfilClient() {
   const estClient = useEstClient();
-  return useQuery({ queryKey: ["client", "profil"], queryFn: clientApi.profil, enabled: estClient, refetchInterval: 300_000 });
+  return useQuery({ queryKey: ["client", "profil"], queryFn: clientApi.profil, enabled: estClient, refetchInterval: 60_000 });
 }

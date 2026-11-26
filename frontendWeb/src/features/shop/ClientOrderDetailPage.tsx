@@ -47,6 +47,26 @@ export function documentCommande(c: CommandeClient, bl: boolean): PosSale {
   };
 }
 
+/** Bon de livraison d'un envoi (livraison partielle) : seulement les quantités envoyées. */
+function documentBon(c: CommandeClient, bon: CommandeClient["bons_livraison"][number]): PosSale {
+  const base = documentCommande(c, true);
+  const items = bon.lignes.map((x, i) => {
+    const ligne = c.lignes.find((l) => l.designation === x.designation);
+    const pu = ligne?.prix_unitaire ?? 0;
+    return {
+      id: i,
+      product: { name: x.designation, type: null, unit: ligne?.unite ? { symbol: ligne.unite } : undefined },
+      quantity: x.quantite,
+      delivered_quantity: x.quantite,
+      remaining_quantity: 0,
+      unit_price: pu,
+      total: Math.round(pu * x.quantite),
+    };
+  });
+  const total = items.reduce((t, x) => t + x.total, 0);
+  return { ...base, number: bon.numero, created_at: bon.livre_le ?? base.created_at, items: items as PosSale["items"], subtotal: total, discount_rate: 0, total };
+}
+
 /** Suivi d'une commande dans l'espace client, comme le suivi en ligne, avec annotations, facture et bon de livraison. */
 export function ClientOrderDetailPage() {
   const { id } = useParams();
@@ -54,7 +74,8 @@ export function ClientOrderDetailPage() {
   const nouvelle = (location.state as { nouvelle?: boolean } | null)?.nouvelle;
   const qc = useQueryClient();
   const notify = useToast();
-  const [doc, setDoc] = useState<"facture" | "bl" | null>(null);
+  // Document affiché : facture, dernier BL, ou BL d'un envoi précis (« bl:BL-00003-2026 »).
+  const [doc, setDoc] = useState<string | null>(null);
   // Ajout de produits tant que la commande est en attente de validation.
   const [ajout, setAjout] = useState<LigneLocale[] | null>(null);
 
@@ -83,8 +104,9 @@ export function ClientOrderDetailPage() {
   if (isLoading) return <Loading />;
   if (isError || !c) return <ErrorState message="Commande introuvable." />;
 
-  if ((doc === "bl" && c.bon_livraison) || (doc === "facture" && c.facture)) {
-    const estBl = doc === "bl";
+  const bonChoisi = doc?.startsWith("bl:") ? c.bons_livraison?.find((b) => b.numero === doc.slice(3)) : undefined;
+  if (bonChoisi || (doc === "bl" && c.bon_livraison) || (doc === "facture" && c.facture)) {
+    const estBl = doc !== "facture";
     return (
       <>
         <div className="no-print mb-4 flex flex-wrap items-center gap-2">
@@ -92,7 +114,7 @@ export function ClientOrderDetailPage() {
           <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-full bg-ge7-gold px-4 py-2 text-sm font-bold text-ge7-black"><Printer size={15} /> Imprimer / PDF</button>
         </div>
         <Facture
-          sale={documentCommande(c, estBl)}
+          sale={bonChoisi ? documentBon(c, bonChoisi) : documentCommande(c, estBl)}
           originLabel={`Commande : ${c.numero}`}
           docTitle={estBl ? "BON DE LIVRAISON" : "FACTURE"}
           solde={!estBl && !!c.facture?.soldee_le}
@@ -140,7 +162,7 @@ export function ClientOrderDetailPage() {
       {valideeOuPlus && c.statut !== "livree" && (
         <div className="mt-4 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           <CircleCheckBig size={18} className="mt-0.5 shrink-0" />
-          <p><strong>Commande validée{c.validee_le ? ` le ${datetime(c.validee_le)}` : ""}.</strong> Les produits sont disponibles et réservés pour vous ; la livraison est en cours d'organisation.</p>
+          <p><strong>Commande validée{c.validee_le ? ` le ${datetime(c.validee_le)}` : ""}.</strong> La livraison est en cours d'organisation : elle peut se faire en plusieurs envois, que vous suivez ci-dessous.</p>
         </div>
       )}
 
@@ -207,6 +229,13 @@ export function ClientOrderDetailPage() {
                   {l.designation} ({l.quantite}{l.unite ? ` ${l.unite}` : ""})
                   {l.inconnu && <span className="ml-1.5 rounded-full bg-ge7-gold-soft px-2 py-0.5 text-[10px] font-bold uppercase text-ge7-bronze">Recherche en cours</span>}
                   {l.precision && <span className="block text-xs text-ge7-black/50">{l.precision}</span>}
+                  {/* Suivi des envois : livré et reste à livrer. */}
+                  {valideeOuPlus && (
+                    <span className="block text-xs">
+                      <span className="font-semibold text-emerald-700">livré {l.quantite_livree}</span>
+                      {l.reste > 0 && <span className="font-semibold text-amber-700"> · reste {l.reste}</span>}
+                    </span>
+                  )}
                 </span>
                 {prix && <span className="shrink-0 font-semibold">{money(l.total_ligne ?? 0)}</span>}
               </li>
@@ -252,6 +281,26 @@ export function ClientOrderDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Chaque envoi (livraison partielle) avec son bon de livraison. */}
+      {(c.bons_livraison?.length ?? 0) > 0 && (
+        <div className="mt-5 rounded-2xl border border-ge7-black/10 bg-white p-5">
+          <p className="mb-3 flex items-center gap-2 text-sm font-bold"><Truck size={16} className="text-ge7-bronze" /> Livraisons ({c.bons_livraison.length})</p>
+          <ul className="divide-y divide-ge7-black/5">
+            {c.bons_livraison.map((b) => (
+              <li key={b.numero} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
+                <span className="min-w-0 flex-1">
+                  <span className="font-semibold">{b.livre_le ? datetime(b.livre_le) : ""}</span>
+                  <span className="block text-xs text-ge7-black/60">{b.lignes.map((x) => `${x.quantite} × ${x.designation}`).join(" · ")}</span>
+                </span>
+                <button onClick={() => setDoc(`bl:${b.numero}`)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-ge7-purple hover:underline">
+                  <FileText size={13} /> {b.numero}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Grande fenêtre d'ajout : catalogue à gauche, produits à ajouter à droite. */}
       {ajout && (

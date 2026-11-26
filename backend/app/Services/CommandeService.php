@@ -368,18 +368,22 @@ class CommandeService
 
             $this->transition($commande, StatutCommande::Validee, $admin, null, false);
 
+            // Le stock doit exister, mais il ne sort qu'à la livraison (envoi
+            // par envoi) : la validation ne déduit rien.
             foreach ($commande->lignes as $ligne) {
-                $this->stock->deduire($ligne->produit_id, (float) $ligne->quantite, $commande, $admin);
+                $this->stock->verifier($ligne->produit_id, (float) $ligne->quantite);
             }
+            $commande->stock_a_la_livraison = true;
 
-            $facture = $this->factures->creerDepuisCommande($commande, $admin);
+            // Facture et vente dans la série commune avec la caisse.
+            $numeros = $this->numerotation->venteEtFacture();
+            $facture = $this->factures->creerDepuisCommande($commande, $admin, $numeros['facture']);
 
             // Vente rattachée à la facture, source boutique, non payée,
-            // encaissée à la livraison. Le stock est déjà sorti : les lignes
-            // sont marquées livrées pour ne pas fausser le suivi des reliquats.
+            // encaissée à la livraison. Rien n'est encore livré : les
+            // quantités livrées suivent les envois.
             $vente = PosSale::create([
-                // Même séquence annuelle que les ventes de caisse.
-                'number' => $this->numerotation->nextAnneeDabord('VNT'),
+                'number' => $numeros['vente'],
                 'user_id' => $admin->id,
                 'zone_id' => $commande->zone_id,
                 'customer_name' => $commande->nom_livraison,
@@ -401,7 +405,7 @@ class CommandeService
                 $vente->items()->create([
                     'product_id' => $ligne->produit_id,
                     'quantity' => $ligne->quantite,
-                    'delivered_quantity' => $ligne->quantite,
+                    'delivered_quantity' => 0,
                     'unit_price' => $ligne->prix_unitaire,
                     'total' => $ligne->total_ligne,
                 ]);
@@ -427,6 +431,105 @@ class CommandeService
     public function preparer(Commande $commande, User $admin): Commande
     {
         return $this->changer($commande, StatutCommande::EnPreparation, $admin, null);
+    }
+
+    /**
+     * Livraison partielle (commande en préparation) : quantités envoyées par
+     * ligne (`$quantites` : id de ligne => quantité). Chaque quantité est
+     * bornée au reste à livrer et sort du stock réel, refusée si le stock
+     * n'existe pas. Un bon de livraison est créé pour l'envoi ; quand tout
+     * est livré, la commande passe en « Livrée ».
+     *
+     * @param  array<int, float>  $quantites
+     */
+    public function livrerPartiel(Commande $commande, array $quantites, User $user): Commande
+    {
+        return DB::transaction(function () use ($commande, $quantites, $user) {
+            $commande = Commande::lockForUpdate()->with('lignes', 'facture')->findOrFail($commande->id);
+
+            if ($commande->statut !== StatutCommande::EnPreparation) {
+                throw ValidationException::withMessages([
+                    'statut' => "La livraison se fait une fois la commande en préparation (statut : {$commande->statut->libelle()}).",
+                ]);
+            }
+
+            $quantites = array_filter(array_map('floatval', $quantites), fn (float $q) => $q > 0);
+            if ($quantites === []) {
+                throw ValidationException::withMessages(['lignes' => 'Indiquez au moins une quantité à livrer.']);
+            }
+
+            foreach ($quantites as $ligneId => $quantite) {
+                $ligne = $commande->lignes->firstWhere('id', (int) $ligneId);
+                if (! $ligne) {
+                    throw ValidationException::withMessages(['lignes' => 'Ligne de commande inconnue.']);
+                }
+                if ($quantite > $ligne->reste() + 0.0001) {
+                    throw ValidationException::withMessages([
+                        'lignes' => '« '.$ligne->designation.' » : '.StockService::nombre($quantite).' demandé(s), il ne reste que '.StockService::nombre($ligne->reste()).' à livrer.',
+                    ]);
+                }
+            }
+
+            $livraison = $commande->livraisons()->create([
+                'chauffeur_id' => $commande->chauffeur_id,
+                'depart_le' => now(),
+                'livree_le' => now(),
+            ]);
+
+            $this->enregistrerEnvoi($commande, $quantites, $livraison, $user);
+
+            $commande->refresh()->load('lignes');
+            if ($commande->lignes->every(fn (CommandeLigne $l) => $l->reste() <= 0.0001)) {
+                $this->transition($commande, StatutCommande::Livree, $user, 'Toute la commande est livrée.', false);
+                $commande->save();
+            }
+
+            $this->notifications->statutCommande($commande);
+
+            return $commande;
+        });
+    }
+
+    /**
+     * Enregistre un envoi : sortie du stock (commandes dont le stock sort à
+     * la livraison), quantités livrées sur les lignes et la vente, bon de
+     * livraison de l'envoi et ligne d'historique visible par le client.
+     *
+     * @param  array<int, float>  $quantites  id de ligne => quantité envoyée
+     */
+    private function enregistrerEnvoi(Commande $commande, array $quantites, Livraison $livraison, User $user): void
+    {
+        $vente = $commande->facture?->vente;
+        $details = [];
+
+        foreach ($commande->lignes as $ligne) {
+            $quantite = (float) ($quantites[$ligne->id] ?? 0);
+            if ($quantite <= 0) {
+                continue;
+            }
+
+            if ($commande->stock_a_la_livraison && $ligne->produit_id) {
+                $this->stock->deduire($ligne->produit_id, $quantite, $commande, $user, 'Livraison commande '.$commande->numero);
+            }
+
+            $ligne->quantite_livree = (float) $ligne->quantite_livree + $quantite;
+            $ligne->save();
+
+            if ($vente && $ligne->produit_id) {
+                $item = $vente->items()->where('product_id', $ligne->produit_id)->first();
+                if ($item) {
+                    $item->delivered_quantity = min((float) $item->quantity, (float) $item->delivered_quantity + $quantite);
+                    $item->save();
+                }
+            }
+
+            $unite = $ligne->produit?->unit?->symbol;
+            $details[] = StockService::nombre($quantite).($unite ? ' '.$unite : '').' de '.$ligne->designation.' (reste '.StockService::nombre($ligne->reste()).')';
+        }
+
+        $bon = $this->factures->creerBonLivraison($commande, $livraison, $user, $quantites);
+
+        $this->historiser($commande, null, $commande->statut, $user, 'Livraison '.$bon->numero.' : '.implode(', ', $details).'.');
     }
 
     /**
@@ -586,8 +689,16 @@ class CommandeService
                 }
             }
 
-            // Bon de livraison généré automatiquement, numéroté comme les factures.
-            $this->factures->creerBonLivraison($commande, $livraison, $user);
+            // Tout le reste à livrer part avec cette livraison : sortie du stock
+            // (refusée si le stock réel manque) et bon de livraison de l'envoi.
+            $commande->load('lignes', 'facture');
+            $restes = $commande->lignes
+                ->mapWithKeys(fn (CommandeLigne $l) => [$l->id => $l->reste()])
+                ->filter(fn (float $q) => $q > 0)
+                ->all();
+            if ($restes !== []) {
+                $this->enregistrerEnvoi($commande, $restes, $livraison, $user);
+            }
 
             $this->marquerStatutChauffeur($livraison->chauffeur_id, 'DISPONIBLE');
             $this->notifications->statutCommande($commande);
@@ -623,8 +734,13 @@ class CommandeService
                     $vente->save();
                 }
 
+                // Seul ce qui est sorti du stock y revient : les quantités livrées
+                // (ou toute la commande pour les anciennes, déduites à la validation).
                 foreach ($commande->lignes as $ligne) {
-                    $this->stock->remettre($ligne->produit_id, (float) $ligne->quantite, $commande, $admin);
+                    $sorti = $commande->stock_a_la_livraison ? (float) $ligne->quantite_livree : (float) $ligne->quantite;
+                    if ($sorti > 0) {
+                        $this->stock->remettre($ligne->produit_id, $sorti, $commande, $admin);
+                    }
                 }
             }
 

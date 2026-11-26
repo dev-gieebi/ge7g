@@ -663,6 +663,9 @@ export interface CommandeLigne {
   precision?: string | null;
   prix_unitaire: number;
   quantite: number;
+  /** Livraisons partielles : quantité déjà livrée (sortie du stock) et reste à livrer. */
+  quantite_livree: number;
+  reste: number;
   total_ligne: number;
   unite: string | null;
   stock_disponible: number;
@@ -675,6 +678,14 @@ export interface CommandeHistoriqueItem {
   user: string;
   commentaire: string | null;
   created_at: string;
+}
+
+export interface BonLivraisonCommande {
+  id: number;
+  numero: string;
+  livre_le: string | null;
+  montant_total: number;
+  lignes: { designation: string; quantite: number; prix_unitaire: number; total_ligne: number }[];
 }
 
 export interface CommandeDetail {
@@ -699,6 +710,8 @@ export interface CommandeDetail {
   };
   /** Bon de livraison généré automatiquement à la confirmation de la livraison. */
   bon_livraison?: { id: number; numero: string; livre_le: string | null } | null;
+  /** Un bon de livraison par envoi (livraisons partielles), avec les quantités envoyées. */
+  bons_livraison?: BonLivraisonCommande[];
   /** Compte CLIENT ayant passé la commande (espace client). */
   compte_client?: { id: number; nom: string; code: string } | null;
   annotations?: { id: number; auteur: "client" | "equipe"; nom: string; contenu: string; created_at: string }[];

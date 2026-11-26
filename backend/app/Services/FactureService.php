@@ -23,9 +23,20 @@ class FactureService
      * (comme la facture), réceptionnaire et signature recueillis par le
      * chauffeur. À appeler dans la transaction de livraison.
      */
-    public function creerBonLivraison(Commande $commande, Livraison $livraison, User $user): BonLivraison
+    /**
+     * Bon de livraison d'un envoi : seulement les quantités envoyées
+     * (`$quantites` : id de ligne => quantité). Sans `$quantites`, toutes les
+     * lignes de la commande (livraison en une fois).
+     *
+     * @param  array<int, float>|null  $quantites
+     */
+    public function creerBonLivraison(Commande $commande, Livraison $livraison, User $user, ?array $quantites = null): BonLivraison
     {
         $commande->loadMissing(['lignes', 'facture']);
+
+        $lignes = $commande->lignes
+            ->map(fn ($l) => ['ligne' => $l, 'quantite' => $quantites === null ? (float) $l->quantite : (float) ($quantites[$l->id] ?? 0)])
+            ->filter(fn ($x) => $x['quantite'] > 0);
 
         $bon = BonLivraison::create([
             'numero' => $this->numerotation->next('BL'),
@@ -33,20 +44,22 @@ class FactureService
             'facture_id' => $commande->facture?->id,
             'client_id' => $commande->client_id,
             'livraison_id' => $livraison->id,
-            'montant_total' => $commande->facture?->montant_total ?? $commande->total,
+            'montant_total' => $quantites === null
+                ? ($commande->facture?->montant_total ?? $commande->total)
+                : (int) round($lignes->sum(fn ($x) => $x['quantite'] * (int) $x['ligne']->prix_unitaire)),
             'receptionnaire' => $livraison->receptionnaire,
             'signature' => $livraison->signature,
             'user_id' => $user->id,
             'livre_le' => $livraison->livree_le ?? now(),
         ]);
 
-        foreach ($commande->lignes as $ligne) {
+        foreach ($lignes as $x) {
             $bon->lignes()->create([
-                'produit_id' => $ligne->produit_id,
-                'designation' => $ligne->designation,
-                'prix_unitaire' => $ligne->prix_unitaire,
-                'quantite' => $ligne->quantite,
-                'total_ligne' => $ligne->total_ligne,
+                'produit_id' => $x['ligne']->produit_id,
+                'designation' => $x['ligne']->designation,
+                'prix_unitaire' => $x['ligne']->prix_unitaire,
+                'quantite' => $x['quantite'],
+                'total_ligne' => (int) round($x['quantite'] * (int) $x['ligne']->prix_unitaire),
             ]);
         }
 
@@ -56,11 +69,12 @@ class FactureService
     /**
      * Crée la facture de la commande : lignes aux prix figés, montant total,
      * statut `non_payee`. À appeler dans la transaction de validation.
+     * `$numero` : n° de la série commune caisse / en ligne (FAC-00012-2026).
      */
-    public function creerDepuisCommande(Commande $commande, User $admin): Facture
+    public function creerDepuisCommande(Commande $commande, User $admin, ?string $numero = null): Facture
     {
         $facture = Facture::create([
-            'numero' => $this->numerotation->next('FAC'),
+            'numero' => $numero ?? $this->numerotation->next('FAC'),
             'commande_id' => $commande->id,
             'client_id' => $commande->client_id,
             'montant_total' => $commande->total,
