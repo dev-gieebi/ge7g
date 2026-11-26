@@ -435,6 +435,8 @@ export interface PosProduct {
 }
 
 export interface PosSale {
+  /** Clé opaque de l'adresse (URL) à la place de l'identifiant. */
+  cle?: string;
   id: number;
   number: string;
   cashier?: Pick<User, "id" | "name">;
@@ -476,6 +478,8 @@ export interface QuoteItem {
 }
 
 export interface Quote {
+  /** Clé opaque de l'adresse (URL) à la place de l'identifiant. */
+  cle?: string;
   id: number;
   number: string;
   creator?: Pick<User, "id" | "name">;
@@ -534,12 +538,12 @@ export interface EtatStockLigne {
   stock_initial: number;
   entrees: number;
   sorties: number;
-  mouvements_nets: number;
   stock_theorique: number;
   stock_minimum: number;
   alerte: "OK" | "À RÉAPPROVISIONNER" | "STOCK NÉGATIF";
   cout_unitaire: number;
-  valeur_stock: number;
+  /** Absente (null) pour l'approvisionneur : Direction et Super admin uniquement. */
+  valeur_stock: number | null;
   /** Prix de vente caisse (barème POS, sinon prix de base). */
   prix_vente: number;
   /** Barème boutique par ville (« Toutes villes » si zone nulle). */
@@ -636,6 +640,8 @@ export type StatutCommande =
 
 /** Ligne de la liste back-office des commandes boutique. */
 export interface CommandeListItem {
+  /** Clé opaque de l'adresse (URL) à la place de l'identifiant. */
+  cle?: string;
   id: number;
   numero: string;
   statut: StatutCommande;
@@ -689,6 +695,8 @@ export interface BonLivraisonCommande {
 }
 
 export interface CommandeDetail {
+  /** Clé opaque de l'adresse (URL) à la place de l'identifiant. */
+  cle?: string;
   id: number;
   numero: string;
   statut: StatutCommande;

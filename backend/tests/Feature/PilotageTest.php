@@ -55,11 +55,23 @@ class PilotageTest extends TestCase
             'balance_after' => 8, 'reference_type' => 'PosSale', 'reference_id' => 1,
         ]);
 
+        // 2 retirés de la vente (vendus par erreur) : remis en stock, déduits des sorties.
+        StockMovement::create([
+            'product_id' => $produit->id, 'type' => 'RETOUR_ANNULATION', 'quantity' => 2,
+            'balance_after' => 10, 'reference_type' => 'PosSale', 'reference_id' => 1,
+        ]);
+        StockMovement::create([
+            'product_id' => $produit->id, 'type' => 'VENTE', 'quantity' => -2,
+            'balance_after' => 8, 'reference_type' => 'PosSale', 'reference_id' => 2,
+        ]);
+
         $res = $this->actingAs($cdg, 'api')->getJson('/api/reports/pilotage')->assertOk();
 
         $ligne = collect($res->json('data.etat_stock'))->firstWhere('product_id', $produit->id);
         $this->assertEquals(20, $ligne['entrees']);
+        // Sorties vendues : 12 + 2 vendus - 2 retirés.
         $this->assertEquals(12, $ligne['sorties']);
+        $this->assertArrayNotHasKey('mouvements_nets', $ligne);
         $this->assertEquals(8, $ligne['stock_theorique']);
         // Stock initial = théorique - entrées + sorties.
         $this->assertEquals(0, $ligne['stock_initial']);
@@ -169,11 +181,20 @@ class PilotageTest extends TestCase
 
     public function test_pilotage_reserve_a_la_direction_et_au_super_admin(): void
     {
-        // Chiffres financiers : ni le CDG ni la logistique.
+        // Approvisionneur : l'état du stock (et son export), sans les chiffres financiers.
+        $this->produit();
         $cdg = User::factory()->create(['role' => 'CDG_ADMIN']);
-        $this->actingAs($cdg, 'api')->getJson('/api/reports/pilotage')->assertForbidden();
+        $this->actingAs($cdg, 'api')->getJson('/api/reports/pilotage')
+            ->assertOk()
+            ->assertJsonPath('data.indicateurs', null)
+            ->assertJsonCount(1, 'data.etat_stock')
+            // Valeur du stock : Direction et Super admin seulement.
+            ->assertJsonPath('data.etat_stock.0.valeur_stock', null);
+        $this->actingAs($cdg, 'api')->get('/api/reports/pilotage/export')->assertOk();
         $this->actingAs($cdg, 'api')->getJson('/api/reports/sales')->assertForbidden();
-        $this->actingAs(User::factory()->create(['role' => 'SUPERADMIN']), 'api')->getJson('/api/reports/pilotage')->assertOk();
+        $this->actingAs(User::factory()->create(['role' => 'SUPERADMIN']), 'api')->getJson('/api/reports/pilotage')
+            ->assertOk()
+            ->assertJsonStructure(['data' => ['indicateurs' => ['ca_facture']]]);
 
         $logistique = User::factory()->create(['role' => 'LG_ADMIN']);
         $this->actingAs($logistique, 'api')->getJson('/api/reports/pilotage')->assertForbidden();

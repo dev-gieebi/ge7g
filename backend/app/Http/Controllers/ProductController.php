@@ -230,7 +230,9 @@ class ProductController extends Controller
             'margin_percent' => $marginPercent,
             'min_stock' => (float) ($validated['min_stock'] ?? 0),
             // Vitrine boutique en ligne : visibilité, description publique, mise en avant.
-            'visible_boutique' => (bool) ($validated['visible_boutique'] ?? false),
+            // Nouveau produit : publié sur la boutique automatiquement (la
+            // modification d'un produit existant garde son réglage, voir update()).
+            'visible_boutique' => (bool) ($validated['visible_boutique'] ?? true),
             'description_publique' => $validated['description_publique'] ?? null,
             'mis_en_avant' => (bool) ($validated['mis_en_avant'] ?? false),
         ];

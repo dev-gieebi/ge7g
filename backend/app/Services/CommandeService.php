@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\StatutCommande;
+use App\Models\BonLivraison;
 use App\Models\Client;
 use App\Models\Commande;
 use App\Models\CommandeAnnotation;
@@ -121,6 +122,7 @@ class CommandeService
     private function creerLigne(Commande $commande, array $ligne, ?int $zoneId, bool $produitInconnuPermis): CommandeLigne
     {
         $quantite = (float) $ligne['quantite'];
+        $precision = isset($ligne['precision']) ? trim((string) $ligne['precision']) : null;
 
         if (empty($ligne['produit_id'])) {
             $designation = trim((string) ($ligne['designation'] ?? ''));
@@ -129,6 +131,13 @@ class CommandeService
             }
             if ($quantite <= 0) {
                 throw ValidationException::withMessages(['lignes' => 'Quantité invalide pour « '.$designation.' ».']);
+            }
+
+            // Même produit hors catalogue déjà demandé (même nom) : quantités cumulées.
+            $existante = $commande->lignes()->whereNull('produit_id')->get()
+                ->first(fn (CommandeLigne $l) => mb_strtolower(trim($l->designation)) === mb_strtolower($designation));
+            if ($existante) {
+                return $this->cumuler($existante, $quantite, $precision);
             }
 
             return $commande->lignes()->create([
@@ -149,6 +158,13 @@ class CommandeService
             throw ValidationException::withMessages(['lignes' => 'Quantité invalide pour « '.$produit->name.' ».']);
         }
 
+        // Produit déjà dans la commande : une seule ligne, quantités cumulées
+        // (1 barre + 25 barres = 26 barres), au prix déjà figé de la ligne.
+        $existante = $commande->lignes()->where('produit_id', $produit->id)->first();
+        if ($existante) {
+            return $this->cumuler($existante, $quantite, $precision);
+        }
+
         // Pas de blocage sur le stock à la commande : le client peut
         // commander même en rupture (réapprovisionnement). Le stock est
         // vérifié et déduit à la validation par l'admin.
@@ -166,6 +182,21 @@ class CommandeService
             'quantite' => $quantite,
             'total_ligne' => (int) round($prixUnitaire * $quantite),
         ]);
+    }
+
+    /** Ajoute une quantité à une ligne existante (précision ajoutée si nouvelle). */
+    private function cumuler(CommandeLigne $ligne, float $quantite, ?string $precision): CommandeLigne
+    {
+        $ligne->quantite = (float) $ligne->quantite + $quantite;
+        $ligne->total_ligne = (int) round((int) $ligne->prix_unitaire * (float) $ligne->quantite);
+
+        if ($precision !== null && $precision !== '' && ! str_contains((string) $ligne->precision, $precision)) {
+            $ligne->precision = $ligne->precision ? $ligne->precision.' · '.$precision : $precision;
+        }
+
+        $ligne->save();
+
+        return $ligne;
     }
 
     /** Total de la commande depuis ses lignes, remise accordée réappliquée. */
@@ -195,16 +226,22 @@ class CommandeService
                 throw ValidationException::withMessages(['lignes' => 'Des produits ne peuvent être ajoutés que sur une commande en attente de validation.']);
             }
 
+            // Historique : la quantité ajoutée et, si le produit était déjà là, le nouveau total.
             $ajouts = [];
             foreach ($lignes as $ligne) {
-                $ajouts[] = $this->creerLigne($commande, $ligne, $commande->zone_id, true);
+                $avant = (float) ($commande->lignes()->when(
+                    ! empty($ligne['produit_id']),
+                    fn ($q) => $q->where('produit_id', $ligne['produit_id']),
+                    fn ($q) => $q->whereNull('produit_id')->whereRaw('LOWER(TRIM(designation)) = ?', [mb_strtolower(trim((string) ($ligne['designation'] ?? '')))]),
+                )->value('quantite') ?? 0);
+                $resultat = $this->creerLigne($commande, $ligne, $commande->zone_id, true);
+                $ajouts[] = StockService::nombre((float) $ligne['quantite']).' × '.$resultat->designation
+                    .($avant > 0 ? ' (total '.StockService::nombre((float) $resultat->quantite).')' : '');
             }
 
             $this->recalculer($commande);
 
-            $this->historiser($commande, null, $commande->statut, $user, 'Produits ajoutés : '.collect($ajouts)
-                ->map(fn (CommandeLigne $l) => rtrim(rtrim(number_format((float) $l->quantite, 2, ',', ''), '0'), ',').' × '.$l->designation)
-                ->implode(', '));
+            $this->historiser($commande, null, $commande->statut, $user, 'Produits ajoutés : '.implode(', ', $ajouts));
 
             return $commande;
         });
@@ -232,6 +269,24 @@ class CommandeService
 
             if ($produitId !== null) {
                 $produit = Product::findOrFail($produitId);
+
+                // Produit déjà présent sur une autre ligne : la demande hors catalogue
+                // y est ajoutée (une seule ligne par produit), puis supprimée.
+                $existante = $ligne->produit_id === null
+                    ? $commande->lignes()->where('produit_id', $produit->id)->where('id', '!=', $ligne->id)->first()
+                    : null;
+                if ($existante) {
+                    if ($prixUnitaire !== null) {
+                        $existante->prix_unitaire = $prixUnitaire;
+                    }
+                    $this->cumuler($existante, (float) $ligne->quantite, $ligne->precision);
+                    $ligne->delete();
+                    $this->recalculer($commande);
+                    $this->historiser($commande, null, $commande->statut, $admin, 'Produit référencé : « '.$avant.' » ajouté à '.$existante->designation.' (total '.StockService::nombre((float) $existante->quantite).')');
+
+                    return $commande;
+                }
+
                 $ligne->produit_id = $produit->id;
                 $ligne->designation = $produit->name.($produit->type ? ' · '.$produit->type : '');
                 $ligne->prix_unitaire = $prixUnitaire ?? ($commande->user_id && ! $commande->zone_id ? 0 : $produit->prixBoutique($commande->zone_id));
@@ -270,7 +325,7 @@ class CommandeService
                 $facture->soldee_par = $admin->id;
                 $facture->save();
 
-                $this->historiser($commande, null, $commande->statut, $admin, 'Facture '.$facture->numero.' soldée');
+                $this->historiser($commande, null, $commande->statut, $admin, 'Facture '.$facture->numeroAffiche().' soldée');
             }
 
             return $commande;
@@ -434,11 +489,11 @@ class CommandeService
     }
 
     /**
-     * Livraison partielle (commande en préparation) : quantités envoyées par
+     * Mise en livraison (commande en préparation) : quantités envoyées par
      * ligne (`$quantites` : id de ligne => quantité). Chaque quantité est
      * bornée au reste à livrer et sort du stock réel, refusée si le stock
-     * n'existe pas. Un bon de livraison est créé pour l'envoi ; quand tout
-     * est livré, la commande passe en « Livrée ».
+     * n'existe pas. Un bon de livraison est créé pour l'envoi et la commande
+     * passe « en cours de livraison » ; `livrer()` confirme l'arrivée.
      *
      * @param  array<int, float>  $quantites
      */
@@ -470,19 +525,17 @@ class CommandeService
                 }
             }
 
+            // L'envoi part : commande « en cours de livraison » jusqu'à ce que
+            // l'équipe confirme son arrivée chez le client (bouton « Livrée »).
+            $this->transition($commande, StatutCommande::EnLivraison, $user, null, false);
+            $commande->save();
+
             $livraison = $commande->livraisons()->create([
                 'chauffeur_id' => $commande->chauffeur_id,
                 'depart_le' => now(),
-                'livree_le' => now(),
             ]);
 
             $this->enregistrerEnvoi($commande, $quantites, $livraison, $user);
-
-            $commande->refresh()->load('lignes');
-            if ($commande->lignes->every(fn (CommandeLigne $l) => $l->reste() <= 0.0001)) {
-                $this->transition($commande, StatutCommande::Livree, $user, 'Toute la commande est livrée.', false);
-                $commande->save();
-            }
 
             $this->notifications->statutCommande($commande);
 
@@ -502,6 +555,11 @@ class CommandeService
         $vente = $commande->facture?->vente;
         $details = [];
 
+        // Bon de l'envoi créé d'abord : chaque sortie de stock y est rattachée
+        // (N° du bon dans le suivi du stock). En cas de stock insuffisant, tout
+        // est annulé par la transaction appelante.
+        $bon = $this->factures->creerBonLivraison($commande, $livraison, $user, $quantites);
+
         foreach ($commande->lignes as $ligne) {
             $quantite = (float) ($quantites[$ligne->id] ?? 0);
             if ($quantite <= 0) {
@@ -509,7 +567,7 @@ class CommandeService
             }
 
             if ($commande->stock_a_la_livraison && $ligne->produit_id) {
-                $this->stock->deduire($ligne->produit_id, $quantite, $commande, $user, 'Livraison commande '.$commande->numero);
+                $this->stock->deduire($ligne->produit_id, $quantite, $commande, $user, 'Livraison '.$bon->numero.' (commande '.$commande->numero.')', $bon);
             }
 
             $ligne->quantite_livree = (float) $ligne->quantite_livree + $quantite;
@@ -526,8 +584,6 @@ class CommandeService
             $unite = $ligne->produit?->unit?->symbol;
             $details[] = StockService::nombre($quantite).($unite ? ' '.$unite : '').' de '.$ligne->designation.' (reste '.StockService::nombre($ligne->reste()).')';
         }
-
-        $bon = $this->factures->creerBonLivraison($commande, $livraison, $user, $quantites);
 
         $this->historiser($commande, null, $commande->statut, $user, 'Livraison '.$bon->numero.' : '.implode(', ', $details).'.');
     }
@@ -649,25 +705,62 @@ class CommandeService
     }
 
     /**
-     * Livraison réussie : signature, nom du réceptionnaire et encaissement
-     * (montant + mode). La facture passe en `payee` ou `partiellement_payee`.
+     * Envoi arrivé chez le client (bouton « Livrée ») : signature, nom du
+     * réceptionnaire et encaissement éventuels. S'il reste des produits à
+     * livrer, la commande revient « en préparation » pour l'envoi suivant ;
+     * sinon elle passe « livrée ». La facture passe en `payee` ou
+     * `partiellement_payee` selon l'encaissement.
      */
     public function livrer(Commande $commande, array $data, User $user): Commande
     {
         return DB::transaction(function () use ($commande, $data, $user) {
-            $commande = Commande::lockForUpdate()->findOrFail($commande->id);
-            $this->transition($commande, StatutCommande::Livree, $user, null, false);
-            $commande->save();
+            $commande = Commande::lockForUpdate()->with('lignes', 'facture')->findOrFail($commande->id);
+            if ($commande->statut !== StatutCommande::EnLivraison) {
+                throw ValidationException::withMessages([
+                    'statut' => "Transition impossible : {$commande->statut->libelle()} → ".StatutCommande::Livree->libelle()." (commande {$commande->numero}).",
+                ]);
+            }
 
             $livraison = $commande->livraisons()->latest('id')->first() ?? new Livraison(['commande_id' => $commande->id]);
             $livraison->chauffeur_id = $livraison->chauffeur_id ?? $commande->chauffeur_id;
             $livraison->livree_le = now();
             $livraison->receptionnaire = $data['receptionnaire'] ?? null;
-
             if (! empty($data['signature'])) {
                 $livraison->signature = $this->stockerSignature($data['signature'], $commande->numero);
             }
             $livraison->save();
+
+            // Bon de l'envoi (créé au départ) : réceptionnaire, signature et date d'arrivée.
+            BonLivraison::where('livraison_id', $livraison->id)->update([
+                'receptionnaire' => $livraison->receptionnaire,
+                'signature' => $livraison->signature,
+                'livre_le' => $livraison->livree_le,
+            ]);
+
+            // Envoi sans quantités choisies (ancien circuit, remise en livraison
+            // après un échec) : tout le reste part avec cette livraison.
+            if (! BonLivraison::where('livraison_id', $livraison->id)->exists()) {
+                $restes = $commande->lignes
+                    ->mapWithKeys(fn (CommandeLigne $l) => [$l->id => $l->reste()])
+                    ->filter(fn (float $q) => $q > 0)
+                    ->all();
+                if ($restes !== []) {
+                    $this->enregistrerEnvoi($commande, $restes, $livraison, $user);
+                }
+            }
+
+            // Tout est-il livré ? Sinon, retour en préparation pour l'envoi suivant.
+            $commande->load('lignes');
+            $reste = $commande->lignes->sum(fn (CommandeLigne $l) => $l->reste());
+            if ($reste > 0.0001) {
+                $this->transition($commande, StatutCommande::EnPreparation, $user, 'Envoi livré. Reste à livrer : '.$commande->lignes
+                    ->filter(fn (CommandeLigne $l) => $l->reste() > 0.0001)
+                    ->map(fn (CommandeLigne $l) => StockService::nombre($l->reste()).' × '.$l->designation)
+                    ->implode(', ').'.', false);
+            } else {
+                $this->transition($commande, StatutCommande::Livree, $user, null, false);
+            }
+            $commande->save();
 
             $facture = $commande->facture;
             if ($facture && isset($data['montant'])) {
@@ -687,17 +780,6 @@ class CommandeService
                     $vente->status = 'PAYEE';
                     $vente->save();
                 }
-            }
-
-            // Tout le reste à livrer part avec cette livraison : sortie du stock
-            // (refusée si le stock réel manque) et bon de livraison de l'envoi.
-            $commande->load('lignes', 'facture');
-            $restes = $commande->lignes
-                ->mapWithKeys(fn (CommandeLigne $l) => [$l->id => $l->reste()])
-                ->filter(fn (float $q) => $q > 0)
-                ->all();
-            if ($restes !== []) {
-                $this->enregistrerEnvoi($commande, $restes, $livraison, $user);
             }
 
             $this->marquerStatutChauffeur($livraison->chauffeur_id, 'DISPONIBLE');

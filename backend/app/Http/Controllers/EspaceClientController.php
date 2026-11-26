@@ -83,6 +83,7 @@ class EspaceClientController extends Controller
         return response()->json([
             'data' => collect($paginator->items())->map(fn (Commande $c) => [
                 'id' => $c->id,
+                'cle' => $c->cle,
                 'numero' => $c->numero,
                 'statut' => $c->statut->value,
                 'statut_libelle' => $c->statut->libelle(),
@@ -114,17 +115,18 @@ class EspaceClientController extends Controller
 
         $paginator = Commande::where('user_id', $user->id)
             ->whereHas('facture')
-            ->with(['facture', 'bonLivraison'])
+            ->with(['facture.vente', 'bonLivraison'])
             ->orderByDesc('created_at')
             ->paginate(min((int) $request->input('per_page', 20), 50));
 
         return response()->json([
             'data' => collect($paginator->items())->map(fn (Commande $c) => [
                 'commande_id' => $c->id,
+                'cle' => $c->cle,
                 'commande' => $c->numero,
                 'statut_libelle' => $c->statut->libelle(),
                 'facture' => [
-                    'numero' => $c->facture->numero,
+                    'numero' => $c->facture->numeroAffiche(),
                     'emise_le' => $c->facture->emise_le?->toIso8601String(),
                     'montant_total' => (int) $c->facture->montant_total,
                     'soldee_le' => $c->facture->soldee_le?->toIso8601String(),
@@ -200,6 +202,7 @@ class EspaceClientController extends Controller
         return response()->json([
             'data' => [
                 'id' => $commande->id,
+                'cle' => $commande->cle,
                 'numero' => $commande->numero,
                 'total' => (int) $commande->total,
                 'statut' => $commande->statut->value,
@@ -243,7 +246,7 @@ class EspaceClientController extends Controller
 
     private function charger(Commande $commande): Commande
     {
-        return $commande->refresh()->load(['lignes.produit.unit', 'historique', 'annotations', 'chauffeur', 'livraison', 'facture.paiements', 'extras', 'bonLivraison', 'bonsLivraison.lignes']);
+        return $commande->refresh()->load(['lignes.produit.unit', 'historique', 'annotations', 'chauffeur', 'livraison', 'facture.paiements', 'facture.vente', 'extras', 'bonLivraison', 'bonsLivraison.lignes']);
     }
 
     /**

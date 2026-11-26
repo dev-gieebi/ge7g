@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AUneCleUrl;
 use Database\Factories\PosSaleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,11 +14,14 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 #[Fillable(['number', 'user_id', 'zone_id', 'customer_name', 'customer_phone', 'customer_address', 'subtotal', 'discount_rate', 'tax_type', 'tax_rate', 'tax_amount', 'tax_details', 'total', 'payment_method', 'amount_received', 'status', 'source', 'annulee', 'facture_id', 'soldee_le'])]
 class PosSale extends Model
 {
+    /** Clé opaque dans les adresses (URL) à la place de l'identifiant. */
+    use AUneCleUrl;
+
     /** @use HasFactory<PosSaleFactory> */
     use HasFactory;
 
     /** @var list<string> */
-    protected $appends = ['delivery_status'];
+    protected $appends = ['delivery_status', 'cle'];
 
     protected function casts(): array
     {

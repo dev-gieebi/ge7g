@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\NumerotationService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -44,5 +45,17 @@ class Facture extends Model
     public function vente(): HasOne
     {
         return $this->hasOne(PosSale::class, 'facture_id');
+    }
+
+    /**
+     * N° de facture affiché partout (équipe, client, PDF) : celui de la vente
+     * liée, comme dans la liste des ventes (VNT-2026-00011 → FAC-00011-2026).
+     * Sans vente : le n° enregistré.
+     */
+    public function numeroAffiche(): string
+    {
+        return $this->vente?->number
+            ? NumerotationService::affichage($this->vente->number, ['VNT' => 'FAC'])
+            : (string) $this->numero;
     }
 }

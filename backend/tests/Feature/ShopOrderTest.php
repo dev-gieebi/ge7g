@@ -162,6 +162,12 @@ class ShopOrderTest extends TestCase
         // Série commune caisse / en ligne : la facture porte le n° de sa vente.
         $this->assertSame(NumerotationService::affichage($vente->number, ['VNT' => 'FAC']), $facture->numero);
 
+        // Ancienne facture au n° d'un autre compteur : l'écran affiche quand
+        // même celui de la vente, comme la liste des ventes.
+        $facture->update(['numero' => 'FAC-09999-2026']);
+        $this->actingAs($admin, 'api')->getJson("/api/commandes/{$commande->id}")
+            ->assertJsonPath('data.facture.numero', NumerotationService::affichage($vente->number, ['VNT' => 'FAC']));
+
         // Le stock ne sort qu'à la livraison : rien n'est déduit à la validation.
         $this->assertEquals(10.0, (float) $p->fresh()->stock_quantity);
         $this->assertEquals(0, StockMovement::count());
@@ -183,14 +189,33 @@ class ShopOrderTest extends TestCase
 
         $this->actingAs($admin, 'api')->postJson("/api/commandes/{$commande->id}/preparer")->assertOk();
 
-        // Premier envoi : 200 sacs sortent du stock, il en reste 1 400 à livrer.
+        // Premier envoi : 200 sacs sortent du stock, la commande part en livraison.
         $this->actingAs($admin, 'api')->postJson("/api/commandes/{$commande->id}/livraison-partielle", ['lignes' => [['id' => $ligne->id, 'quantite' => 200]]])
             ->assertOk()
-            ->assertJsonPath('data.statut', 'en_preparation')
+            ->assertJsonPath('data.statut', 'en_livraison')
             ->assertJsonPath('data.lignes.0.quantite_livree', 200)
             ->assertJsonPath('data.lignes.0.reste', 1400)
             ->assertJsonCount(1, 'data.bons_livraison');
         $this->assertEquals(1400.0, (float) $p->fresh()->stock_quantity);
+
+        // Suivi du stock : la sortie porte le N° du bon de livraison de l'envoi, le client et le montant.
+        $bon = $commande->bonsLivraison()->firstOrFail();
+        $mouvement = collect($this->actingAs(User::factory()->create(['role' => 'DG_ADMIN']), 'api')->getJson('/api/stock-movements')->assertOk()->json('data'))
+            ->firstWhere('reference_type', 'BonLivraison');
+        $this->assertSame($bon->numero, $mouvement['bl_number']);
+        $this->assertSame('Jean Mba', $mouvement['party_name']);
+        $this->assertEquals(200 * 10000, $mouvement['amount']);
+
+        // Pendant le trajet, pas de nouvel envoi.
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$commande->id}/livraison-partielle", ['lignes' => [['id' => $ligne->id, 'quantite' => 100]]])
+            ->assertUnprocessable();
+
+        // « Livrée » à l'arrivée : il reste 1 400 sacs, la commande reste en cours (en préparation).
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$commande->id}/livrer")
+            ->assertOk()
+            ->assertJsonPath('data.statut', 'en_preparation');
+        $this->assertEquals(1400.0, (float) $p->fresh()->stock_quantity);
+        $this->assertEquals(1, $commande->bonsLivraison()->count());
 
         // Une autre commande peut être validée : le stock existe toujours.
         $this->postJson('/api/public/commandes', $this->commandePayload($p, 1000, '077445566'));
@@ -209,12 +234,16 @@ class ShopOrderTest extends TestCase
         $this->assertEquals(100.0, (float) $p->fresh()->stock_quantity);
         $this->assertEquals(200.0, (float) $ligne->fresh()->quantite_livree);
 
-        // Dernier envoi : tout est livré, la commande passe en « Livrée ».
+        // Dernier envoi, puis « Livrée » à l'arrivée : tout est livré, la commande passe en « Livrée ».
         $p->update(['stock_quantity' => 1400]);
         $this->actingAs($admin, 'api')->postJson("/api/commandes/{$commande->id}/livraison-partielle", ['lignes' => [['id' => $ligne->id, 'quantite' => 1400]]])
             ->assertOk()
-            ->assertJsonPath('data.statut', 'livree')
+            ->assertJsonPath('data.statut', 'en_livraison')
             ->assertJsonCount(2, 'data.bons_livraison');
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$commande->id}/livrer")
+            ->assertOk()
+            ->assertJsonPath('data.statut', 'livree');
+        $this->assertEquals(2, $commande->bonsLivraison()->count());
         $this->assertEquals(0.0, (float) $p->fresh()->stock_quantity);
         $this->assertEquals(1600.0, (float) PosSale::where('facture_id', $commande->facture->id)->firstOrFail()->items()->firstOrFail()->delivered_quantity);
     }
@@ -306,6 +335,7 @@ class ShopOrderTest extends TestCase
         // 3 des 4 livrés : seuls ces 3 sortent du stock.
         $ligne = $commande->lignes()->firstOrFail();
         $this->actingAs($admin, 'api')->postJson("/api/commandes/{$commande->id}/livraison-partielle", ['lignes' => [['id' => $ligne->id, 'quantite' => 3]]])->assertOk();
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$commande->id}/livrer")->assertOk()->assertJsonPath('data.statut', 'en_preparation');
         $this->assertEquals(7.0, (float) $p->fresh()->stock_quantity);
 
         $res = $this->actingAs($admin, 'api')->postJson("/api/commandes/{$commande->id}/annuler", ['motif' => 'Client injoignable']);

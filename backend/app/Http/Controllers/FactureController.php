@@ -33,7 +33,7 @@ class FactureController extends Controller
         $enTete = function () use ($pdf, $facture, $m, $w) {
             $pdf->text($m, 800, 'G-ENERGIE 7 GROUPE', 16, true);
             $pdf->text($m, 785, 'www.g-energie7groupe.com', 9);
-            $pdf->text($w - $m - 180, 800, 'FACTURE '.$facture->numero, 13, true);
+            $pdf->text($w - $m - 180, 800, 'FACTURE '.$facture->numeroAffiche(), 13, true);
             $pdf->text($w - $m - 180, 786, 'Date : '.$facture->emise_le->format('d/m/Y'), 9);
             $pdf->line($m, 775, $w - $m, 775, 1);
         };
@@ -94,6 +94,6 @@ class FactureController extends Controller
         $pdf->text($m, 60, 'Merci de votre confiance G-ENERGIE 7 GROUPE', 8);
         $pdf->text($m, 48, 'Facture générée le '.now()->format('d/m/Y à H:i'), 8);
 
-        return $pdf->stream('facture-'.$facture->numero.'.pdf');
+        return $pdf->stream('facture-'.$facture->numeroAffiche().'.pdf');
     }
 }

@@ -34,7 +34,7 @@ class CommandeController extends Controller
     private const DELIVER_ROLES = ['LG_ADMIN', 'DG_ADMIN', 'SUPERADMIN', 'CHAUFFEUR'];
 
     /** Relations de la fiche commande complète (détail, frais, annotations). */
-    private const DETAIL = ['lignes.produit.unit', 'historique.user', 'chauffeur', 'valideur', 'facture.paiements', 'facture.avoir', 'livraison', 'extras', 'annotations.user', 'compte', 'bonLivraison', 'bonsLivraison.lignes'];
+    private const DETAIL = ['lignes.produit.unit', 'historique.user', 'chauffeur', 'valideur', 'facture.paiements', 'facture.avoir', 'facture.vente', 'livraison', 'extras', 'annotations.user', 'compte', 'bonLivraison', 'bonsLivraison.lignes'];
 
     public function __construct(private readonly CommandeService $service) {}
 
@@ -85,6 +85,7 @@ class CommandeController extends Controller
         return response()->json([
             'data' => collect($paginator->items())->map(fn (Commande $c) => [
                 'id' => $c->id,
+                'cle' => $c->cle,
                 'numero' => $c->numero,
                 'statut' => $c->statut->value,
                 'statut_libelle' => $c->statut->libelle(),
@@ -126,7 +127,7 @@ class CommandeController extends Controller
     {
         $this->authorizeUser($request, self::MANAGE_ROLES);
         $commande = $this->service->valider($commande, $request->user());
-        $commande->load(['lignes.produit.unit', 'historique.user', 'chauffeur', 'facture.paiements', 'facture.avoir', 'livraison']);
+        $commande->load(['lignes.produit.unit', 'historique.user', 'chauffeur', 'facture.paiements', 'facture.avoir', 'facture.vente', 'livraison']);
 
         return new CommandeResource($commande);
     }

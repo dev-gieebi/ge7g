@@ -59,7 +59,7 @@ export function OrdersPage() {
         isLoading={isLoading}
         error={errorMessage}
         rowKey={(c) => c.id}
-        onCardClick={(c) => navigate(`/admin/commandes/${c.id}`)}
+        onCardClick={(c) => navigate(`/admin/commandes/${c.cle ?? c.id}`)}
         page={list.page}
         onPageChange={list.setPage}
         emptyTitle="Aucune commande"

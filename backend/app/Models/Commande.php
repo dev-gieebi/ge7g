@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\StatutCommande;
+use App\Models\Concerns\AUneCleUrl;
 use Database\Factories\CommandeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 #[Fillable(['numero', 'client_id', 'user_id', 'zone_id', 'nom_livraison', 'telephone_livraison', 'ville', 'quartier', 'point_repere', 'note', 'total', 'statut', 'stock_a_la_livraison', 'motif', 'validee_par', 'validee_le', 'chauffeur_id', 'remise_taux_demande', 'remise_motif', 'remise_statut', 'remise_taux', 'remise_montant', 'client_vu_le'])]
 class Commande extends Model
 {
+    /** Clé opaque dans les adresses (URL) à la place de l'identifiant. */
+    use AUneCleUrl;
+
     /** @use HasFactory<CommandeFactory> */
     use HasFactory;
 

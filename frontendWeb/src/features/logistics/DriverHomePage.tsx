@@ -43,7 +43,7 @@ export function DriverHomePage() {
         rowKey={(c) => c.id}
         page={list.page}
         onPageChange={list.setPage}
-        onRowClick={(c) => navigate(`/admin/mes-livraisons/${c.id}`)}
+        onRowClick={(c) => navigate(`/admin/mes-livraisons/${c.cle ?? c.id}`)}
         emptyTitle="Aucune livraison affectée"
       />
     </>

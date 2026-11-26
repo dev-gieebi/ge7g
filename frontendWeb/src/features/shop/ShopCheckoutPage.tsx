@@ -53,7 +53,8 @@ export function ShopCheckoutPage() {
       cart.clear();
       if (estClient && "id" in data) {
         void qc.invalidateQueries({ queryKey: ["client"] });
-        navigate(`/mon-compte/commandes/${data.id}`, { state: { nouvelle: true } });
+        const cle = "cle" in data && typeof data.cle === "string" ? data.cle : String(data.id);
+        navigate(`/mon-compte/commandes/${cle}`, { state: { nouvelle: true } });
         return;
       }
       navigate(`/commande/confirmation/${data.numero}`, { state: { total: data.total } });

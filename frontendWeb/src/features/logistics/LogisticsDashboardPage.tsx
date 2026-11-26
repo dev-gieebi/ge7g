@@ -45,7 +45,7 @@ export function LogisticsDashboardPage() {
         ) : (
           <div className="divide-y divide-ge7-black/5">
             {enCours.data.data.map((c) => (
-              <Link key={c.id} to={`/admin/commandes/${c.id}`} className="flex flex-wrap items-center justify-between gap-3 py-3 hover:bg-ge7-gold-soft/30">
+              <Link key={c.id} to={`/admin/commandes/${c.cle ?? c.id}`} className="flex flex-wrap items-center justify-between gap-3 py-3 hover:bg-ge7-gold-soft/30">
                 <div>
                   <p className="font-bold">{c.numero} <span className="font-normal text-ge7-black/50">· {c.client}</span></p>
                   <p className="text-xs text-ge7-black/60">{c.chauffeur ?? "Chauffeur ?"} → {c.quartier}, {c.ville} · {money(c.total)}</p>

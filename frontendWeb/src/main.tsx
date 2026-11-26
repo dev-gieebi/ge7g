@@ -5,6 +5,7 @@ import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react
 import { AuthProvider } from "@/lib/auth";
 import { ToastProvider } from "@/lib/toast";
 import { ConfirmationProvider } from "@/lib/confirmation";
+import { BandeauMiseAJour, demarrerMiseAJourAuto } from "@/lib/miseAJour";
 import { router } from "@/app/router";
 import { PusherListener } from "@/components/PusherListener";
 import "./styles.css";
@@ -22,6 +23,9 @@ const queryClient: QueryClient = new QueryClient({
   },
 });
 
+// Nouvelle version mise en ligne : chargée automatiquement, sans recharger à la main.
+demarrerMiseAJourAuto(router);
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
@@ -30,6 +34,7 @@ createRoot(document.getElementById("root")!).render(
           <ConfirmationProvider>
             <PusherListener />
             <RouterProvider router={router} />
+            <BandeauMiseAJour />
           </ConfirmationProvider>
         </AuthProvider>
       </ToastProvider>

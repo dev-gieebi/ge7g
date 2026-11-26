@@ -40,7 +40,7 @@ export function PosSalesPage() {
         isLoading={isLoading}
         error={errorMessage}
         rowKey={(s) => s.id}
-        onCardClick={(s) => navigate(`/admin/caisse/ventes/${s.id}`)}
+        onCardClick={(s) => navigate(`/admin/caisse/ventes/${s.cle ?? s.id}`)}
         page={list.page}
         onPageChange={list.setPage}
         emptyTitle="Aucune vente"

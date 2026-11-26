@@ -24,12 +24,15 @@ class ReportController extends Controller
     // Super admin uniquement.
     private const VIEW_ROLES = DashboardController::FINANCE_ROLES;
 
-    private function authorizeUser(Request $request): User
+    /** État du stock (cumul par article) : aussi l'approvisionneur, sans les indicateurs financiers. */
+    private const ETAT_STOCK_ROLES = [...DashboardController::FINANCE_ROLES, 'CDG_ADMIN'];
+
+    private function authorizeUser(Request $request, array $roles = self::VIEW_ROLES): User
     {
         /** @var User $user */
         $user = $request->user();
 
-        if (! in_array($user->role, self::VIEW_ROLES, true)) {
+        if (! in_array($user->role, $roles, true)) {
             abort(403, 'Accès réservé.');
         }
 
@@ -135,9 +138,19 @@ class ReportController extends Controller
      */
     public function pilotage(Request $request): JsonResponse
     {
-        $this->authorizeUser($request);
+        $user = $this->authorizeUser($request, self::ETAT_STOCK_ROLES);
+        $data = $this->buildPilotage();
 
-        return response()->json(['data' => $this->buildPilotage()]);
+        // Approvisionneur : état du stock seulement, sans chiffres financiers
+        // (CA, marge…) ni valeur du stock (Direction et Super admin).
+        if (! in_array($user->role, self::VIEW_ROLES, true)) {
+            $data = [
+                'indicateurs' => null,
+                'etat_stock' => collect($data['etat_stock'])->map(fn (array $l) => array_merge($l, ['valeur_stock' => null]))->values(),
+            ];
+        }
+
+        return response()->json(['data' => $data]);
     }
 
     /**
@@ -146,46 +159,51 @@ class ReportController extends Controller
      */
     public function exportPilotage(Request $request): BinaryFileResponse
     {
-        $this->authorizeUser($request);
+        $user = $this->authorizeUser($request, self::ETAT_STOCK_ROLES);
+        // Chiffres financiers et valeur du stock : Direction et Super admin seulement.
+        $finance = in_array($user->role, self::VIEW_ROLES, true);
 
         $data = $this->buildPilotage();
         $i = $data['indicateurs'];
+        $largeur = $finance ? 12 : 11;
+        $derniere = $finance ? 'L' : 'K';
 
         $rows = [];
         $merges = [];
-        $wide = function (string $text, int $style) use (&$rows, &$merges) {
-            $rows[] = array_merge([[$text, $style]], array_fill(0, 14, [null, $style]));
-            $merges[] = 'A'.count($rows).':O'.count($rows);
+        $wide = function (string $text, int $style) use (&$rows, &$merges, $largeur, $derniere) {
+            $rows[] = array_merge([[$text, $style]], array_fill(0, $largeur - 1, [null, $style]));
+            $merges[] = 'A'.count($rows).':'.$derniere.count($rows);
         };
 
         $wide('ETAT DU STOCK AU '.now()->format('d/m/Y'), 1);
-        $wide("CA facturé : {$i['ca_facture']} FCFA · Valeur stock : {$i['valeur_stock']} FCFA · Achats : {$i['achats']} FCFA · Marge livrée : {$i['marge_livree']} FCFA", 2);
-        $rows[] = array_fill(0, 15, [null, 0]);
-        $rows[] = array_map(fn ($h) => [$h, 2], [
+        if ($finance) {
+            $wide("CA facturé : {$i['ca_facture']} FCFA · Valeur stock : {$i['valeur_stock']} FCFA · Achats : {$i['achats']} FCFA · Marge livrée : {$i['marge_livree']} FCFA", 2);
+        }
+        $rows[] = array_fill(0, $largeur, [null, 0]);
+        $rows[] = array_map(fn ($h) => [$h, 2], array_merge([
             'Code article', 'Désignation', 'Unité', 'Stock initial', 'Entrées cumulées',
-            'Sorties livrées', 'Mouvements nets', 'Stock théorique', 'Stock minimum',
-            'Alerte', 'Prix de vente (FCFA)', 'Prix par ville', 'Valeur stock estimée (FCFA)',
-            'Stock physique saisi', 'Écart physique - théorique',
-        ]);
+            'Sorties (vendues)', 'Stock réel', 'Stock minimum',
+            'Alerte', 'Prix de vente (FCFA)', 'Prix par ville',
+        ], $finance ? ['Valeur stock estimée (FCFA)'] : []));
 
         foreach ($data['etat_stock'] as $l) {
-            $rows[] = [
+            $ligne = [
                 [$l['reference'], 3],
                 [$l['designation'], 3],
                 [$l['unit'] ?? '', 3],
                 [$l['stock_initial'], 4],
                 [$l['entrees'], 4],
                 [$l['sorties'], 4],
-                [$l['mouvements_nets'], 4],
                 [$l['stock_theorique'], 4],
                 [$l['stock_minimum'], 4],
                 [$l['alerte'], 3],
                 [$l['prix_vente'], 4],
                 [collect($l['prix_zones'])->map(fn ($z) => "{$z['zone']} : {$z['amount']}")->implode(' · '), 3],
-                [$l['valeur_stock'], 4],
-                [$l['stock_physique'] ?? '', 4],
-                [$l['ecart'] ?? '', 4],
             ];
+            if ($finance) {
+                $ligne[] = [$l['valeur_stock'], 4];
+            }
+            $rows[] = $ligne;
         }
 
         return Xlsx::download([[
@@ -216,10 +234,12 @@ class ReportController extends Controller
             $mvmts = $mouvements->get($p->id, collect());
             $parType = $mvmts->keyBy('type');
             $entrees = round((float) ($parType->get('ENTREE')?->total ?? 0), 2);
-            // Les sorties sont stockées en quantité négative dans les mouvements.
+            // Sorties = quantité vendue sortie du stock (caisse + commandes en
+            // ligne, stockées en négatif), moins les retours (produit retiré
+            // d'une vente, commande annulée) remis en stock.
             $sorties = round(abs((float) ($parType->get('VENTE')?->total ?? 0)
-                + (float) ($parType->get('SORTIE_VENTE')?->total ?? 0)), 2);
-            $mouvementsNets = round((float) ($parType->get('RETOUR_ANNULATION')?->total ?? 0), 2);
+                + (float) ($parType->get('SORTIE_VENTE')?->total ?? 0))
+                - (float) ($parType->get('RETOUR_ANNULATION')?->total ?? 0), 2);
             $theorique = round((float) $p->stock_quantity, 2);
             $physique = $p->physical_stock !== null ? round((float) $p->physical_stock, 2) : null;
             // Prix de vente : barème caisse (for_pos) sinon « Toutes villes »
@@ -235,10 +255,9 @@ class ReportController extends Controller
                 'reference' => $p->reference,
                 'designation' => $p->name.($p->type ? ' · '.$p->type : ''),
                 'unit' => $p->unit?->symbol,
-                'stock_initial' => round($theorique - $entrees + $sorties - $mouvementsNets, 2),
+                'stock_initial' => round($theorique - $entrees + $sorties, 2),
                 'entrees' => $entrees,
                 'sorties' => $sorties,
-                'mouvements_nets' => $mouvementsNets,
                 'stock_theorique' => $theorique,
                 'stock_minimum' => round((float) $p->min_stock, 2),
                 'alerte' => $theorique < 0

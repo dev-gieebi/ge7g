@@ -146,7 +146,7 @@ function QuoteNewContenu({ brouillonId }: { brouillonId: string | null }) {
         notes: notes || null,
         extras: [],
       })
-      .then((q) => { brouillon.terminer(); navigate(`/admin/devis/${q.id}`); })
+      .then((q) => { brouillon.terminer(); navigate(`/admin/devis/${q.cle ?? q.id}`); })
       .catch(() => {});
   };
 

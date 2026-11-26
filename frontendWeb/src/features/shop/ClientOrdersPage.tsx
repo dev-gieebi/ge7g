@@ -69,7 +69,7 @@ export function ClientOrdersPage() {
             {data.data.map((c) => (
               <li key={c.id}>
                 <Link
-                  to={`/mon-compte/commandes/${c.id}`}
+                  to={`/mon-compte/commandes/${c.cle ?? c.id}`}
                   className={`flex items-center gap-3 rounded-2xl border bg-white px-4 py-3.5 transition hover:border-ge7-gold/60 hover:shadow-soft ${c.non_lu ? "border-ge7-gold" : "border-ge7-black/10"}`}
                 >
                   <div className="min-w-0 flex-1">

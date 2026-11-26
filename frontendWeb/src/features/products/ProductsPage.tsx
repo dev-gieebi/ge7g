@@ -18,7 +18,6 @@ import {
   PageHeader,
   SearchInput,
   Select,
-  Textarea,
 } from "@/components/ui";
 
 type ProductForm = Partial<Omit<Product, "id" | "category" | "unit">>;
@@ -197,22 +196,8 @@ export function ProductsPage() {
                 </label>
               </div>
             </FormGrid>
-            <div className="mt-5 rounded-2xl border border-ge7-black/10 p-4">
-              <p className="mb-3 text-sm font-bold text-ge7-black/80">Boutique en ligne</p>
-              <div className="flex flex-wrap items-center gap-6">
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input type="checkbox" checked={!!editing.visible_boutique} onChange={(e) => setEditing({ ...editing, visible_boutique: e.target.checked })} className="size-4 accent-ge7-gold" />
-                  Visible sur la boutique
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input type="checkbox" checked={!!editing.mis_en_avant} onChange={(e) => setEditing({ ...editing, mis_en_avant: e.target.checked })} className="size-4 accent-ge7-gold" />
-                  Mis en avant (page d'accueil)
-                </label>
-              </div>
-              {editing.visible_boutique && (
-                <Textarea label="Description publique (affichée aux clients)" value={editing.description_publique ?? ""} onChange={(e) => setEditing({ ...editing, description_publique: e.target.value })} className="mt-3" />
-              )}
-            </div>
+            {/* Boutique en ligne : un nouveau produit y est publié automatiquement ;
+                les réglages des produits existants ne sont pas modifiés. */}
             {!editId && (
               <p className="mt-4 rounded-xl bg-ge7-purple-soft px-4 py-3 text-xs text-ge7-purple">
                 Les prix se gèrent dans l'onglet <strong>Prix / Barème</strong> et le stock via les <strong>réceptions d'achats</strong>.

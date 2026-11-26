@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
+use App\Models\Product;
 use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,5 +34,23 @@ class ProduitDoublonTest extends TestCase
 
         // Modifier un produit sans changer son nom reste possible.
         $this->actingAs($admin, 'api')->putJson("/api/products/{$autre}", [...$base, 'name' => 'Fer à béton 12', 'min_stock' => 5])->assertOk();
+    }
+
+    public function test_nouveau_produit_publie_sur_la_boutique_sans_toucher_aux_existants(): void
+    {
+        $admin = User::factory()->create(['role' => 'DG_ADMIN']);
+        $base = [
+            'category_id' => Category::firstOrCreate(['slug' => 'tests'], ['name' => 'Tests'])->id,
+            'unit_id' => Unit::firstOrCreate(['symbol' => 'pc'], ['name' => 'Pièce'])->id,
+        ];
+
+        // Nouveau produit, sans réglage boutique envoyé : publié automatiquement, pas mis en avant.
+        $id = $this->actingAs($admin, 'api')->postJson('/api/products', [...$base, 'name' => 'Câble 2,5 mm²'])->assertCreated()->json('data.id');
+        $this->assertDatabaseHas('products', ['id' => $id, 'visible_boutique' => true, 'mis_en_avant' => false]);
+
+        // Produit existant masqué de la boutique : une modification ne change pas son réglage.
+        $masque = Product::create([...$base, 'reference' => 'TESTS-0099', 'name' => 'Ancien produit', 'sale_price' => 0, 'stock_quantity' => 0, 'reserved_quantity' => 0, 'min_stock' => 0, 'visible_boutique' => false, 'mis_en_avant' => true]);
+        $this->actingAs($admin, 'api')->putJson("/api/products/{$masque->id}", [...$base, 'name' => 'Ancien produit', 'min_stock' => 3])->assertOk();
+        $this->assertDatabaseHas('products', ['id' => $masque->id, 'visible_boutique' => false, 'mis_en_avant' => true]);
     }
 }

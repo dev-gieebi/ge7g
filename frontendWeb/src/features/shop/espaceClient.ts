@@ -18,6 +18,8 @@ export interface ProfilClient {
 }
 
 export interface CommandeClientListItem {
+  /** Clé opaque de l'adresse (URL) à la place de l'identifiant. */
+  cle?: string;
   id: number;
   numero: string;
   statut: string;
@@ -49,6 +51,8 @@ export interface Annotation {
 }
 
 export interface CommandeClient {
+  /** Clé opaque de l'adresse (URL) à la place de l'identifiant. */
+  cle?: string;
   id: number;
   numero: string;
   statut: string;
@@ -114,6 +118,8 @@ export interface LigneDemandee {
 
 /** Archive : une commande facturée, sa facture et son bon de livraison. */
 export interface DocumentsCommande {
+  /** Clé opaque de l'adresse (URL) à la place de l'identifiant. */
+  cle?: string;
   commande_id: number;
   commande: string;
   statut_libelle: string;
@@ -135,10 +141,10 @@ export const clientApi = {
   documents: (page: number) => api.get<ShopPaginated<DocumentsCommande>>("/client/documents", { params: { page } }).then((r) => r.data),
   commande: (id: number | string) => api.get<{ data: CommandeClient }>(`/client/commandes/${id}`).then((r) => r.data.data),
   commander: (payload: CommandeClientPayload) =>
-    api.post<{ data: { id: number; numero: string; total: number; statut: string } }>("/client/commandes", payload).then((r) => r.data.data),
-  ajouterLignes: (id: number, lignes: LigneDemandee[]) =>
+    api.post<{ data: { id: number; cle?: string; numero: string; total: number; statut: string } }>("/client/commandes", payload).then((r) => r.data.data),
+  ajouterLignes: (id: number | string, lignes: LigneDemandee[]) =>
     api.post<{ data: CommandeClient }>(`/client/commandes/${id}/lignes`, { lignes }).then((r) => r.data.data),
-  annoter: (id: number, contenu: string) =>
+  annoter: (id: number | string, contenu: string) =>
     api.post<{ data: CommandeClient }>(`/client/commandes/${id}/annotations`, { contenu }).then((r) => r.data.data),
 };
 

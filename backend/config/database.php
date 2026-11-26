@@ -58,10 +58,11 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
-            'engine' => null,
+            // InnoDB obligatoire : transactions (tout ou rien) et verrous de stock.
+            'engine' => env('DB_ENGINE', 'InnoDB'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                \PDO::ATTR_PERSISTENT => false,
+                PDO::ATTR_PERSISTENT => false,
             ]) : [],
         ],
 
@@ -79,10 +80,11 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
-            'engine' => null,
+            // InnoDB obligatoire : transactions (tout ou rien) et verrous de stock.
+            'engine' => env('DB_ENGINE', 'InnoDB'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                \PDO::ATTR_PERSISTENT => false,
+                PDO::ATTR_PERSISTENT => false,
             ]) : [],
         ],
 

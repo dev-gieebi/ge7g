@@ -47,7 +47,7 @@ export function QuotesPage() {
         isLoading={isLoading}
         error={errorMessage}
         rowKey={(q) => q.id}
-        onCardClick={(q) => navigate(`/admin/devis/${q.id}`)}
+        onCardClick={(q) => navigate(`/admin/devis/${q.cle ?? q.id}`)}
         page={list.page}
         onPageChange={list.setPage}
         emptyTitle="Aucune proforma"

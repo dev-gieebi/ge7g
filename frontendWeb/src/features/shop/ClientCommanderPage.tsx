@@ -57,7 +57,7 @@ export function ClientCommanderPage() {
     onSuccess: (data) => {
       majLignes([]);
       void qc.invalidateQueries({ queryKey: ["client"] });
-      navigate(`/mon-compte/commandes/${data.id}`, { state: { nouvelle: true } });
+      navigate(`/mon-compte/commandes/${data.cle ?? data.id}`, { state: { nouvelle: true } });
     },
     onError: (e) => setErrors(fieldErrors(e)),
   });

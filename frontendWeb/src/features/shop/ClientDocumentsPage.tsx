@@ -6,7 +6,7 @@ import { date, money } from "@/lib/format";
 import { ErrorState, Loading } from "@/components/ui";
 import { Facture } from "@/features/pos/Facture";
 import { clientApi } from "./espaceClient";
-import { documentCommande } from "./ClientOrderDetailPage";
+import { documentBon, documentCommande } from "./ClientOrderDetailPage";
 
 /** Archive du client : une entrée par commande facturée, facture et bon de livraison rangés ensemble. */
 export function ClientDocumentsPage() {
@@ -34,7 +34,7 @@ export function ClientDocumentsPage() {
             {data.data.map((d) => (
               <li key={d.commande_id}>
                 <Link
-                  to={`/mon-compte/documents/${d.commande_id}`}
+                  to={`/mon-compte/documents/${d.cle ?? d.commande_id}`}
                   className="flex items-center gap-3 rounded-2xl border border-ge7-black/10 bg-white px-4 py-3.5 transition hover:border-ge7-gold/60 hover:shadow-soft"
                 >
                   <div className="min-w-0 flex-1">
@@ -77,7 +77,8 @@ export function ClientDocumentsPage() {
 export function ClientDocumentViewerPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [doc, setDoc] = useState<"facture" | "bl">("facture");
+  // Facture, ou bon de livraison d'un envoi (n° du bon) : un bon par livraison partielle.
+  const [doc, setDoc] = useState<string>("facture");
   const { data: c, isLoading, isError } = useQuery({
     queryKey: ["client", "commande", id],
     queryFn: () => clientApi.commande(id!),
@@ -87,7 +88,9 @@ export function ClientDocumentViewerPage() {
   if (isLoading) return <Loading />;
   if (isError || !c || !c.facture) return <ErrorState message="Document introuvable." />;
 
-  const estBl = doc === "bl" && !!c.bon_livraison;
+  const bons = c.bons_livraison ?? [];
+  const bonChoisi = bons.find((b) => b.numero === doc);
+  const estBl = !!bonChoisi;
   const bouton = (actif: boolean) =>
     `flex w-full items-center gap-2.5 rounded-xl px-3.5 py-3 text-left text-sm font-bold transition ${actif ? "bg-ge7-black text-ge7-gold-light" : "bg-white text-ge7-black/75 hover:bg-ge7-gold-soft/50"}`;
 
@@ -96,7 +99,7 @@ export function ClientDocumentViewerPage() {
       <div className="no-print mb-4 flex flex-wrap items-center gap-2">
         <button onClick={() => navigate("/mon-compte/documents")} className="inline-flex items-center gap-1.5 rounded-full border border-ge7-black/15 bg-white px-4 py-2 text-sm font-semibold"><ArrowLeft size={15} /> Mes documents</button>
         <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-full bg-ge7-gold px-4 py-2 text-sm font-bold text-ge7-black"><Printer size={15} /> Imprimer / PDF</button>
-        <Link to={`/mon-compte/commandes/${c.id}`} className="text-sm font-semibold text-ge7-purple hover:underline">Suivi de la commande {c.numero}</Link>
+        <Link to={`/mon-compte/commandes/${c.cle ?? c.id}`} className="text-sm font-semibold text-ge7-purple hover:underline">Suivi de la commande {c.numero}</Link>
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
@@ -108,18 +111,31 @@ export function ClientDocumentViewerPage() {
               <span className="block truncate text-[11px] font-semibold opacity-70">{c.facture.numero}{c.facture.soldee_le ? " · soldée" : ""}</span>
             </span>
           </button>
-          <button onClick={() => setDoc("bl")} disabled={!c.bon_livraison} className={`${bouton(estBl)} disabled:cursor-not-allowed disabled:opacity-45`}>
-            <FileText size={17} />
-            <span className="min-w-0">
-              Bon de livraison
-              <span className="block truncate text-[11px] font-semibold opacity-70">{c.bon_livraison?.numero ?? "Après la livraison"}</span>
-            </span>
-          </button>
+          {/* Un bon de livraison par envoi, avec les seules quantités de cet envoi. */}
+          {bons.length > 0 ? (
+            bons.map((b) => (
+              <button key={b.numero} onClick={() => setDoc(b.numero)} className={bouton(doc === b.numero)}>
+                <FileText size={17} />
+                <span className="min-w-0">
+                  Bon de livraison
+                  <span className="block truncate text-[11px] font-semibold opacity-70">{b.numero}{b.livre_le ? ` · ${date(b.livre_le)}` : ""}</span>
+                </span>
+              </button>
+            ))
+          ) : (
+            <button disabled className={`${bouton(false)} cursor-not-allowed opacity-45`}>
+              <FileText size={17} />
+              <span className="min-w-0">
+                Bon de livraison
+                <span className="block truncate text-[11px] font-semibold opacity-70">Après la livraison</span>
+              </span>
+            </button>
+          )}
         </nav>
 
         <div className="min-w-0 flex-1">
           <Facture
-            sale={documentCommande(c, estBl)}
+            sale={bonChoisi ? documentBon(c, bonChoisi) : documentCommande(c, false)}
             originLabel={`Commande : ${c.numero}`}
             docTitle={estBl ? "BON DE LIVRAISON" : "FACTURE"}
             solde={!estBl && !!c.facture.soldee_le}

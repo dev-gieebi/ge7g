@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\BonLivraison;
 use App\Models\Commande;
 use App\Models\Product;
 use App\Models\StockMovement;
@@ -15,8 +16,11 @@ use Illuminate\Validation\ValidationException;
  */
 class StockService
 {
-    /** Déduit le stock d'une ligne de commande livrée (stock réel obligatoire). */
-    public function deduire(int $produitId, float $quantite, Commande $commande, ?User $user, ?string $note = null): void
+    /**
+     * Déduit le stock d'une ligne de commande livrée (stock réel obligatoire).
+     * `$bon` : bon de livraison de l'envoi, référencé sur le mouvement (suivi du stock).
+     */
+    public function deduire(int $produitId, float $quantite, Commande $commande, ?User $user, ?string $note = null, ?BonLivraison $bon = null): void
     {
         $produit = Product::lockForUpdate()->findOrFail($produitId);
 
@@ -35,9 +39,9 @@ class StockService
             'type' => 'SORTIE_VENTE',
             'quantity' => -$quantite,
             'balance_after' => $produit->stock_quantity,
-            'reference_type' => 'Commande',
-            'reference_id' => $commande->id,
-            'reference_number' => $commande->numero,
+            'reference_type' => $bon ? 'BonLivraison' : 'Commande',
+            'reference_id' => $bon?->id ?? $commande->id,
+            'reference_number' => $bon?->numero ?? $commande->numero,
             'note' => $note ?? 'Vente boutique en ligne '.$commande->numero,
             'user_id' => $user?->id,
         ]);

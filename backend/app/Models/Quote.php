@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AUneCleUrl;
 use Database\Factories\QuoteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,8 +14,13 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 #[Fillable(['number', 'user_id', 'zone_id', 'customer_name', 'customer_phone', 'customer_address', 'subtotal', 'discount_rate', 'tax_type', 'tax_rate', 'tax_amount', 'tax_details', 'total', 'status', 'valid_until', 'notes'])]
 class Quote extends Model
 {
+    /** Clé opaque dans les adresses (URL) à la place de l'identifiant. */
+    use AUneCleUrl;
+
     /** @use HasFactory<QuoteFactory> */
     use HasFactory;
+
+    protected $appends = ['cle'];
 
     protected function casts(): array
     {

@@ -48,7 +48,7 @@ export function documentCommande(c: CommandeClient, bl: boolean): PosSale {
 }
 
 /** Bon de livraison d'un envoi (livraison partielle) : seulement les quantités envoyées. */
-function documentBon(c: CommandeClient, bon: CommandeClient["bons_livraison"][number]): PosSale {
+export function documentBon(c: CommandeClient, bon: CommandeClient["bons_livraison"][number]): PosSale {
   const base = documentCommande(c, true);
   const items = bon.lignes.map((x, i) => {
     const ligne = c.lignes.find((l) => l.designation === x.designation);
@@ -92,12 +92,12 @@ export function ClientOrderDetailPage() {
     void qc.invalidateQueries({ queryKey: ["client", "commandes"] });
   };
   const annoter = useMutation({
-    mutationFn: (contenu: string) => clientApi.annoter(Number(id), contenu),
+    mutationFn: (contenu: string) => clientApi.annoter(id!, contenu),
     onSuccess: (data) => { majCache(data); notify("Annotation envoyée"); },
     onError: (e) => notify(toApiError(e).message, "error"),
   });
   const ajouterLignes = useMutation({
-    mutationFn: (lignes: LigneLocale[]) => clientApi.ajouterLignes(Number(id), versPayload(lignes)),
+    mutationFn: (lignes: LigneLocale[]) => clientApi.ajouterLignes(id!, versPayload(lignes)),
     onSuccess: (data) => { majCache(data); setAjout(null); notify("Produits ajoutés à la commande"); },
     onError: (e) => notify(toApiError(e).message, "error"),
   });
@@ -170,7 +170,7 @@ export function ClientOrderDetailPage() {
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           <p className="flex items-center gap-2"><Check size={17} /> <span><strong>Livrée le {datetime(c.livraison.livree_le)}</strong>{c.livraison.receptionnaire ? `, reçue par ${c.livraison.receptionnaire}` : ""}.</span></p>
           {c.bon_livraison && (
-            <button onClick={() => setDoc("bl")} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-700 px-4 py-2 text-sm font-bold text-white"><FileText size={15} /> Bon de livraison {c.bon_livraison.numero}</button>
+            <button onClick={() => setDoc(`bl:${c.bon_livraison!.numero}`)} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-700 px-4 py-2 text-sm font-bold text-white"><FileText size={15} /> Bon de livraison {c.bon_livraison.numero}</button>
           )}
         </div>
       )}
@@ -182,8 +182,10 @@ export function ClientOrderDetailPage() {
               <CommandeMap latitude={c.position.latitude} longitude={c.position.longitude} majLe={c.position.maj_le} label={`${c.chauffeur ?? "Le chauffeur"} · commande ${c.numero}`} height="h-80" />
               <p className="mt-2 flex items-center gap-1.5 text-xs text-ge7-black/50"><MapPin size={13} className="text-ge7-purple" /> Position actualisée {relative(c.position.maj_le)}.</p>
             </>
-          ) : (
+          ) : c.chauffeur ? (
             <p className="flex items-center gap-2 rounded-2xl border border-ge7-black/10 bg-white px-4 py-3 text-sm text-ge7-black/60"><MapPin size={15} className="text-ge7-purple" /> En attente de la position du chauffeur…</p>
+          ) : (
+            <p className="flex items-center gap-2 rounded-2xl border border-ge7-black/10 bg-white px-4 py-3 text-sm text-ge7-black/70"><Truck size={15} className="text-ge7-purple" /> Un envoi de votre commande est en route. Le détail des quantités envoyées figure dans « Livraisons » ci-dessous.</p>
           )}
         </div>
       )}
@@ -273,7 +275,7 @@ export function ClientOrderDetailPage() {
                 </button>
               )}
               {c.bon_livraison && (
-                <button onClick={() => setDoc("bl")} className="block font-semibold text-ge7-purple hover:underline">
+                <button onClick={() => setDoc(`bl:${c.bon_livraison!.numero}`)} className="block font-semibold text-ge7-purple hover:underline">
                   Bon de livraison {c.bon_livraison.numero}
                 </button>
               )}

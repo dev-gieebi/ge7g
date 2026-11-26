@@ -39,6 +39,7 @@ class ClientCommandeResource extends JsonResource
 
         return [
             'id' => $this->id,
+            'cle' => $this->cle,
             'numero' => $this->numero,
             'statut' => $this->statut->value,
             'statut_libelle' => $this->statut->libelle(),
@@ -74,7 +75,7 @@ class ClientCommandeResource extends JsonResource
             'total' => $prix ? (int) $this->total : null,
             'extras' => $prix ? $this->extras->map(fn ($e) => ['label' => $e->label, 'amount' => (float) $e->amount])->values() : [],
             'facture' => $this->facture ? [
-                'numero' => $this->facture->numero,
+                'numero' => $this->facture->numeroAffiche(),
                 'statut_paiement' => $this->facture->statut_paiement,
                 'montant_total' => (int) $this->facture->montant_total,
                 'encaisse' => (int) $this->facture->paiements->sum('montant'),

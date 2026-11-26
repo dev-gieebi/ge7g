@@ -287,18 +287,81 @@ class EspaceClientTest extends TestCase
 
         $id = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p))->json('data.id');
 
+        // Même produit ajouté : une seule ligne, quantités cumulées (2 + 1 = 3).
         $this->actingAs($compte, 'api')->postJson("/api/client/commandes/{$id}/lignes", [
             'lignes' => [['produit_id' => $p->id, 'quantite' => 1], ['designation' => 'Gaine ICTA 20', 'quantite' => 5]],
-        ])->assertOk()->assertJsonCount(3, 'data.lignes');
+        ])->assertOk()
+            ->assertJsonCount(2, 'data.lignes')
+            ->assertJsonPath('data.lignes.0.quantite', 3);
         $this->assertEquals(30000, (int) Commande::findOrFail($id)->total);
 
+        // Même produit hors catalogue redemandé (casse différente) : cumulé aussi.
+        $this->actingAs($compte, 'api')->postJson("/api/client/commandes/{$id}/lignes", [
+            'lignes' => [['designation' => 'gaine icta 20', 'quantite' => 2]],
+        ])->assertOk()->assertJsonCount(2, 'data.lignes')->assertJsonPath('data.lignes.1.quantite', 7);
+
+        // L'équipe référence la gaine vers un produit déjà dans la commande : fusion des lignes.
         $ligne = Commande::findOrFail($id)->lignes()->whereNull('produit_id')->firstOrFail();
-        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/lignes/{$ligne->id}", ['produit_id' => $p->id, 'prix_unitaire' => 300])->assertOk();
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/lignes/{$ligne->id}", ['produit_id' => $p->id, 'prix_unitaire' => 300])
+            ->assertOk()
+            ->assertJsonCount(1, 'data.lignes')
+            ->assertJsonPath('data.lignes.0.quantite', 10)
+            ->assertJsonPath('data.total', 3000);
         $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/valider")->assertOk();
 
         $this->actingAs($compte, 'api')->postJson("/api/client/commandes/{$id}/lignes", [
             'lignes' => [['produit_id' => $p->id, 'quantite' => 1]],
         ])->assertUnprocessable();
+    }
+
+    public function test_lignes_en_double_deja_enregistrees_sont_regroupees(): void
+    {
+        $compte = $this->creerCompteClient();
+        $admin = User::factory()->create(['role' => 'LG_ADMIN']);
+        $fer = $this->produit(['name' => 'Fer A de 12', 'sale_price' => 1000]);
+
+        $id = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($fer, ['lignes' => [['produit_id' => $fer->id, 'quantite' => 1]]]))->json('data.id');
+        $this->actingAs($admin, 'api')->postJson("/api/commandes/{$id}/valider")->assertOk();
+
+        // Ancienne commande : même produit sur deux lignes (1 barre + 25 barres), en double aussi dans la vente.
+        $commande = Commande::findOrFail($id);
+        $ligne = $commande->lignes()->firstOrFail();
+        $commande->lignes()->create(['produit_id' => $fer->id, 'designation' => $ligne->designation, 'prix_unitaire' => 1000, 'quantite' => 25, 'total_ligne' => 25000]);
+        $vente = $commande->facture->vente;
+        $vente->items()->create(['product_id' => $fer->id, 'quantity' => 25, 'delivered_quantity' => 0, 'unit_price' => 1000, 'total' => 25000]);
+
+        (require database_path('migrations/2026_11_26_123659_fusionner_lignes_en_double_des_commandes.php'))->up();
+
+        $this->actingAs($compte, 'api')->getJson("/api/client/commandes/{$id}")
+            ->assertJsonCount(1, 'data.lignes')
+            ->assertJsonPath('data.lignes.0.quantite', 26)
+            ->assertJsonPath('data.lignes.0.total_ligne', 26000);
+        $this->actingAs($admin, 'api')->getJson("/api/commandes/{$id}")->assertJsonCount(1, 'data.lignes');
+        $this->assertSame(1, $vente->items()->count());
+        $this->assertEquals(26, (float) $vente->items()->value('quantity'));
+    }
+
+    public function test_adresse_de_la_commande_par_cle_opaque(): void
+    {
+        $compte = $this->creerCompteClient();
+        $p = $this->produit();
+
+        $cree = $this->actingAs($compte, 'api')->postJson('/api/client/commandes', $this->payload($p))->assertCreated();
+        $id = $cree->json('data.id');
+        $cle = $cree->json('data.cle');
+
+        // La clé ne contient pas l'identifiant en clair et ouvre la commande.
+        $this->assertMatchesRegularExpression('/^[0-9A-Za-z]{16}_[0-9a-z]+$/', $cle);
+        $this->actingAs($compte, 'api')->getJson("/api/client/commandes/{$cle}")->assertOk()->assertJsonPath('data.id', $id);
+        $this->actingAs($compte, 'api')->getJson('/api/client/commandes')->assertJsonPath('data.0.cle', $cle);
+
+        // Clé modifiée ou fabriquée pour un autre numéro : introuvable.
+        $falsifiee = 'AAAAAAAAAAAAAAAA_'.base_convert((string) $id, 10, 36);
+        $this->actingAs($compte, 'api')->getJson("/api/client/commandes/{$falsifiee}")->assertNotFound();
+
+        // Clé valide d'une commande d'un autre client : toujours refusée.
+        $autre = Commande::create(['numero' => 'CMD-99999-2026', 'client_id' => $compte->client_id, 'nom_livraison' => 'X', 'telephone_livraison' => 'X', 'ville' => 'X', 'quartier' => 'X', 'point_repere' => 'X', 'total' => 0, 'statut' => 'en_attente']);
+        $this->actingAs($compte, 'api')->getJson("/api/client/commandes/{$autre->cle}")->assertNotFound();
     }
 
     public function test_facture_soldee_definitivement_et_visible_du_client(): void

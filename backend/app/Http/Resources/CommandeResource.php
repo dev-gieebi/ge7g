@@ -21,6 +21,7 @@ class CommandeResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'cle' => $this->cle,
             'numero' => $this->numero,
             'statut' => $this->statut->value,
             'statut_libelle' => $this->statut->libelle(),
@@ -74,7 +75,7 @@ class CommandeResource extends JsonResource
             'chauffeur' => $this->chauffeur ? ['id' => $this->chauffeur->id, 'nom' => $this->chauffeur->name] : null,
             'facture' => $this->whenLoaded('facture', fn () => $this->facture ? [
                 'id' => $this->facture->id,
-                'numero' => $this->facture->numero,
+                'numero' => $this->facture->numeroAffiche(),
                 'statut_paiement' => $this->facture->statut_paiement,
                 'montant_total' => (int) $this->facture->montant_total,
                 'encaisse' => (int) $this->facture->paiements->sum('montant'),

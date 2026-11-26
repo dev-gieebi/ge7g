@@ -137,7 +137,7 @@ export function OrderDetailPage() {
   const preparer = useAction(() => `/commandes/${id}/preparer`, { keys: KEYS, success: "Commande passée en préparation" });
   const livraisonPartielle = useAction<{ lignes: { id: number; quantite: number }[] }>(
     () => `/commandes/${id}/livraison-partielle`,
-    { keys: [...KEYS, "products", "stock-movements", "pos-products"], success: "Livraison enregistrée stock mis à jour", body: (v) => v },
+    { keys: [...KEYS, "products", "stock-movements", "pos-products"], success: "Envoi parti en livraison stock mis à jour", body: (v) => v },
   );
   const actionMotif = useAction<{ action: MotifAction; valeur: string }>(
     (v) => `/commandes/${id}/${v.action}`,
@@ -151,7 +151,7 @@ export function OrderDetailPage() {
   //   { keys: KEYS, success: "Livraison enregistrée", body: (v) => v },
   // );
   // En attendant : un simple clic marque la commande livrée.
-  const doLivrer = useAction(() => `/commandes/${id}/livrer`, { keys: KEYS, success: "Commande marquée livrée" });
+  const doLivrer = useAction(() => `/commandes/${id}/livrer`, { keys: KEYS, success: "Livraison confirmée" });
   const modifierLigne = useAction<{ ligne: number; produit_id?: number; prix_unitaire?: number }>(
     (v) => `/commandes/${id}/lignes/${v.ligne}`,
     { keys: KEYS, success: "Ligne mise à jour", body: ({ produit_id, prix_unitaire }) => ({ produit_id, prix_unitaire }) },
@@ -245,7 +245,10 @@ export function OrderDetailPage() {
   // Aperçu d'impression : même modèle A4 que la facture d'achat caisse,
   // avec la mention « Commande en ligne » pour distinguer la provenance.
   if (impression) {
-    const bonChoisi = typeof impression === "number" ? c.bons_livraison?.find((b) => b.id === impression) : undefined;
+    // Un bon de livraison par envoi : le bouton du haut imprime le dernier, la carte « Livraisons » chacun.
+    const bonChoisi = typeof impression === "number"
+      ? c.bons_livraison?.find((b) => b.id === impression)
+      : impression === "bl" ? c.bons_livraison?.at(-1) : undefined;
     const estBl = impression === "bl" || !!bonChoisi;
     // Bon d'un envoi précis : ses quantités. Sinon le BL généré à la livraison
     // porte son propre numéro (BL-xxxxx-AAAA) ; avant, aperçu au n° de commande.
@@ -345,7 +348,10 @@ export function OrderDetailPage() {
         action={
           <>
             {imprimable && (
-              <Button variant="secondary" onClick={() => setImpression("bl")}><Printer size={16} /> {c.bon_livraison ? `BL ${c.bon_livraison.numero}` : "Bon de livraison"}</Button>
+              // Bon de livraison du dernier envoi (chaque envoi a le sien, voir « Livraisons »).
+              (c.bons_livraison?.length ?? 0) > 0 && (
+                <Button variant="secondary" onClick={() => setImpression("bl")}><Printer size={16} /> BL {c.bons_livraison!.at(-1)!.numero}</Button>
+              )
             )}
             <Button variant="secondary" onClick={() => setCommentaires(true)}>
               <MessageSquareText size={16} /> Commentaires
@@ -394,7 +400,22 @@ export function OrderDetailPage() {
                 <Button
                   loading={doLivrer.isPending}
                   onClick={async () => {
-                    if (await confirmer({ titre: "Commande livrée ?", message: `Marquer la commande ${c.numero} comme livrée ? Le bon de livraison sera créé.`, bouton: "Marquer livrée", danger: false })) doLivrer.mutate();
+                    // Envoi arrivé chez le client : la commande reste en cours tant qu'il reste à livrer.
+                    const restes = c.lignes.filter((l) => l.reste > 0);
+                    const ok = await confirmer({
+                      titre: "Envoi livré ?",
+                      message: restes.length > 0 ? (
+                        <>
+                          Confirmer que cet envoi est arrivé chez le client ? La commande <b>{c.numero}</b> reste en cours : il reste à livrer
+                          <ul className="mt-2 list-disc pl-5">{restes.map((l) => <li key={l.id}>{l.reste} {l.unite ?? ""} de « {l.designation} »</li>)}</ul>
+                        </>
+                      ) : (
+                        <>Confirmer que cet envoi est arrivé chez le client ? Tout est livré : la commande <b>{c.numero}</b> passera « Livrée ».</>
+                      ),
+                      bouton: "Confirmer la livraison",
+                      danger: false,
+                    });
+                    if (ok) doLivrer.mutate();
                   }}
                 >
                   <PackageCheck size={16} /> Livrée
@@ -515,7 +536,7 @@ export function OrderDetailPage() {
           {envoi && (
             <Modal
               title="Mettre en livraison"
-              subtitle="Quantité à envoyer maintenant pour chaque produit. Seule cette quantité sort du stock ; le reste sera livré plus tard."
+              subtitle="Quantité à envoyer maintenant pour chaque produit. Seule cette quantité sort du stock ; la commande passe « en cours de livraison ». Cliquez « Livrée » à son arrivée chez le client."
               size="lg"
               onClose={() => setEnvoi(null)}
               footer={
@@ -534,7 +555,7 @@ export function OrderDetailPage() {
                         titre: "Enregistrer la livraison ?",
                         message: (
                           <>
-                            Ces quantités sortent du stock et un bon de livraison est créé :
+                            Ces quantités sortent du stock, un bon de livraison est créé et la commande part en livraison :
                             <ul className="mt-2 list-disc pl-5">
                               {lignes.map((x) => <li key={x.id}>{x.quantite} {x.l.unite ?? ""} de « {x.l.designation} » (reste ensuite {Math.max(0, x.l.reste - x.quantite)})</li>)}
                             </ul>
